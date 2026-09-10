@@ -1,0 +1,78 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!--
+        Paleta Catppuccin (https://catppuccin.com) - Mocha jako ciemny wariant, Latte jako jasny.
+        Nazwy kluczy 1:1 z oficjalnymi rolami palety, zeby styl nie musial ich tlumaczyc.
+        SystemAccentColor nadpisuje akcent FluentTheme (podkreslenia zakladek, focus, itp.)
+        mauve'em Catppuccin, tak zeby wbudowane kontrolki tez zlapaly akcent bez wlasnego stylu.
+    -->
+    <ResourceDictionary.ThemeDictionaries>
+
+        <ResourceDictionary x:Key="Dark">
+            <Color x:Key="SystemAccentColor">#cba6f7</Color>
+
+            <SolidColorBrush x:Key="CtpRosewater" Color="#f5e0dc" />
+            <SolidColorBrush x:Key="CtpFlamingo" Color="#f2cdcd" />
+            <SolidColorBrush x:Key="CtpPink" Color="#f5c2e7" />
+            <SolidColorBrush x:Key="CtpMauve" Color="#cba6f7" />
+            <SolidColorBrush x:Key="CtpRed" Color="#f38ba8" />
+            <SolidColorBrush x:Key="CtpMaroon" Color="#eba0ac" />
+            <SolidColorBrush x:Key="CtpPeach" Color="#fab387" />
+            <SolidColorBrush x:Key="CtpYellow" Color="#f9e2af" />
+            <SolidColorBrush x:Key="CtpGreen" Color="#a6e3a1" />
+            <SolidColorBrush x:Key="CtpTeal" Color="#94e2d5" />
+            <SolidColorBrush x:Key="CtpSky" Color="#89dceb" />
+            <SolidColorBrush x:Key="CtpSapphire" Color="#74c7ec" />
+            <SolidColorBrush x:Key="CtpBlue" Color="#89b4fa" />
+            <SolidColorBrush x:Key="CtpLavender" Color="#b4befe" />
+
+            <SolidColorBrush x:Key="CtpText" Color="#cdd6f4" />
+            <SolidColorBrush x:Key="CtpSubtext1" Color="#bac2de" />
+            <SolidColorBrush x:Key="CtpSubtext0" Color="#a6adc8" />
+            <SolidColorBrush x:Key="CtpOverlay2" Color="#9399b2" />
+            <SolidColorBrush x:Key="CtpOverlay1" Color="#7f849c" />
+            <SolidColorBrush x:Key="CtpOverlay0" Color="#6c7086" />
+            <SolidColorBrush x:Key="CtpSurface2" Color="#585b70" />
+            <SolidColorBrush x:Key="CtpSurface1" Color="#45475a" />
+            <SolidColorBrush x:Key="CtpSurface0" Color="#313244" />
+            <SolidColorBrush x:Key="CtpBase" Color="#1e1e2e" />
+            <SolidColorBrush x:Key="CtpMantle" Color="#181825" />
+            <SolidColorBrush x:Key="CtpCrust" Color="#11111b" />
+        </ResourceDictionary>
+
+        <ResourceDictionary x:Key="Light">
+            <Color x:Key="SystemAccentColor">#8839ef</Color>
+
+            <SolidColorBrush x:Key="CtpRosewater" Color="#dc8a78" />
+            <SolidColorBrush x:Key="CtpFlamingo" Color="#dd7878" />
+            <SolidColorBrush x:Key="CtpPink" Color="#ea76cb" />
+            <SolidColorBrush x:Key="CtpMauve" Color="#8839ef" />
+            <SolidColorBrush x:Key="CtpRed" Color="#d20f39" />
+            <SolidColorBrush x:Key="CtpMaroon" Color="#e64553" />
+            <SolidColorBrush x:Key="CtpPeach" Color="#fe640b" />
+            <SolidColorBrush x:Key="CtpYellow" Color="#df8e1d" />
+            <SolidColorBrush x:Key="CtpGreen" Color="#40a02b" />
+            <SolidColorBrush x:Key="CtpTeal" Color="#179299" />
+            <SolidColorBrush x:Key="CtpSky" Color="#04a5e5" />
+            <SolidColorBrush x:Key="CtpSapphire" Color="#209fb5" />
+            <SolidColorBrush x:Key="CtpBlue" Color="#1e66f5" />
+            <SolidColorBrush x:Key="CtpLavender" Color="#7287fd" />
+
+            <SolidColorBrush x:Key="CtpText" Color="#4c4f69" />
+            <SolidColorBrush x:Key="CtpSubtext1" Color="#5c5f77" />
+            <SolidColorBrush x:Key="CtpSubtext0" Color="#6c6f85" />
+            <SolidColorBrush x:Key="CtpOverlay2" Color="#7c7f93" />
+            <SolidColorBrush x:Key="CtpOverlay1" Color="#8c8fa1" />
+            <SolidColorBrush x:Key="CtpOverlay0" Color="#9ca0b0" />
+            <SolidColorBrush x:Key="CtpSurface2" Color="#acb0be" />
+            <SolidColorBrush x:Key="CtpSurface1" Color="#bcc0cc" />
+            <SolidColorBrush x:Key="CtpSurface0" Color="#ccd0da" />
+            <SolidColorBrush x:Key="CtpBase" Color="#eff1f5" />
+            <SolidColorBrush x:Key="CtpMantle" Color="#e6e9ef" />
+            <SolidColorBrush x:Key="CtpCrust" Color="#dce0e8" />
+        </ResourceDictionary>
+
+    </ResourceDictionary.ThemeDictionaries>
+
+</ResourceDictionary>

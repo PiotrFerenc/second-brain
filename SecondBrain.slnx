@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="SecondBrain.Core/SecondBrain.Core.csproj" />
+  <Project Path="SecondBrain.Desktop/SecondBrain.Desktop.csproj" />
+  <Project Path="SecondBrain.Infrastructure/SecondBrain.Infrastructure.csproj" />
+  <Project Path="SecondBrain.PipelineTest/SecondBrain.PipelineTest.csproj" />
+</Solution>

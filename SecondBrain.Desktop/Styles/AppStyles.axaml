@@ -1,0 +1,150 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- Fluent zostaje jako baza (zachowanie kontrolek, uklad, dostepnosc) - tu tylko
+         nadajemy kolor Catppuccin i lagodniejsze, "notesowe" ksztalty niz domyslny Fluent. -->
+
+    <Style Selector="Window">
+        <Setter Property="Background" Value="{DynamicResource CtpMantle}" />
+        <Setter Property="FontSize" Value="14" />
+    </Style>
+
+    <Style Selector="TextBlock">
+        <Setter Property="Foreground" Value="{DynamicResource CtpText}" />
+    </Style>
+    <Style Selector="TextBlock.subtle">
+        <Setter Property="Foreground" Value="{DynamicResource CtpSubtext1}" />
+    </Style>
+    <Style Selector="TextBlock.label">
+        <Setter Property="Foreground" Value="{DynamicResource CtpSubtext1}" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="LetterSpacing" Value="0.4" />
+    </Style>
+
+    <!-- Przyciski: domyslnie subtelne (ghost), klasa .accent = akcja glowna -->
+    <Style Selector="Button">
+        <Setter Property="Background" Value="{DynamicResource CtpSurface0}" />
+        <Setter Property="Foreground" Value="{DynamicResource CtpText}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource CtpSurface2}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="6" />
+        <Setter Property="Padding" Value="14,9" />
+        <Setter Property="FontWeight" Value="Medium" />
+        <Setter Property="Cursor" Value="Hand" />
+    </Style>
+    <Style Selector="Button:pointerover">
+        <Setter Property="Background" Value="{DynamicResource CtpSurface1}" />
+    </Style>
+    <Style Selector="Button:pressed">
+        <Setter Property="Background" Value="{DynamicResource CtpSurface2}" />
+    </Style>
+    <Style Selector="Button:disabled">
+        <Setter Property="Opacity" Value="0.5" />
+    </Style>
+    <Style Selector="Button:focus-visible /template/ ContentPresenter">
+        <Setter Property="BorderBrush" Value="{DynamicResource CtpMauve}" />
+        <Setter Property="BorderThickness" Value="2" />
+    </Style>
+
+    <Style Selector="Button.accent">
+        <Setter Property="Background" Value="{DynamicResource CtpMauve}" />
+        <Setter Property="Foreground" Value="{DynamicResource CtpBase}" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector="Button.accent:pointerover">
+        <Setter Property="Opacity" Value="0.92" />
+    </Style>
+    <Style Selector="Button.accent:pressed">
+        <Setter Property="Opacity" Value="0.8" />
+    </Style>
+    <Style Selector="Button.accent:disabled">
+        <Setter Property="Opacity" Value="0.4" />
+    </Style>
+
+    <!-- Pola tekstowe -->
+    <Style Selector="TextBox">
+        <Setter Property="Background" Value="{DynamicResource CtpSurface0}" />
+        <Setter Property="Foreground" Value="{DynamicResource CtpText}" />
+        <Setter Property="CaretBrush" Value="{DynamicResource CtpMauve}" />
+        <Setter Property="SelectionBrush" Value="{DynamicResource CtpMauve}" />
+        <Setter Property="PlaceholderForeground" Value="{DynamicResource CtpOverlay2}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource CtpSurface2}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="6" />
+        <Setter Property="Padding" Value="10,8" />
+    </Style>
+    <Style Selector="TextBox:pointerover">
+        <Setter Property="BorderBrush" Value="{DynamicResource CtpOverlay1}" />
+    </Style>
+    <Style Selector="TextBox:focus">
+        <Setter Property="BorderBrush" Value="{DynamicResource CtpMauve}" />
+        <Setter Property="BorderThickness" Value="2" />
+    </Style>
+
+    <!-- Edytor notatki: bez ramki i tla, ma wygladac jak czesc "kartki", nie jak pole
+         formularza - w tym w stanach hover/focus, ktore FluentTheme domyslnie maluje
+         na innym tle nawet gdy Background jest juz ustawione na Transparent. -->
+    <Style Selector="TextBox.editor">
+        <Style.Resources>
+            <SolidColorBrush x:Key="TextControlBackground" Color="Transparent" />
+            <SolidColorBrush x:Key="TextControlBackgroundPointerOver" Color="Transparent" />
+            <SolidColorBrush x:Key="TextControlBackgroundFocused" Color="Transparent" />
+            <SolidColorBrush x:Key="TextControlBackgroundDisabled" Color="Transparent" />
+        </Style.Resources>
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Padding" Value="0" />
+    </Style>
+    <Style Selector="TextBox.editor:pointerover /template/ Border#PART_BorderElement">
+        <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector="TextBox.editor:focus /template/ Border#PART_BorderElement">
+        <Setter Property="Background" Value="Transparent" />
+    </Style>
+
+    <!-- Listy: sidebar folderow, wyniki wyszukiwania -->
+    <Style Selector="ListBox">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Padding" Value="0" />
+    </Style>
+    <Style Selector="ListBoxItem">
+        <Setter Property="Padding" Value="10,9" />
+        <Setter Property="Margin" Value="0,1" />
+        <Setter Property="CornerRadius" Value="6" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Foreground" Value="{DynamicResource CtpText}" />
+    </Style>
+    <Style Selector="ListBoxItem:pointerover /template/ ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource CtpSurface0}" />
+    </Style>
+    <Style Selector="ListBoxItem:selected /template/ ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource CtpSurface1}" />
+    </Style>
+    <Style Selector="ListBoxItem:focus-visible /template/ ContentPresenter">
+        <Setter Property="BorderBrush" Value="{DynamicResource CtpMauve}" />
+        <Setter Property="BorderThickness" Value="1.5" />
+    </Style>
+
+    <!-- Zakladki -->
+    <Style Selector="TabControl">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Padding" Value="0" />
+    </Style>
+    <Style Selector="TabItem">
+        <Setter Property="Padding" Value="4,10" />
+        <Setter Property="Margin" Value="0,0,20,0" />
+        <Setter Property="Foreground" Value="{DynamicResource CtpSubtext1}" />
+        <Setter Property="FontWeight" Value="Medium" />
+        <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector="TabItem:pointerover">
+        <Setter Property="Foreground" Value="{DynamicResource CtpText}" />
+    </Style>
+    <Style Selector="TabItem:selected">
+        <Setter Property="Foreground" Value="{DynamicResource CtpMauve}" />
+    </Style>
+
+</Styles>

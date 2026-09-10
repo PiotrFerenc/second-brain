@@ -1,0 +1,184 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:SecondBrain.Desktop.ViewModels"
+        xmlns:conv="using:SecondBrain.Desktop.Converters"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="1040" d:DesignHeight="680"
+        x:Class="SecondBrain.Desktop.Views.MainWindow"
+        x:DataType="vm:MainViewModel"
+        Width="1040" Height="680"
+        Icon="/Assets/avalonia-logo.ico"
+        Title="Second Brain">
+
+    <Grid ColumnDefinitions="260,*">
+
+        <!-- Boczny panel: foldery = kolorowe sekcje jak w OneNote -->
+        <DockPanel Grid.Column="0" Margin="24,28,16,24">
+
+            <StackPanel DockPanel.Dock="Top" Spacing="2" Margin="0,0,0,28">
+                <TextBlock Text="Second Brain" FontSize="20" FontWeight="Bold" />
+                <TextBlock Text="Twoja baza wiedzy" Classes="subtle" FontSize="12.5" />
+            </StackPanel>
+
+            <StackPanel DockPanel.Dock="Bottom" Spacing="8" Margin="0,20,0,0">
+                <TextBox Text="{Binding NewFolderName}" PlaceholderText="nazwa nowego folderu" />
+                <Button Content="Nowy folder"
+                        Classes="accent"
+                        Command="{Binding CreateFolderCommand}"
+                        HorizontalAlignment="Stretch"
+                        HorizontalContentAlignment="Center" />
+            </StackPanel>
+
+            <DockPanel>
+                <TextBlock DockPanel.Dock="Top" Text="FOLDERY" Classes="label" Margin="10,0,0,8" />
+
+                <Panel>
+                    <TextBlock Text="Brak folderów. Utwórz pierwszy poniżej."
+                               Classes="subtle" TextWrapping="Wrap"
+                               Margin="10,4,10,0"
+                               IsVisible="{Binding !HasFolders}" />
+
+                    <ListBox ItemsSource="{Binding Folders}"
+                             SelectedItem="{Binding SelectedFolder}"
+                             IsVisible="{Binding HasFolders}">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel Orientation="Horizontal" Spacing="10">
+                                    <Ellipse Width="8" Height="8"
+                                             Fill="{Binding Converter={x:Static conv:FolderAccentConverter.Instance}}" />
+                                    <TextBlock Text="{Binding}" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Panel>
+            </DockPanel>
+
+        </DockPanel>
+
+        <!-- "Kartka" z treścią - jaśniejsza plaszczyzna nad ciemniejszym chrome, jak strona w OneNote -->
+        <Border Grid.Column="1"
+                Background="{DynamicResource CtpBase}"
+                CornerRadius="16,0,0,0"
+                Margin="0,12,0,0"
+                BoxShadow="0 0 24 0 #22000000">
+
+            <TabControl Margin="28,20,28,24">
+
+                <TabItem Header="Nowa notatka">
+                    <DockPanel Margin="0,20,0,0">
+                        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="12" Margin="0,16,0,0">
+                            <Button Content="Zapisz"
+                                    Classes="accent"
+                                    Command="{Binding SaveNoteCommand}"
+                                    IsEnabled="{Binding !IsBusy}" />
+                            <TextBlock Text="{Binding EditorStatus}"
+                                       Classes="subtle"
+                                       VerticalAlignment="Center" />
+                        </StackPanel>
+
+                        <TextBox Text="{Binding NoteText}"
+                                 Classes="editor"
+                                 AcceptsReturn="True" TextWrapping="Wrap"
+                                 PlaceholderText="Wpisz notatkę..."
+                                 FontSize="15" />
+                    </DockPanel>
+                </TabItem>
+
+                <TabItem Header="Szukaj">
+                    <DockPanel Margin="0,20,0,0">
+                        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="10" Margin="0,0,0,16">
+                            <TextBox Text="{Binding SearchQuery}" PlaceholderText="Zadaj pytanie..." Width="420" />
+                            <Button Content="Szukaj"
+                                    Classes="accent"
+                                    Command="{Binding SearchCommand}"
+                                    IsEnabled="{Binding !IsBusy}" />
+                        </StackPanel>
+
+                        <Border DockPanel.Dock="Top"
+                                IsVisible="{Binding HasAnswer}"
+                                Background="{DynamicResource CtpSurface0}"
+                                CornerRadius="10"
+                                Padding="16,14"
+                                Margin="0,0,0,16">
+                            <StackPanel Spacing="6">
+                                <TextBlock Text="ODPOWIEDŹ" Classes="label" />
+                                <TextBlock Text="{Binding SynthesizedAnswer}"
+                                           TextWrapping="Wrap" FontSize="14.5" LineHeight="21" />
+                            </StackPanel>
+                        </Border>
+
+                        <Grid ColumnDefinitions="280,*">
+
+                            <Panel Grid.Column="0">
+                                <StackPanel Spacing="4" IsVisible="{Binding !HasResults}">
+                                    <TextBlock Text="Wpisz pytanie i kliknij Szukaj."
+                                               Classes="subtle" TextWrapping="Wrap"
+                                               IsVisible="{Binding !HasSearched}" />
+                                    <TextBlock Text="Brak wyników dla tego zapytania."
+                                               Classes="subtle" TextWrapping="Wrap"
+                                               IsVisible="{Binding HasSearched}" />
+                                </StackPanel>
+
+                                <ListBox ItemsSource="{Binding SearchResults}"
+                                         SelectedItem="{Binding SelectedResult}"
+                                         IsVisible="{Binding HasResults}">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:SearchResultItem">
+                                            <StackPanel Spacing="2">
+                                                <TextBlock Text="{Binding Title}" FontWeight="Medium" TextWrapping="Wrap" />
+                                                <TextBlock Text="{Binding Score, StringFormat='trafność {0:0.00}'}"
+                                                           Classes="subtle" FontSize="11.5" />
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                            </Panel>
+
+                            <ScrollViewer Grid.Column="1" Margin="20,0,0,0">
+                                <TextBlock Text="{Binding SelectedResult.RawContent}"
+                                           TextWrapping="Wrap"
+                                           FontSize="15"
+                                           LineHeight="22" />
+                            </ScrollViewer>
+                        </Grid>
+                    </DockPanel>
+                </TabItem>
+
+                <TabItem Header="Notatki">
+                    <DockPanel Margin="0,20,0,0">
+                        <Grid ColumnDefinitions="280,*">
+
+                            <Panel Grid.Column="0">
+                                <TextBlock Text="Ten folder jest jeszcze pusty."
+                                           Classes="subtle" TextWrapping="Wrap"
+                                           IsVisible="{Binding !HasFolderNotes}" />
+
+                                <ListBox ItemsSource="{Binding FolderNotes}"
+                                         SelectedItem="{Binding SelectedFolderNote}"
+                                         IsVisible="{Binding HasFolderNotes}">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:SearchResultItem">
+                                            <TextBlock Text="{Binding Title}" FontWeight="Medium" TextWrapping="Wrap" />
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                            </Panel>
+
+                            <ScrollViewer Grid.Column="1" Margin="20,0,0,0">
+                                <TextBlock Text="{Binding SelectedFolderNote.RawContent}"
+                                           TextWrapping="Wrap"
+                                           FontSize="15"
+                                           LineHeight="22" />
+                            </ScrollViewer>
+                        </Grid>
+                    </DockPanel>
+                </TabItem>
+
+            </TabControl>
+        </Border>
+
+    </Grid>
+
+</Window>
