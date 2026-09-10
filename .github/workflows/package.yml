@@ -4,6 +4,9 @@ on:
   push:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   zip:
     runs-on: ubuntu-latest
@@ -13,7 +16,12 @@ jobs:
       - name: Zip source
         run: zip -r second-brain-source.zip . -x '.git/*'
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: second-brain-source
-          path: second-brain-source.zip
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="build-${{ github.run_number }}"
+          gh release create "$tag" second-brain-source.zip \
+            --repo "${{ github.repository }}" \
+            --title "Build ${{ github.run_number }}" \
+            --notes "Zip zrodel (bez kompilacji) z commita ${{ github.sha }}"
