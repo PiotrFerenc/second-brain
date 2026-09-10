@@ -1,0 +1,19 @@
+name: Package source
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  zip:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Zip source
+        run: zip -r second-brain-source.zip . -x '.git/*'
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: second-brain-source
+          path: second-brain-source.zip
