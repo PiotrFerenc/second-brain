@@ -96,19 +96,6 @@
                                     IsEnabled="{Binding !IsBusy}" />
                         </StackPanel>
 
-                        <Border DockPanel.Dock="Top"
-                                IsVisible="{Binding HasAnswer}"
-                                Background="{DynamicResource CtpSurface0}"
-                                CornerRadius="10"
-                                Padding="16,14"
-                                Margin="0,0,0,16">
-                            <StackPanel Spacing="6">
-                                <TextBlock Text="ODPOWIEDŹ" Classes="label" />
-                                <TextBlock Text="{Binding SynthesizedAnswer}"
-                                           TextWrapping="Wrap" FontSize="14.5" LineHeight="21" />
-                            </StackPanel>
-                        </Border>
-
                         <Grid ColumnDefinitions="280,*">
 
                             <Panel Grid.Column="0">

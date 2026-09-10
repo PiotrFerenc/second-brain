@@ -10,7 +10,6 @@ public partial class MainViewModel(
     IEmbedder embedder,
     IReranker reranker,
     ICompressor compressor,
-    IAnswerSynthesizer answerSynthesizer,
     INoteStore noteStore) : ViewModelBase
 {
     public ObservableCollection<string> Folders { get; } = [];
@@ -32,12 +31,6 @@ public partial class MainViewModel(
 
     [ObservableProperty]
     public partial SearchResultItem? SelectedResult { get; set; }
-
-    [ObservableProperty]
-    public partial string SynthesizedAnswer { get; set; } = "";
-
-    [ObservableProperty]
-    public partial bool HasAnswer { get; set; }
 
     [ObservableProperty]
     public partial SearchResultItem? SelectedFolderNote { get; set; }
@@ -65,8 +58,6 @@ public partial class MainViewModel(
         NoteText = "";
         EditorStatus = "";
         SearchQuery = "";
-        SynthesizedAnswer = "";
-        HasAnswer = false;
         SearchResults.Clear();
         SelectedResult = null;
         HasSearched = false;
@@ -163,8 +154,6 @@ public partial class MainViewModel(
         SearchResults.Clear();
         SelectedResult = null;
         HasSearched = true;
-        SynthesizedAnswer = "";
-        HasAnswer = false;
 
         if (SelectedFolder is null || string.IsNullOrWhiteSpace(SearchQuery))
             return;
@@ -176,8 +165,6 @@ public partial class MainViewModel(
             var candidates = await vectorIndex.SearchAsync(SelectedFolder, queryVector, limit: 20);
             var reranked = await reranker.RerankAsync(SearchQuery, candidates);
 
-            var notesForAnswer = new List<Note>();
-
             foreach (var r in reranked.Take(10))
             {
                 var note = r.Note;
@@ -185,19 +172,10 @@ public partial class MainViewModel(
                     note = await noteStore.LoadAsync(r.Note.FilePath);
 
                 SearchResults.Add(new SearchResultItem(note.Title, string.Join(", ", note.Tags), r.Score, note.RawContent));
-
-                if (notesForAnswer.Count < 5)
-                    notesForAnswer.Add(note);
             }
 
             SelectedResult = SearchResults.FirstOrDefault();
             HasResults = SearchResults.Count > 0;
-
-            if (notesForAnswer.Count > 0)
-            {
-                SynthesizedAnswer = await answerSynthesizer.SynthesizeAsync(SearchQuery, notesForAnswer);
-                HasAnswer = !string.IsNullOrWhiteSpace(SynthesizedAnswer);
-            }
         }
         finally
         {

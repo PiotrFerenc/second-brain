@@ -19,7 +19,6 @@ var store = provider.GetRequiredService<IVectorIndex>();
 var embedder = provider.GetRequiredService<IEmbedder>();
 var reranker = provider.GetRequiredService<IReranker>();
 var compressor = provider.GetRequiredService<ICompressor>();
-var answerSynthesizer = provider.GetRequiredService<IAnswerSynthesizer>();
 var noteStore = provider.GetRequiredService<INoteStore>();
 
 switch (args.ElementAtOrDefault(0))
@@ -92,11 +91,8 @@ switch (args.ElementAtOrDefault(0))
         var candidates = await store.SearchAsync(folder, queryVector, limit: 20);
         var reranked = await reranker.RerankAsync(query, candidates);
 
-        var fullNotes = new List<Note>();
-        var top = reranked.Take(5).ToList();
-
         Console.WriteLine($"Wyniki dla: \"{query}\"\n");
-        foreach (var r in top)
+        foreach (var r in reranked.Take(5))
         {
             var note = r.Note;
             if (!string.IsNullOrEmpty(r.Note.FilePath) && File.Exists(r.Note.FilePath))
@@ -104,13 +100,6 @@ switch (args.ElementAtOrDefault(0))
 
             Console.WriteLine($"[{r.Score:0.00}] {note.Title} — tagi: {string.Join(", ", note.Tags)}");
             Console.WriteLine($"    {note.RawContent}");
-            fullNotes.Add(note);
-        }
-
-        if (fullNotes.Count > 0)
-        {
-            var answer = await answerSynthesizer.SynthesizeAsync(query, fullNotes);
-            Console.WriteLine($"\nOdpowiedz:\n{answer}");
         }
         break;
     }

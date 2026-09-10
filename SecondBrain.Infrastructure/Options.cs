@@ -23,6 +23,8 @@ public class QdrantOptions
 {
     public string Host { get; set; } = "localhost";
     public int Port { get; set; } = 6334;
+    public bool UseHttps { get; set; }
+    public string? ApiKey { get; set; }
     public uint VectorSize { get; set; } = 1536;
     public string Distance { get; set; } = "Cosine";
 }

@@ -21,13 +21,6 @@ public interface IReranker
     Task<IReadOnlyList<ScoredNote>> RerankAsync(string query, IReadOnlyList<ScoredNote> candidates, CancellationToken ct = default);
 }
 
-// Osobny krok od wyszukiwania: bierze juz-znalezione notatki i syntetyzuje z nich
-// bezposrednia odpowiedz na pytanie. Wyszukiwanie samo w sobie dziala bez tego kroku.
-public interface IAnswerSynthesizer
-{
-    Task<string> SynthesizeAsync(string query, IReadOnlyList<Note> notes, CancellationToken ct = default);
-}
-
 public interface INoteStore
 {
     Task<string> SaveAsync(string folder, Note note, CancellationToken ct = default);

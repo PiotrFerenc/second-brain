@@ -15,7 +15,7 @@ public class QdrantVectorIndex : IVectorIndex
     public QdrantVectorIndex(IOptions<QdrantOptions> options)
     {
         _options = options.Value;
-        _client = new QdrantClient(_options.Host, _options.Port);
+        _client = new QdrantClient(_options.Host, _options.Port, _options.UseHttps, _options.ApiKey ?? "");
     }
 
     public async Task<IReadOnlyList<string>> ListFoldersAsync(CancellationToken ct = default)
