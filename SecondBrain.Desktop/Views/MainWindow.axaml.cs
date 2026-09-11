@@ -13,8 +13,24 @@ public partial class MainWindow : Window
         Opened += async (_, _) =>
         {
             if (DataContext is MainViewModel vm)
+            {
                 await vm.InitializeCommand.ExecuteAsync(null);
+                BuildTemplateButtons(vm);
+            }
         };
+    }
+
+    // Szablony sa lista dynamiczna (wczytana z plikow) - prosciej dopisac przyciski
+    // w code-behind niz wiazac Command z zewnetrznym DataContext przez ItemsControl.
+    private void BuildTemplateButtons(MainViewModel vm)
+    {
+        TemplatesPanel.Children.Clear();
+        foreach (var template in vm.Templates)
+        {
+            var button = new Button { Content = template.Name, Classes = { "subtleAction" } };
+            button.Click += (_, _) => vm.NoteText = template.Content;
+            TemplatesPanel.Children.Add(button);
+        }
     }
 
     // Schowek wymaga TopLevel, do ktorego ViewModel nie ma dostepu - stad w code-behind.

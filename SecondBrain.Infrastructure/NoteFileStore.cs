@@ -11,6 +11,13 @@ public class FileNoteStore(IOptions<StorageOptions> options) : INoteStore
     private const string CompressedHeader = "## Skompresowane (embedowane)";
     private const string TrashSeparator = "___";
 
+    private static readonly (string Name, string Content)[] DefaultTemplates =
+    [
+        ("Spotkanie", "## Spotkanie\nData: \nUczestnicy: \n\n### Ustalenia\n- \n\n### Kolejne kroki\n- \n"),
+        ("Pomysł", "## Pomysł\n\nProblem: \n\nRozwiązanie: \n\nDlaczego to działa: \n"),
+        ("Zadanie", "## Zadanie\n\nCel: \n\nKroki:\n1. \n\nTermin: \n"),
+    ];
+
     private readonly string _root = string.IsNullOrWhiteSpace(options.Value.NotesRootPath)
         ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "SecondBrain", "notes")
         : options.Value.NotesRootPath;
@@ -100,6 +107,23 @@ public class FileNoteStore(IOptions<StorageOptions> options) : INoteStore
             File.Delete(trashPath);
 
         return Task.CompletedTask;
+    }
+
+    public async Task<IReadOnlyList<NoteTemplate>> ListTemplatesAsync(CancellationToken ct = default)
+    {
+        var dir = Path.Combine(_root, ".templates");
+        if (!Directory.Exists(dir))
+        {
+            Directory.CreateDirectory(dir);
+            foreach (var (name, content) in DefaultTemplates)
+                await File.WriteAllTextAsync(Path.Combine(dir, $"{name}.md"), content, ct);
+        }
+
+        var templates = new List<NoteTemplate>();
+        foreach (var file in Directory.EnumerateFiles(dir, "*.md").OrderBy(f => f))
+            templates.Add(new NoteTemplate(Path.GetFileNameWithoutExtension(file), await File.ReadAllTextAsync(file, ct)));
+
+        return templates;
     }
 
     private static string ExtractTrashFolder(string trashPath)

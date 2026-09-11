@@ -9,6 +9,8 @@ public record CompressionResult(
 
 public record TrashedNote(Note Note, string OriginalFolder, string TrashPath);
 
+public record NoteTemplate(string Name, string Content);
+
 public interface ICompressor
 {
     Task<CompressionResult> CompressAsync(string rawText, CancellationToken ct = default);
@@ -43,6 +45,9 @@ public interface INoteStore
     Task<IReadOnlyList<TrashedNote>> ListTrashAsync(CancellationToken ct = default);
     Task<TrashedNote> RestoreFromTrashAsync(string trashPath, CancellationToken ct = default);
     Task PurgeTrashAsync(string trashPath, CancellationToken ct = default);
+
+    // Szablony notatek - pliki .md czytelne i edytowalne przez uzytkownika poza aplikacja.
+    Task<IReadOnlyList<NoteTemplate>> ListTemplatesAsync(CancellationToken ct = default);
 }
 
 // Folder = kolekcja w bazie wektorowej. Jedna implementacja (Qdrant) na razie,

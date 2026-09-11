@@ -24,9 +24,15 @@
         <!-- Boczny panel: drzewo folderow (kolorowe kropki jak sekcje OneNote) i notatek -->
         <DockPanel Grid.Column="0" Margin="24,28,16,24">
 
-            <StackPanel DockPanel.Dock="Top" Spacing="2" Margin="0,0,0,20">
+            <StackPanel DockPanel.Dock="Top" Spacing="2" Margin="0,0,0,16">
                 <TextBlock Text="Second Brain" FontSize="20" FontWeight="Bold" />
                 <TextBlock Text="Twoja baza wiedzy" Classes="subtle" FontSize="12.5" />
+            </StackPanel>
+
+            <!-- Pasek narzedzi: akcje globalne, niezalezne od wybranego folderu -->
+            <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="0,0,0,20">
+                <Button Content="Szukaj" Classes="subtleAction" Command="{Binding ShowSearchTabCommand}" />
+                <Button Content="Kosz" Classes="subtleAction" Command="{Binding ShowTrashTabCommand}" />
             </StackPanel>
 
             <StackPanel DockPanel.Dock="Bottom" Spacing="8" Margin="0,20,0,0">
@@ -103,11 +109,7 @@
                         </StackPanel>
 
                         <StackPanel DockPanel.Dock="Top" Spacing="8" Margin="0,0,0,12">
-                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                <Button Content="Spotkanie" Classes="subtleAction" Command="{Binding ApplyTemplateCommand}" CommandParameter="spotkanie" />
-                                <Button Content="Pomysł" Classes="subtleAction" Command="{Binding ApplyTemplateCommand}" CommandParameter="pomysl" />
-                                <Button Content="Zadanie" Classes="subtleAction" Command="{Binding ApplyTemplateCommand}" CommandParameter="zadanie" />
-                            </StackPanel>
+                            <StackPanel x:Name="TemplatesPanel" Orientation="Horizontal" Spacing="8" />
                             <TextBox Text="{Binding NoteTagsInput}" PlaceholderText="tagi po przecinku (puste = LLM zaproponuje)" />
                             <ComboBox ItemsSource="{Binding ParentOptions}"
                                       SelectedItem="{Binding SelectedParentOption}"

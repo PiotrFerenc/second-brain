@@ -201,16 +201,21 @@ public partial class MainViewModel(
             ParentOptions.Add(ToItem(note));
     }
 
+    public ObservableCollection<NoteTemplate> Templates { get; } = [];
+
     [RelayCommand]
-    private void ApplyTemplate(string templateName)
+    private async Task LoadTemplatesAsync()
     {
-        NoteText = templateName switch
-        {
-            "spotkanie" => "## Spotkanie\nData: \nUczestnicy: \n\n### Ustalenia\n- \n\n### Kolejne kroki\n- \n",
-            "pomysl" => "## Pomysł\n\nProblem: \n\nRozwiązanie: \n\nDlaczego to działa: \n",
-            "zadanie" => "## Zadanie\n\nCel: \n\nKroki:\n1. \n\nTermin: \n",
-            _ => NoteText
-        };
+        Templates.Clear();
+        foreach (var t in await noteStore.ListTemplatesAsync())
+            Templates.Add(t);
+    }
+
+    [RelayCommand]
+    private void ApplyTemplate(NoteTemplate? template)
+    {
+        if (template is not null)
+            NoteText = template.Content;
     }
 
     [RelayCommand]
@@ -447,6 +452,9 @@ public partial class MainViewModel(
     [RelayCommand]
     private void ShowSearchTab() => SelectedTabIndex = TabSearch;
 
+    [RelayCommand]
+    private void ShowTrashTab() => SelectedTabIndex = TabTrash;
+
     // ---- Start ----
 
     [RelayCommand]
@@ -454,5 +462,6 @@ public partial class MainViewModel(
     {
         await LoadTreeAsync();
         await LoadTrashAsync();
+        await LoadTemplatesAsync();
     }
 }
