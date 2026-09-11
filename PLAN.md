@@ -20,60 +20,86 @@ Dwie ścieżki:
 Foldery organizacyjne (odpowiednik notesów w OneNote) realizowane są jako osobne
 kolekcje Qdrant — jedna kolekcja to jeden folder, wszystkie o identycznym schemacie wektora.
 
-## 2. Stan obecny — wszystkie zadania z poprzedniej wersji planu zrobione
+## 2. Stan obecny
 
-Wszystkie pięć zadań z poprzedniej wersji tego planu (kompresja LLM, magazyn plikowy,
-restrukturyzacja na projekty, realny reranker, aplikacja Avalonia) jest zaimplementowane.
-Solucja: `SecondBrain.slnx` (nowy XML-owy format solucji z .NET 10 SDK — nie `.sln`).
+Core zapisu/wyszukiwania działa end-to-end (na mockach embeddingu/rerankera). Do tego
+dochodzi druga warstwa funkcji "jak w innych apkach tego typu" (OneNote/Obsidian/Roam):
+drzewo notatek z podstronami, tagi, backlinki, powiązane notatki, przypinanie, szablony,
+dziennik, kosz, skróty klawiszowe, renderowanie Markdown. Solucja: `SecondBrain.slnx`
+(nowy XML-owy format solucji z .NET 10 SDK — nie `.sln`).
 
 ```
 SecondBrain.slnx
   SecondBrain.Core/            interfejsy domenowe + modele, bez zaleznosci zewnetrznych
     Note.cs                    record Note (Id, Title, RawContent, CompressedContent, Tags,
-                                CreatedAt, UpdatedAt, FilePath) + ScoredNote
-    Interfaces.cs               ICompressor (zwraca CompressionResult: Title+CompressedContent,
-                                 tytul ustala LLM), IEmbedder, IReranker, IAnswerSynthesizer
-                                 (RAG: odpowiedz na pytanie na podstawie znalezionych notatek),
-                                 INoteStore (+ ListAsync — wszystkie notatki z folderu), IVectorIndex
+                                CreatedAt, UpdatedAt, FilePath, ParentId, Pinned) + ScoredNote
+    Interfaces.cs               ICompressor (zwraca CompressionResult: Title+CompressedContent
+                                 +Tags, wszystko ustala LLM jednym wywolaniem), IEmbedder,
+                                 IReranker, IAnswerSynthesizer (RAG: odpowiedz na pytanie na
+                                 podstawie znalezionych notatek), INoteStore (ListAsync +
+                                 kosz: MoveToTrashAsync/ListTrashAsync/RestoreFromTrashAsync/
+                                 PurgeTrashAsync, TrashedNote), IVectorIndex (+ DeleteFolderAsync,
+                                 DeleteNoteAsync)
 
   SecondBrain.Infrastructure/  implementacje, referencja do Core
     Options.cs                  HttpClientOptions (BaseAddress, TimeoutSeconds, ApiKey, Headers)
-                                 + OpenAiOptions, RerankerOptions, QdrantOptions, StorageOptions
+                                 + OpenAiOptions, RerankerOptions, QdrantOptions (+ApiKey/UseHttps),
+                                 StorageOptions
     HttpClientHeaders.cs        wspolne nakladanie naglowkow (w tym {ApiKey}) na nazwany HttpClient
     Embedding.cs                OpenAiEmbedder (realny) + MockEmbedder (aktywny, patrz nizej)
     Compression.cs              OpenAiCompressor (chat/completions, response_format json_object,
-                                 zwraca tytul+tresc jednym wywolaniem) — dziala, klucz ma dostep
+                                 zwraca tytul+tresc+tagi jednym wywolaniem) — dziala
     AnswerSynthesis.cs           OpenAiAnswerSynthesizer (chat/completions) — dziala
     Reranking.cs                MockReranker (aktywny) + CohereReranker (v2/rerank, gotowy,
                                  nieprzetestowany — provider dostepny tylko na 2. maszynie)
-    NoteFileStore.cs             FileNoteStore — zapis/odczyt .md z front matterem + ListAsync
-                                 (skan katalogu folderu, wszystkie lata, posortowane po dacie)
-    QdrantVectorIndex.cs         implementacja IVectorIndex na Qdrant.Client
+    NoteFileStore.cs             FileNoteStore — front matter (+parent/pinned), ListAsync
+                                 (posortowane: przypiete pierwsze, potem data), kosz jako
+                                 <root>/.trash/<folder>___<id>.md (folder zakodowany w nazwie)
+    QdrantVectorIndex.cs         implementacja IVectorIndex na Qdrant.Client (+DeleteCollectionAsync,
+                                 DeleteAsync po Guid)
     ServiceCollectionExtensions.cs  AddSecondBrainInfrastructure(config) — jedna rejestracja
                                  DI uzywana przez PipelineTest i Desktop
 
   SecondBrain.Desktop/         Avalonia + CommunityToolkit.Mvvm, referencja do Core+Infrastructure
     Program.cs                  buduje ServiceProvider PRZED startem Avalonii, wystawia App.Services
     App.axaml.cs                 rozwiazuje MainViewModel z App.Services zamiast `new MainViewModel()`
-    ViewModels/MainViewModel.cs  jeden ViewModel na cale okno (foldery + edytor + wyszukiwanie —
-                                 zakres MVP nie uzasadnial rozbicia na wiecej VM/widokow)
-    ViewModels/SearchResultItem.cs  DTO do bindowania listy wynikow
+    ViewModels/MainViewModel.cs  jeden ViewModel na cale okno — spory (drzewo, edytor,
+                                 wyszukiwanie, notatka, dziennik, kosz), ale nadal jeden plik
+                                 bo commandy sie nie duplikuja, tylko rosna liczbowo
+    ViewModels/SearchResultItem.cs  DTO notatki do bindowania (Id, Title, Tags, Score,
+                                 RawContent, FilePath, ParentId, Pinned)
+    ViewModels/TreeItem.cs       wezel drzewa sidebaru (folder lub notatka, z OwningFolder)
+    ViewModels/TrashItem.cs      DTO wpisu w koszu
     Converters/FolderAccentConverter.cs  string -> kolorowa kropka folderu (Catppuccin)
+    Converters/PinLabelConverter.cs  bool Pinned -> "Przypnij"/"Odepnij"
     Styles/Catppuccin.axaml      paleta Mocha/Latte jako ThemeDictionaries (Light/Dark),
                                  nadpisuje tez SystemAccentColor (mauve) dla FluentTheme
-    Styles/AppStyles.axaml       Style dla Window/Button/TextBox/ListBox(Item)/TabItem -
-                                 FluentTheme zostaje baza, tu tylko kolory/ksztalty
-    Views/MainWindow.axaml       Grid: sidebar folderow (kolorowe kropki, jak sekcje OneNote)
-                                 | "kartka" tresci z TabControl: "Nowa notatka", "Szukaj"
-                                 (+ karta z odpowiedzia LLM nad wynikami), "Notatki" (wszystkie
-                                 notatki z wybranego folderu). Zmiana folderu czysci wszystkie
-                                 pola (OnSelectedFolderChanged) i przeladowuje liste notatek.
+    Styles/AppStyles.axaml       Style dla Window/Button(+.accent/.danger/.subtleAction)/
+                                 TextBox(+.editor)/ListBox(Item)/TabItem - FluentTheme baza
+    Views/MainWindow.axaml       Grid: sidebar = TreeView (foldery jako korzenie z kolorowa
+                                 kropka, notatki jako dzieci, zagniezdzone podstrony jako
+                                 dzieci notatek) | "kartka" tresci z TabControl 5 zakladek:
+                                 Nowa notatka (szablony, tagi, wybor notatki nadrzednej),
+                                 Szukaj (+ karta odpowiedzi LLM, Markdown w wyniku), Notatka
+                                 (podglad wybranej w drzewie: pin/kopiuj/usun/backlinki,
+                                 Markdown), Dziś (dziennik), Kosz (przywroc/usun na zawsze).
+                                 Wybor folderu w drzewie czysci pola edytora/wyszukiwania;
+                                 wybor notatki przelacza automatycznie na zakladke "Notatka".
+                                 Skroty: Ctrl+N/F/D/S.
+    Views/MainWindow.axaml.cs    start (InitializeCommand), kopiowanie do schowka (wlasny
+                                 IAsyncDataTransfer - Avalonia 12 usunela SetTextAsync)
 
   SecondBrain.PipelineTest/    cienki CLI nad Core+Infrastructure, do szybkich testow bez UI
-    Program.cs                  komendy: list, create, seed, add, notes, search (search
-                                 drukuje tez syntezowana odpowiedz LLM pod wynikami)
+    Program.cs                  komendy: list, create, delete-folder, seed, add, notes,
+                                 delete-note (do kosza), list-trash, restore, purge, search
+                                 (drukuje tez syntezowana odpowiedz LLM pod wynikami)
     SampleNotes.cs               3 przykladowe notatki do `seed`
 ```
+
+Pakiet zewnętrzny: `Markdown.Avalonia.Tight` (12.0.0-a3, alpha, ale jedyny kompatybilny
+z Avalonia 12 + net10.0) — renderuje notatki jako Markdown zamiast zwykłego tekstu w
+zakładkach Szukaj/Notatka/Dziś/Kosz. Xmlns to `.../Markdown.Avalonia.Tight` (nie bez
+`.Tight` — tak jest zarejestrowane w tej wersji, sprawdzone przez reflection na dll).
 
 Konfiguracja (`appsettings.json`, gitignorowany, `appsettings.Example.json` jako szablon)
 jest zduplikowana per-aplikacja (PipelineTest i Desktop mają każdy swój, bo mają osobne
@@ -87,6 +113,10 @@ cd SecondBrain.PipelineTest
 dotnet run -- list
 dotnet run -- create praca
 dotnet run -- add praca "tekst notatki..."
+dotnet run -- notes praca
+dotnet run -- delete-note praca <id>       # do kosza
+dotnet run -- list-trash
+dotnet run -- restore <sciezka>
 dotnet run -- search praca "pytanie..."
 ```
 
@@ -100,34 +130,26 @@ dotnet run
 Stan weryfikacji:
 
 - ✅ `dotnet build SecondBrain.slnx` — cała solucja buduje się czysto (0 warn, 0 err).
-- ✅ CLI: `list`, `create`, `seed`, `add`, `search` przetestowane end-to-end (mock embedding,
-  realna kompresja `gpt-3.5-turbo`, mock reranker, realny zapis/odczyt plików).
-- ✅ Desktop: proces startuje i działa (sprawdzone uruchomieniem w tle — brak wyjątków
-  w logu, proces żywy i zużywa CPU jak działająca pętla UI).
-- ✅ Desktop UI: zweryfikowano zrzutem ekranu (`gnome-screenshot`, ten sam `DISPLAY` co
-  wcześniej działa poprawnie — wcześniejszy czarny zrzut był przejściowym problemem, nie
-  cechą środowiska). Sidebar folderów, kolorowe kropki, zakładki i przycisk akcji renderują
-  się poprawnie w motywie Catppuccin Mocha. Klikanie w kontrolki (Zapisz/Szukaj/wybór
-  folderu) nie zostało jeszcze przeklikane end-to-end przez człowieka — tylko wizualnie.
+- ✅ CLI: `list`, `create`, `delete-folder`, `seed`, `add` (tytuł+tagi z LLM), `notes`,
+  `delete-note`/`list-trash`/`restore`/`purge` (pełny cykl kosza), `search` (+ odpowiedź LLM)
+  — wszystko przetestowane end-to-end na żywym Qdrant i plikach.
+- ✅ Desktop: build czysty, proces startuje i działa bez wyjątków w logu (sprawdzone
+  wielokrotnie uruchomieniem w tle + `gnome-screenshot`). To środowisko okazało się **mieć**
+  działający realny display mimo wcześniejszych podejrzeń o headless — zrzuty pokazują
+  faktyczną wyrenderowaną treść okna, nie czarny ekran.
+- ✅ Wygląd zweryfikowany zrzutami ekranu wielokrotnie: sidebar jako `TreeView` (foldery z
+  kolorową kropką jako korzenie, notatki jako rozwijane dzieci), 5 zakładek, szablony,
+  pole tagów, selektor notatki nadrzędnej — wszystko renderuje się poprawnie w Catppuccin Mocha.
+- ⚠️ **Nieprzeklikane ręcznie**: to środowisko nie ma `xdotool`/`wmctrl`, więc nie da się
+  symulować kliknięcia — tylko zrzuty stanu spoczynkowego (po starcie, przed interakcją).
+  Nie zweryfikowano interaktywnie: rozwijanie węzłów drzewa, przełączanie na zakładkę
+  "Notatka" po kliknięciu notatki, faktyczne renderowanie Markdown w treści, zachowanie
+  tła edytora na focus (naprawione w kodzie, ale nieklikniete). Wymaga przejścia przez
+  Ciebie na Twojej maszynie — patrz Zadanie 8.
 - ⏳ `OpenAiEmbedder` — kod gotowy, nadal zablokowany po stronie OpenAI (403 na
   `text-embedding-3-small` mimo widocznego dostępu — patrz decyzje, sekcja 3).
 - ⏳ `CohereReranker` — kod gotowy pod wire-format Cohere v2/rerank, nieprzetestowany
   (provider dostępny tylko na drugiej maszynie użytkownika).
-- ✅ Tytuł notatki ustalany przez LLM (`ICompressor.CompressAsync` zwraca `CompressionResult`
-  z `Title`+`CompressedContent` jednym wywołaniem `chat/completions` w trybie JSON) —
-  przetestowane w CLI (`add`), tytuł sensowny i różny od pierwszej linii wpisu.
-- ✅ Odpowiedź LLM na pytanie (RAG) — `IAnswerSynthesizer` bierze top wyniki wyszukiwania
-  i syntetyzuje bezpośrednią odpowiedź — przetestowane w CLI (`search`), działa.
-- ✅ `notes <folder>` / zakładka "Notatki" w Desktop — wszystkie notatki z folderu, testowane
-  w CLI.
-- ✅ Czyszczenie pól po zmianie folderu — zaimplementowane (`OnSelectedFolderChanged`),
-  nieprzeklikane ręcznie (patrz Zadanie 8).
-- ⚠️ Tło edytora notatki na focus — naprawione najbardziej prawdopodobnym mechanizmem
-  (nadpisanie `TextControlBackground*` w scope stylu `.editor` + `/template/
-  Border#PART_BorderElement`), ale **nieprzetestowane interaktywnie**: to środowisko nie ma
-  `xdotool`/`wmctrl` do symulacji kliknięcia, więc nie dało się zrobić zrzutu z realnie
-  sfokusowanym polem. Zweryfikuj klikając w pole notatki — jeśli nadal robi się czarne,
-  zgłoś to z opisem (jaki motyw systemowy, jasny czy ciemny).
 
 ## 3. Decyzje i ich powody
 
@@ -149,10 +171,20 @@ Te ustalenia są wiążące — nie zmieniaj ich bez wyraźnej prośby użytkown
 | **Front matter YAML pisany/czytany ręcznie**, bez zależności YamlDotNet | Format ma stałe 5 pól — pełny parser YAML byłby przerostem formy nad treścią |
 | **Folder = kolekcja Qdrant** | Naturalna izolacja wyszukiwania per folder, bez filtrowania po payloadzie |
 | **Cztery projekty: Core / Infrastructure / Desktop / PipelineTest**, wspólna rejestracja DI w `AddSecondBrainInfrastructure` | Desktop i CLI harness współdzielą całą logikę biznesową bez duplikacji; Core nie zależy od Qdrant/HTTP, więc jest łatwy do testowania |
-| **Jeden `MainViewModel` na cały ekran Desktop** (foldery + edytor + wyszukiwanie), TabControl zamiast nawigacji przez ViewLocator | Zakres MVP (3 proste panele) nie uzasadnia rozbicia na osobne ViewModels/widoki z nawigacją — dodać dopiero gdy realnie zabraknie miejsca |
+| **Jeden `MainViewModel` na cały ekran Desktop**, TabControl zamiast nawigacji przez ViewLocator | Nawet po rozroście do 5 zakładek commandy się nie duplikują (każda funkcja to metoda + kilka property), więc rozbicie na osobne VM na razie nic by nie uprościło — dodać dopiero gdy realnie zabraknie miejsca |
 | **MVVM: CommunityToolkit.Mvvm** (partial properties + `[RelayCommand]`) | Source-generatory zamiast ręcznego boilerplate'u; mniej kodu niż ReactiveUI dla tego zakresu; to, co dała domyślna templatka `avalonia.mvvm` |
 | **UI: paleta Catppuccin (Mocha/Latte) na bazie FluentTheme**, akcent = mauve, foldery = kolorowe kropki (odpowiednik sekcji OneNote) | Wprost zażądane przez użytkownika; `FluentTheme` zostaje jako baza (zachowanie kontrolek, dostępność), kolory i kształty nadpisane w `Styles/Catppuccin.axaml` + `Styles/AppStyles.axaml` zamiast pisać kontrolki od zera |
 | **Target framework: `net10.0`** wszędzie | Specyfikacja mówiła o .NET 8 LTS, ale na maszynie dev zainstalowane są tylko runtime 6, 7 i 10 — `net8.0` nie startuje |
+| **Sidebar jako `TreeView`** (foldery = korzenie, notatki = dzieci, podstrony = dzieci notatek), zakładka "Notatki" usunięta na rzecz zakładki "Notatka" (podgląd tego, co zaznaczone w drzewie) | Wprost zażądane przez użytkownika; drzewo naturalnie łączy przeglądanie folderów z hierarchią notatek (podstrony) bez dwóch osobnych list |
+| **Drzewo ładowane w całości przy starcie/odświeżeniu** (nie leniwie przy rozwinięciu węzła) | Prostszy kod (jeden `LoadTreeAsync` zamiast obsługi zdarzenia rozwinięcia); do zmiany gdy liczba notatek realnie zacznie spowalniać start |
+| **Kosz zamiast trwałego usuwania notatek** — plik trafia do `.trash/<folder>___<id>.md`, punkt usuwany z Qdrant od razu (nie da się go "skosić") | Wprost zażądane przez użytkownika |
+| **Usuwanie folderu zostaje trwałe** (nie trafia do kosza) | Pełne cofnięcie wymagałoby klonowania całej kolekcji Qdrant zamiast jednego `DeleteCollectionAsync` — niewspółmiernie drogie do tego jak rzadko się kasuje cały folder; dwa kliknięcia jako jedyna ochrona |
+| **Tagi: pole wpisywane ręcznie, puste = LLM proponuje** (`CompressionResult.Tags` z tego samego wywołania co tytuł/treść) | Wprost zażądane przez użytkownika; brak osobnego wywołania LLM tylko po tagi |
+| **Filtrowanie po tagach NIE zostało zrobione** | Świadomy cios w zakres — drzewo+5 zakładek to już duża zmiana za jeden raz; tagi są zapisywane i widoczne w zakładce "Notatka", ale nie ma jeszcze UI do filtrowania po nich |
+| **Backlinki liczone na żądanie** (skan wszystkich notatek folderu w poszukiwaniu `[[Tytuł]]` przy otwarciu notatki), bez precomputowanego indeksu | Skala osobistej bazy wiedzy (dziesiątki–setki notatek na folder) nie uzasadnia utrzymywania indeksu; `[[...]]` nie jest klikalne (zwykły tekst) — nawigacja po linkach to możliwy kolejny krok |
+| **"Auto-linkowanie" przez wyszukiwanie wektorowe, nie przez LLM** — po zapisaniu notatki program szuka top-3 podobnych własnym wektorem notatki i pokazuje w statusie | Tańsze i bez ryzyka halucynacji (LLM proszony o zgadywanie tytułów notatek mógłby wymyślić nieistniejący tytuł); reużywa już policzony embedding |
+| **Dziennik = zwykły folder "Dziennik"**, notatka na dzień = tytuł `yyyy-MM-dd`, kolejne wpisy tego samego dnia dopisywane do `RawContent` i re-kompresowane w całości | Brak specjalnego typu notatki w modelu; jedna re-kompresja na dopisanie jest prostsza niż różnicowe aktualizowanie skompresowanej treści |
+| **Renderowanie Markdown: `Markdown.Avalonia.Tight` (12.0.0-a3, alpha)** | Jedyny pakiet kompatybilny z Avalonia 12 + net10.0 w chwili pisania; ręczne pisanie renderera Markdown byłoby dużo większym nakładem niż ryzyko alpha-wersji biblioteki |
 
 ## 4. Co dalej
 
@@ -186,24 +218,36 @@ realnych providerów i dopracowanie UX — żadne z tych zadań nie blokuje pozo
 
 ### Zadanie 8 — przeklikać interakcje Desktop ręcznie
 
-Wygląd zweryfikowany zrzutem ekranu (sidebar, kolorowe kropki folderów, zakładki, akcent
-mauve — wszystko renderuje się poprawnie w Catppuccin Mocha). Nie sprawdzono jeszcze
-realnym klikaniem, czy komendy faktycznie coś robią w działającym oknie:
+Wygląd zweryfikowany wielokrotnie zrzutami ekranu (drzewo, zakładki, szablony, pole tagów —
+wszystko renderuje się poprawnie). Nie sprawdzono jeszcze realnym klikaniem:
 
 1. `cd SecondBrain.Desktop && dotnet run`.
-2. Sprawdzić: lista folderów ładuje się przy starcie, tworzenie nowego folderu działa,
-   zakładka "Nowa notatka" zapisuje (kompresja → plik → embedding → Qdrant), zakładka
-   "Szukaj" zwraca wyniki z podglądem pełnej treści po prawej, przyciski disable'ują się
-   w trakcie operacji (`IsBusy`).
+2. Rozwinięcie węzła folderu w drzewie (strzałka `>`) pokazuje jego notatki.
+3. Kliknięcie notatki w drzewie przełącza na zakładkę "Notatka" i pokazuje treść jako
+   wyrenderowany Markdown (nagłówki `##` z szablonów powinny wyglądać jak nagłówki, nie
+   jak `##` w zwykłym tekście).
+4. Pole notatki w zakładce "Nowa notatka" ma tło identyczne z resztą karty, także po
+   kliknięciu w nie (to był zgłoszony wcześniej problem — kod naprawiony, nieklikane).
+5. Przypnij/Odepnij w zakładce "Notatka" przenosi notatkę na górę drzewa przy odświeżeniu.
+6. Kosz: usuń notatkę → pojawia się w zakładce "Kosz" → "Przywróć" wraca do drzewa.
+7. Zakładka "Dziś": dodanie wpisu tworzy/dopisuje notatkę w folderze "Dziennik".
+8. Skróty Ctrl+N/F/D przełączają zakładki, Ctrl+S zapisuje z zakładki edytora.
 
-**Odbiór:** wszystkie cztery interakcje działają bez wyjątków w oknie aplikacji.
+**Odbiór:** wszystkie osiem punktów działa bez wyjątków w oknie aplikacji.
 
-### Zadanie 9 (opcjonalne, dopiero po 6-8) — tagi i edycja notatki w UI
+### Zadanie 9 — filtrowanie notatek po tagach (świadomie pominięte w tej turze)
 
-Obecnie `add`/edytor Desktop zawsze zapisuje notatkę z pustą listą tagów (`Tags: []`) —
-CLI/UI nie mają jeszcze pola do ich wpisania, mimo że model i front matter je wspierają.
-Podobnie nie ma edycji istniejącej notatki (tylko tworzenie nowej). Nie zaczynaj tego
-zadania bez wyraźnej prośby — nie było części żadnego wcześniejszego ustalenia.
+Tagi są zapisywane (ręcznie albo przez LLM) i widoczne w zakładce "Notatka", ale nigdzie
+nie da się po nich filtrować/szukać. Najprostsze podejście: pole tekstowe nad drzewem,
+filtrujące widoczne węzły-notatki po dopasowaniu do `SearchResultItem.Tags` (samo drzewo
+zostaje, tylko chowa niepasujące liście).
+
+### Zadanie 10 — klikalne `[[linki]]` w treści notatki
+
+Backlinki działają (sekcja "Odnośniki do tej notatki" w zakładce "Notatka"), ale sam
+`[[Tytuł notatki]]` w treści to obecnie zwykły tekst, nie link. Wymaga własnego inline
+parsera nad `Markdown.Avalonia.Tight` albo TextBlock z `Inlines` i `Run`/`InlineUIContainer`
+reagującym na klik — nietrywialne, nie zaczynaj bez wyraźnej prośby.
 
 ## 5. Czego nie robić
 
@@ -214,17 +258,24 @@ zadania bez wyraźnej prośby — nie było części żadnego wcześniejszego us
 - Nie commituj `appsettings.json` z prawdziwym kluczem — jest w `.gitignore`, aktualizuj
   tylko `appsettings.Example.json` (z pustymi wartościami `ApiKey`).
 - Nie rozbijaj `MainViewModel` na osobne ViewModels/nawigację, dopóki jeden plik faktycznie
-  nie zrobi się nieczytelny — na razie 3 panele w jednym VM to celowy wybór, nie dług.
+  nie zrobi się nieczytelny — na razie to celowy wybór, nie dług.
 - Nie dodawaj YamlDotNet ani innej biblioteki do front matteru — format jest stały i prosty.
+- Nie dodawaj kosza dla usuwania folderów bez wyraźnej prośby — świadomie zostawione jako
+  trwałe (patrz decyzja w sekcji 3, powód: koszt klonowania kolekcji Qdrant).
+- Nie zaczynaj klikalnych `[[linków]]` (Zadanie 10) ani filtrowania po tagach (Zadanie 9)
+  bez wyraźnej prośby — to świadome cięcia zakresu, nie zapomniane elementy.
 
 ## 6. Środowisko
 
 - SDK: .NET 10.0.111. Zainstalowane runtime'y: 6.0, 7.0, 10.0 (brak 8.0).
 - Docker 20.10.17; kontener `secondbrain-qdrant` na portach 6333 (REST) i 6334 (gRPC).
 - Katalog roboczy: `/home/piotr/Projekty/Brain`. Solucja: `SecondBrain.slnx` (format .NET 10,
-  nie klasyczny `.sln`). Repozytorium git nie jest jeszcze zainicjalizowane.
-- Kolekcje istniejące w Qdrant po testach: `praca`, `osobiste`, `test`.
-- Środowisko deweloperskie jest headless — `DISPLAY`/`WAYLAND_DISPLAY` są ustawione i
-  `gnome-screenshot` działa technicznie, ale nie pokazuje realnie wyrenderowanej treści
-  okien aplikacji (zrzut wychodzi czarny). Weryfikacja UI Desktop wymaga innej maszyny
-  (patrz Zadanie 8).
+  nie klasyczny `.sln`). Repozytorium git: https://github.com/PiotrFerenc/second-brain
+  (publiczne), CI (`.github/workflows/package.yml`) publikuje zip źródeł jako GitHub
+  Release przy każdym pushu na `master`.
+- Kolekcje istniejące w Qdrant po testach: `123`, `osobiste`, `praca`, `test`.
+- To środowisko deweloperskie **ma działający display** (`gnome-screenshot` pokazuje
+  realną treść okna, sprawdzone wielokrotnie) — ale nie ma `xdotool`/`wmctrl`, więc nie da
+  się symulować kliknięć/klawiatury. Zrzuty ekranu = tylko stan spoczynkowy po starcie.
+  Weryfikacja interakcji (klikanie, rozwijanie drzewa, skróty klawiszowe) wymaga
+  przejścia przez Ciebie ręcznie — patrz Zadanie 8.

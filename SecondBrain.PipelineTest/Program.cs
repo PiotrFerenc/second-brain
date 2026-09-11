@@ -43,7 +43,7 @@ switch (args.ElementAtOrDefault(0))
         var folder = args[1];
         await store.DeleteFolderAsync(folder);
         await noteStore.DeleteFolderAsync(folder);
-        Console.WriteLine($"Usunieto folder '{folder}' (kolekcja Qdrant + pliki na dysku).");
+        Console.WriteLine($"Usunieto folder '{folder}' (kolekcja Qdrant + pliki na dysku, trwale).");
         break;
     }
 
@@ -66,7 +66,7 @@ switch (args.ElementAtOrDefault(0))
         var now = DateTimeOffset.UtcNow;
 
         var result = await compressor.CompressAsync(rawText);
-        var note = new Note(Guid.NewGuid(), result.Title, rawText, result.CompressedContent, [], now, now);
+        var note = new Note(Guid.NewGuid(), result.Title, rawText, result.CompressedContent, result.Tags, now, now);
 
         var path = await noteStore.SaveAsync(folder, note);
         note = note with { FilePath = path };
@@ -74,7 +74,7 @@ switch (args.ElementAtOrDefault(0))
         var vector = await embedder.EmbedAsync(note.CompressedContent);
         await store.UpsertAsync(folder, note, vector);
 
-        Console.WriteLine($"Zapisano: {path}\nId: {note.Id}\nTytul (LLM): {result.Title}\nSkompresowano do: {result.CompressedContent}");
+        Console.WriteLine($"Zapisano: {path}\nId: {note.Id}\nTytul (LLM): {result.Title}\nTagi (LLM): {string.Join(", ", result.Tags)}\nSkompresowano do: {result.CompressedContent}");
         break;
     }
 
@@ -88,7 +88,7 @@ switch (args.ElementAtOrDefault(0))
         }
 
         foreach (var note in notes)
-            Console.WriteLine($"{note.Id}  {note.UpdatedAt:yyyy-MM-dd HH:mm}  {note.Title}");
+            Console.WriteLine($"{note.Id}  {note.UpdatedAt:yyyy-MM-dd HH:mm}  {(note.Pinned ? "[przypieta] " : "")}{note.Title}");
         break;
     }
 
@@ -106,8 +106,39 @@ switch (args.ElementAtOrDefault(0))
         }
 
         await store.DeleteNoteAsync(folder, noteId);
-        await noteStore.DeleteAsync(note.FilePath);
-        Console.WriteLine($"Usunieto: {note.Title}");
+        await noteStore.MoveToTrashAsync(folder, note.FilePath);
+        Console.WriteLine($"Przeniesiono do kosza: {note.Title}");
+        break;
+    }
+
+    case "list-trash":
+    {
+        var trashed = await noteStore.ListTrashAsync();
+        if (trashed.Count == 0)
+        {
+            Console.WriteLine("Kosz jest pusty.");
+            break;
+        }
+
+        foreach (var t in trashed)
+            Console.WriteLine($"{t.TrashPath}  ({t.OriginalFolder})  {t.Note.Title}");
+        break;
+    }
+
+    case "restore" when args.Length >= 2:
+    {
+        var trashPath = args[1];
+        var restored = await noteStore.RestoreFromTrashAsync(trashPath);
+        var vector = await embedder.EmbedAsync(restored.Note.CompressedContent);
+        await store.UpsertAsync(restored.OriginalFolder, restored.Note, vector);
+        Console.WriteLine($"Przywrocono: {restored.Note.Title} -> folder '{restored.OriginalFolder}'.");
+        break;
+    }
+
+    case "purge" when args.Length >= 2:
+    {
+        await noteStore.PurgeTrashAsync(args[1]);
+        Console.WriteLine("Usunieto na zawsze.");
         break;
     }
 
@@ -151,7 +182,10 @@ switch (args.ElementAtOrDefault(0))
               dotnet run -- seed <folder>
               dotnet run -- add <folder> <tekst notatki...>
               dotnet run -- notes <folder>
-              dotnet run -- delete-note <folder> <id notatki>
+              dotnet run -- delete-note <folder> <id notatki>   (do kosza)
+              dotnet run -- list-trash
+              dotnet run -- restore <sciezka z list-trash>
+              dotnet run -- purge <sciezka z list-trash>        (trwale)
               dotnet run -- search <folder> <zapytanie...>
             """);
         break;

@@ -8,6 +8,8 @@ public record Note(
     string[] Tags,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
-    string FilePath = "");
+    string FilePath = "",
+    Guid? ParentId = null,
+    bool Pinned = false);
 
 public record ScoredNote(Note Note, float Score);

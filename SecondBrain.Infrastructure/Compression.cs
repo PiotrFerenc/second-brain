@@ -10,10 +10,11 @@ public class OpenAiCompressor(IHttpClientFactory httpClientFactory, IOptions<Ope
 {
     private const string SystemPrompt =
         "Jestes asystentem kompresujacym notatki uzytkownika do osobistej bazy wiedzy. " +
-        "Zwroc WYLACZNIE obiekt JSON o polach \"title\" (krotki, zwiezly tytul notatki " +
-        "ustalony przez Ciebie na podstawie tresci, maks. 80 znakow) oraz \"content\" " +
+        "Zwroc WYLACZNIE obiekt JSON o polach: \"title\" (krotki, zwiezly tytul notatki " +
+        "ustalony przez Ciebie na podstawie tresci, maks. 80 znakow), \"content\" " +
         "(skompresowana, ustrukturyzowana tresc notatki zachowujaca kluczowe fakty, " +
-        "bez powtorzen i dygresji).";
+        "bez powtorzen i dygresji) oraz \"tags\" (2-5 krotkich tagow jednowyrazowych " +
+        "po polsku, malymi literami, opisujacych temat notatki).";
 
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
 

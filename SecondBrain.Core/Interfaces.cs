@@ -4,7 +4,10 @@ namespace SecondBrain.Core;
 
 public record CompressionResult(
     [property: JsonPropertyName("title")] string Title,
-    [property: JsonPropertyName("content")] string CompressedContent);
+    [property: JsonPropertyName("content")] string CompressedContent,
+    [property: JsonPropertyName("tags")] string[] Tags);
+
+public record TrashedNote(Note Note, string OriginalFolder, string TrashPath);
 
 public interface ICompressor
 {
@@ -33,8 +36,13 @@ public interface INoteStore
     Task<string> SaveAsync(string folder, Note note, CancellationToken ct = default);
     Task<Note> LoadAsync(string filePath, CancellationToken ct = default);
     Task<IReadOnlyList<Note>> ListAsync(string folder, CancellationToken ct = default);
-    Task DeleteAsync(string filePath, CancellationToken ct = default);
     Task DeleteFolderAsync(string folder, CancellationToken ct = default);
+
+    // Kosz: usuniecie notatki przenosi plik do .trash zamiast go kasowac.
+    Task<string> MoveToTrashAsync(string folder, string filePath, CancellationToken ct = default);
+    Task<IReadOnlyList<TrashedNote>> ListTrashAsync(CancellationToken ct = default);
+    Task<TrashedNote> RestoreFromTrashAsync(string trashPath, CancellationToken ct = default);
+    Task PurgeTrashAsync(string trashPath, CancellationToken ct = default);
 }
 
 // Folder = kolekcja w bazie wektorowej. Jedna implementacja (Qdrant) na razie,

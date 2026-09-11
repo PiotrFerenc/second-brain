@@ -13,7 +13,7 @@ public partial class MainWindow : Window
         Opened += async (_, _) =>
         {
             if (DataContext is MainViewModel vm)
-                await vm.LoadFoldersCommand.ExecuteAsync(null);
+                await vm.InitializeCommand.ExecuteAsync(null);
         };
     }
 
@@ -30,9 +30,9 @@ public partial class MainWindow : Window
             await CopyToClipboardAsync(item.RawContent);
     }
 
-    private async void CopyFolderNote_Click(object? sender, RoutedEventArgs e)
+    private async void CopyNote_Click(object? sender, RoutedEventArgs e)
     {
-        if (DataContext is MainViewModel { SelectedFolderNote: { } item })
+        if (DataContext is MainViewModel { SelectedNote: { } item })
             await CopyToClipboardAsync(item.RawContent);
     }
 

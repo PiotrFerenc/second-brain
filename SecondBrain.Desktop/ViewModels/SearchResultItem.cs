@@ -1,6 +1,6 @@
 namespace SecondBrain.Desktop.ViewModels;
 
-public class SearchResultItem(Guid id, string title, string tags, float score, string rawContent, string filePath)
+public class SearchResultItem(Guid id, string title, string tags, float score, string rawContent, string filePath, Guid? parentId, bool pinned)
 {
     public Guid Id { get; } = id;
     public string Title { get; } = title;
@@ -8,4 +8,6 @@ public class SearchResultItem(Guid id, string title, string tags, float score, s
     public float Score { get; } = score;
     public string RawContent { get; } = rawContent;
     public string FilePath { get; } = filePath;
+    public Guid? ParentId { get; } = parentId;
+    public bool Pinned { get; } = pinned;
 }
