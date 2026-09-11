@@ -37,6 +37,18 @@ public partial class MainViewModel(
     [ObservableProperty]
     public partial bool HasFolders { get; set; }
 
+    // Aktywny filtr po tagu (klikniecie w chip w widoku Notatka) - zawezia drzewo do
+    // notatek majacych ten tag, ze wszystkich folderow, dopoki nie zostanie wyczyszczony.
+    [ObservableProperty]
+    public partial string? ActiveTagFilter { get; set; }
+
+    [RelayCommand]
+    private async Task ClearTagFilterAsync()
+    {
+        ActiveTagFilter = null;
+        await LoadTreeAsync();
+    }
+
     partial void OnSelectedTreeItemChanged(TreeItem? value)
     {
         if (value is null)
@@ -61,6 +73,14 @@ public partial class MainViewModel(
         foreach (var folder in await vectorIndex.ListFoldersAsync())
         {
             var notes = await noteStore.ListAsync(folder);
+
+            if (ActiveTagFilter is not null)
+            {
+                notes = notes.Where(n => n.Tags.Any(t => string.Equals(t, ActiveTagFilter, StringComparison.OrdinalIgnoreCase))).ToList();
+                if (notes.Count == 0)
+                    continue;
+            }
+
             var folderNode = new TreeItem { DisplayName = folder, IsFolder = true, OwningFolder = folder };
             BuildNoteTree(folderNode.Children, notes, null, folder);
             Tree.Add(folderNode);
@@ -383,6 +403,11 @@ public partial class MainViewModel(
 
     public ObservableCollection<SearchResultItem> SearchResults { get; } = [];
 
+    // Domyslnie globalnie (wszystkie foldery) - zaznaczenie zawezia do aktualnie
+    // wybranego w drzewie folderu.
+    [ObservableProperty]
+    public partial bool SearchCurrentFolderOnly { get; set; }
+
     [RelayCommand]
     private async Task SearchAsync()
     {
@@ -400,8 +425,12 @@ public partial class MainViewModel(
         {
             var queryVector = await embedder.EmbedAsync(SearchQuery);
 
+            IReadOnlyList<string> foldersToSearch = SearchCurrentFolderOnly && SelectedFolder is not null
+                ? [SelectedFolder]
+                : await vectorIndex.ListFoldersAsync();
+
             var candidatesWithFolder = new List<(string Folder, ScoredNote Scored)>();
-            foreach (var folder in await vectorIndex.ListFoldersAsync())
+            foreach (var folder in foldersToSearch)
             {
                 var candidates = await vectorIndex.SearchAsync(folder, queryVector, limit: 20);
                 candidatesWithFolder.AddRange(candidates.Select(c => (folder, c)));
@@ -440,41 +469,16 @@ public partial class MainViewModel(
         }
     }
 
-    // Klikniecie w tag: filtruje notatki po wszystkich folderach (zwykle dopasowanie
-    // tekstowe po pliku, bez embeddingu/rerankera - to nie jest wyszukiwanie semantyczne).
+    // Klikniecie w tag: zawezia DRZEWO folderow do notatek z tym tagiem (ze wszystkich
+    // folderow), zamiast pokazywac plaska liste wynikow - patrz ActiveTagFilter/LoadTreeAsync.
     [RelayCommand]
     private async Task FilterByTagAsync(string? tag)
     {
         if (string.IsNullOrWhiteSpace(tag))
             return;
 
-        SearchResults.Clear();
-        SelectedResult = null;
-        SynthesizedAnswer = "";
-        HasAnswer = false;
-        HasSearched = true;
-        SearchQuery = $"#{tag}";
-
-        IsBusy = true;
-        try
-        {
-            foreach (var folder in await vectorIndex.ListFoldersAsync())
-            {
-                foreach (var note in await noteStore.ListAsync(folder))
-                {
-                    if (note.Tags.Any(t => string.Equals(t, tag, StringComparison.OrdinalIgnoreCase)))
-                        SearchResults.Add(ToItem(note, folder));
-                }
-            }
-
-            SelectedResult = SearchResults.FirstOrDefault();
-            HasResults = SearchResults.Count > 0;
-            SelectedTabIndex = TabSearch;
-        }
-        finally
-        {
-            IsBusy = false;
-        }
+        ActiveTagFilter = tag;
+        await LoadTreeAsync();
     }
 
     // ---- Kosz ----

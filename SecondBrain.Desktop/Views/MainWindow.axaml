@@ -61,6 +61,18 @@
             <DockPanel>
                 <TextBlock DockPanel.Dock="Top" Text="FOLDERY" Classes="label" Margin="10,0,0,8" />
 
+                <Border DockPanel.Dock="Top"
+                        IsVisible="{Binding ActiveTagFilter, Converter={x:Static acnv:ObjectConverters.IsNotNull}}"
+                        Background="{DynamicResource CtpSurface0}"
+                        CornerRadius="6" Padding="8,6" Margin="0,0,0,10">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock Grid.Column="0" Classes="subtle" FontSize="12" TextWrapping="Wrap">
+                            <Run Text="tag: " /><Run Text="{Binding ActiveTagFilter}" />
+                        </TextBlock>
+                        <Button Grid.Column="1" Content="×" Classes="subtleAction" Padding="6,0" Command="{Binding ClearTagFilterCommand}" />
+                    </Grid>
+                </Border>
+
                 <Panel>
                     <TextBlock Text="Brak folderów. Utwórz pierwszy poniżej."
                                Classes="subtle" TextWrapping="Wrap"
@@ -174,6 +186,10 @@
                                     Classes="accent"
                                     Command="{Binding SearchCommand}"
                                     IsEnabled="{Binding !IsBusy}" />
+                            <CheckBox Content="{Binding SelectedFolder, StringFormat='tylko w folderze: {0}'}"
+                                      IsChecked="{Binding SearchCurrentFolderOnly}"
+                                      IsEnabled="{Binding SelectedFolder, Converter={x:Static acnv:ObjectConverters.IsNotNull}}"
+                                      VerticalAlignment="Center" />
                         </StackPanel>
 
                         <Border DockPanel.Dock="Top"
