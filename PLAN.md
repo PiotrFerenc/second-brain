@@ -82,7 +82,7 @@ SecondBrain.slnx
                                  Nowa notatka (szablony, tagi, wybor notatki nadrzednej),
                                  Szukaj (+ karta odpowiedzi LLM, Markdown w wyniku), Notatka
                                  (podglad wybranej w drzewie: pin/kopiuj/usun/backlinki,
-                                 Markdown), Dziś (dziennik), Kosz (przywroc/usun na zawsze).
+                                 Markdown), Kosz (przywroc/usun na zawsze).
                                  Wybor folderu w drzewie czysci pola edytora/wyszukiwania;
                                  wybor notatki przelacza automatycznie na zakladke "Notatka".
                                  Skroty: Ctrl+N/F/D/S.
@@ -98,7 +98,7 @@ SecondBrain.slnx
 
 Pakiet zewnętrzny: `Markdown.Avalonia.Tight` (12.0.0-a3, alpha, ale jedyny kompatybilny
 z Avalonia 12 + net10.0) — renderuje notatki jako Markdown zamiast zwykłego tekstu w
-zakładkach Szukaj/Notatka/Dziś/Kosz. Xmlns to `.../Markdown.Avalonia.Tight` (nie bez
+zakładkach Szukaj/Notatka/Kosz. Xmlns to `.../Markdown.Avalonia.Tight` (nie bez
 `.Tight` — tak jest zarejestrowane w tej wersji, sprawdzone przez reflection na dll).
 
 Konfiguracja (`appsettings.json`, gitignorowany, `appsettings.Example.json` jako szablon)
@@ -183,8 +183,8 @@ Te ustalenia są wiążące — nie zmieniaj ich bez wyraźnej prośby użytkown
 | **Filtrowanie po tagach NIE zostało zrobione** | Świadomy cios w zakres — drzewo+5 zakładek to już duża zmiana za jeden raz; tagi są zapisywane i widoczne w zakładce "Notatka", ale nie ma jeszcze UI do filtrowania po nich |
 | **Backlinki liczone na żądanie** (skan wszystkich notatek folderu w poszukiwaniu `[[Tytuł]]` przy otwarciu notatki), bez precomputowanego indeksu | Skala osobistej bazy wiedzy (dziesiątki–setki notatek na folder) nie uzasadnia utrzymywania indeksu; `[[...]]` nie jest klikalne (zwykły tekst) — nawigacja po linkach to możliwy kolejny krok |
 | **"Auto-linkowanie" przez wyszukiwanie wektorowe, nie przez LLM** — po zapisaniu notatki program szuka top-3 podobnych własnym wektorem notatki i pokazuje w statusie | Tańsze i bez ryzyka halucynacji (LLM proszony o zgadywanie tytułów notatek mógłby wymyślić nieistniejący tytuł); reużywa już policzony embedding |
-| **Dziennik = zwykły folder "Dziennik"**, notatka na dzień = tytuł `yyyy-MM-dd`, kolejne wpisy tego samego dnia dopisywane do `RawContent` i re-kompresowane w całości | Brak specjalnego typu notatki w modelu; jedna re-kompresja na dopisanie jest prostsza niż różnicowe aktualizowanie skompresowanej treści |
 | **Renderowanie Markdown: `Markdown.Avalonia.Tight` (12.0.0-a3, alpha)** | Jedyny pakiet kompatybilny z Avalonia 12 + net10.0 w chwili pisania; ręczne pisanie renderera Markdown byłoby dużo większym nakładem niż ryzyko alpha-wersji biblioteki |
+| **Zakładka "Dziś" (dziennik) usunięta** po przetestowaniu przez użytkownika | Wprost zażądane; folder `Dziennik` i notatki w nim utworzone podczas testów **zostają** — to realne dane użytkownika, usunięcie dotyczyło tylko dedykowanej zakładki/UX, nie danych |
 
 ## 4. Co dalej
 
@@ -230,7 +230,6 @@ wszystko renderuje się poprawnie). Nie sprawdzono jeszcze realnym klikaniem:
    kliknięciu w nie (to był zgłoszony wcześniej problem — kod naprawiony, nieklikane).
 5. Przypnij/Odepnij w zakładce "Notatka" przenosi notatkę na górę drzewa przy odświeżeniu.
 6. Kosz: usuń notatkę → pojawia się w zakładce "Kosz" → "Przywróć" wraca do drzewa.
-7. Zakładka "Dziś": dodanie wpisu tworzy/dopisuje notatkę w folderze "Dziennik".
 8. Skróty Ctrl+N/F/D przełączają zakładki, Ctrl+S zapisuje z zakładki edytora.
 
 **Odbiór:** wszystkie osiem punktów działa bez wyjątków w oknie aplikacji.

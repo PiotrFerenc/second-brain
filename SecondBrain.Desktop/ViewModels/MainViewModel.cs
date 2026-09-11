@@ -13,13 +13,10 @@ public partial class MainViewModel(
     IAnswerSynthesizer answerSynthesizer,
     INoteStore noteStore) : ViewModelBase
 {
-    private const string DailyFolder = "Dziennik";
-
     public const int TabEditor = 0;
     public const int TabSearch = 1;
     public const int TabNote = 2;
-    public const int TabDaily = 3;
-    public const int TabTrash = 4;
+    public const int TabTrash = 3;
 
     // ---- Drzewo (foldery + notatki, w tym zagniezdzone podstrony) ----
 
@@ -392,67 +389,6 @@ public partial class MainViewModel(
         }
     }
 
-    // ---- Dziennik (notatka dnia) ----
-
-    [ObservableProperty]
-    public partial string DailyText { get; set; } = "";
-
-    [ObservableProperty]
-    public partial string DailyContent { get; set; } = "";
-
-    [ObservableProperty]
-    public partial string DailyStatus { get; set; } = "";
-
-    [RelayCommand]
-    private async Task LoadDailyAsync()
-    {
-        var title = DateTimeOffset.Now.ToString("yyyy-MM-dd");
-        var notes = await noteStore.ListAsync(DailyFolder);
-        DailyContent = notes.FirstOrDefault(n => n.Title == title)?.RawContent ?? "(brak wpisow dzisiaj)";
-    }
-
-    [RelayCommand]
-    private async Task AppendDailyAsync()
-    {
-        if (string.IsNullOrWhiteSpace(DailyText))
-            return;
-
-        IsBusy = true;
-        try
-        {
-            await vectorIndex.CreateFolderAsync(DailyFolder);
-
-            var title = DateTimeOffset.Now.ToString("yyyy-MM-dd");
-            var notes = await noteStore.ListAsync(DailyFolder);
-            var existing = notes.FirstOrDefault(n => n.Title == title);
-            var now = DateTimeOffset.UtcNow;
-            var timestamp = DateTimeOffset.Now.ToString("HH:mm");
-
-            var note = existing is null
-                ? new Note(Guid.NewGuid(), title, $"[{timestamp}] {DailyText}", "", [], now, now)
-                : existing with { RawContent = $"{existing.RawContent}\n[{timestamp}] {DailyText}", UpdatedAt = now };
-
-            var result = await compressor.CompressAsync(note.RawContent);
-            note = note with { CompressedContent = result.CompressedContent, Tags = result.Tags };
-
-            var path = await noteStore.SaveAsync(DailyFolder, note);
-            note = note with { FilePath = path };
-
-            var vector = await embedder.EmbedAsync(note.CompressedContent);
-            await vectorIndex.UpsertAsync(DailyFolder, note, vector);
-
-            DailyContent = note.RawContent;
-            DailyText = "";
-            DailyStatus = "Dodano.";
-
-            await LoadTreeAsync();
-        }
-        finally
-        {
-            IsBusy = false;
-        }
-    }
-
     // ---- Kosz ----
 
     public ObservableCollection<TrashItem> TrashItems { get; } = [];
@@ -511,9 +447,6 @@ public partial class MainViewModel(
     [RelayCommand]
     private void ShowSearchTab() => SelectedTabIndex = TabSearch;
 
-    [RelayCommand]
-    private void ShowDailyTab() => SelectedTabIndex = TabDaily;
-
     // ---- Start ----
 
     [RelayCommand]
@@ -521,6 +454,5 @@ public partial class MainViewModel(
     {
         await LoadTreeAsync();
         await LoadTrashAsync();
-        await LoadDailyAsync();
     }
 }

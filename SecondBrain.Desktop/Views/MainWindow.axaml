@@ -16,7 +16,6 @@
     <Window.KeyBindings>
         <KeyBinding Gesture="Ctrl+N" Command="{Binding ShowEditorTabCommand}" />
         <KeyBinding Gesture="Ctrl+F" Command="{Binding ShowSearchTabCommand}" />
-        <KeyBinding Gesture="Ctrl+D" Command="{Binding ShowDailyTabCommand}" />
         <KeyBinding Gesture="Ctrl+S" Command="{Binding SaveNoteCommand}" />
     </Window.KeyBindings>
 
@@ -219,21 +218,6 @@
                         </StackPanel>
 
                         <md:MarkdownScrollViewer Markdown="{Binding SelectedNote.RawContent}" />
-                    </DockPanel>
-                </TabItem>
-
-                <TabItem Header="Dziś">
-                    <DockPanel Margin="0,20,0,0">
-                        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="12" Margin="0,16,0,0">
-                            <TextBox Text="{Binding DailyText}"
-                                     PlaceholderText="Szybka notatka do dziennika..."
-                                     Width="500"
-                                     IsEnabled="{Binding !IsBusy}" />
-                            <Button Content="Dodaj" Classes="accent" Command="{Binding AppendDailyCommand}" IsEnabled="{Binding !IsBusy}" />
-                            <TextBlock Text="{Binding DailyStatus}" Classes="subtle" VerticalAlignment="Center" />
-                        </StackPanel>
-
-                        <md:MarkdownScrollViewer Markdown="{Binding DailyContent}" />
                     </DockPanel>
                 </TabItem>
 
