@@ -121,11 +121,18 @@
                             </ComboBox>
                         </StackPanel>
 
-                        <TextBox Text="{Binding NoteText}"
-                                 Classes="editor"
-                                 AcceptsReturn="True" TextWrapping="Wrap"
-                                 PlaceholderText="Wpisz notatkę... (odwołaj się do innej przez [[Tytuł notatki]])"
-                                 FontSize="15" />
+                        <Grid ColumnDefinitions="*,Auto,*">
+                            <TextBox Grid.Column="0"
+                                     Text="{Binding NoteText}"
+                                     Classes="editor"
+                                     AcceptsReturn="True" TextWrapping="Wrap"
+                                     PlaceholderText="Wpisz notatkę... (odwołaj się do innej przez [[Tytuł notatki]])"
+                                     FontSize="15" />
+
+                            <Border Grid.Column="1" Width="1" Background="{DynamicResource CtpSurface2}" Margin="16,0" />
+
+                            <md:MarkdownScrollViewer Grid.Column="2" Markdown="{Binding NoteText}" />
+                        </Grid>
                     </DockPanel>
                 </TabItem>
 
