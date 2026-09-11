@@ -81,7 +81,7 @@ public partial class MainViewModel(
                 DisplayName = note.Title,
                 IsFolder = false,
                 OwningFolder = owningFolder,
-                Note = ToItem(note)
+                Note = ToItem(note, owningFolder)
             };
             BuildNoteTree(item.Children, notes, note.Id, owningFolder);
             target.Add(item);
@@ -102,8 +102,8 @@ public partial class MainViewModel(
         return null;
     }
 
-    private static SearchResultItem ToItem(Note note) =>
-        new(note.Id, note.Title, string.Join(", ", note.Tags), 0f, note.RawContent, note.FilePath, note.ParentId, note.Pinned);
+    private static SearchResultItem ToItem(Note note, string folder) =>
+        new(note.Id, note.Title, note.Tags, 0f, note.RawContent, note.FilePath, note.ParentId, note.Pinned, folder);
 
     // ---- Foldery ----
 
@@ -177,13 +177,6 @@ public partial class MainViewModel(
         NoteText = "";
         NoteTagsInput = "";
         EditorStatus = "";
-        SearchQuery = "";
-        SynthesizedAnswer = "";
-        HasAnswer = false;
-        SearchResults.Clear();
-        SelectedResult = null;
-        HasSearched = false;
-        HasResults = false;
         ConfirmDeleteFolder = false;
         SelectedParentOption = null;
 
@@ -198,7 +191,7 @@ public partial class MainViewModel(
             return;
 
         foreach (var note in await noteStore.ListAsync(SelectedFolder))
-            ParentOptions.Add(ToItem(note));
+            ParentOptions.Add(ToItem(note, SelectedFolder));
     }
 
     public ObservableCollection<NoteTemplate> Templates { get; } = [];
@@ -271,29 +264,73 @@ public partial class MainViewModel(
         }
     }
 
+    // Import zbiorczy: kazda niepusta linia pliku przechodzi przez ten sam pipeline
+    // co pojedyncza notatka (kompresja -> zapis -> embedding -> upsert).
+    [RelayCommand]
+    private async Task ImportLinesAsync(IReadOnlyList<string> lines)
+    {
+        if (SelectedFolder is null)
+        {
+            EditorStatus = "Wybierz folder przed importem.";
+            return;
+        }
+
+        var toImport = lines.Select(l => l.Trim()).Where(l => l.Length > 0).ToList();
+        if (toImport.Count == 0)
+            return;
+
+        IsBusy = true;
+        try
+        {
+            var imported = 0;
+            foreach (var line in toImport)
+            {
+                EditorStatus = $"Importuje {imported + 1}/{toImport.Count}...";
+                var now = DateTimeOffset.UtcNow;
+                var result = await compressor.CompressAsync(line);
+                var note = new Note(Guid.NewGuid(), result.Title, line, result.CompressedContent, result.Tags, now, now);
+
+                var path = await noteStore.SaveAsync(SelectedFolder, note);
+                note = note with { FilePath = path };
+
+                var vector = await embedder.EmbedAsync(note.CompressedContent);
+                await vectorIndex.UpsertAsync(SelectedFolder, note, vector);
+                imported++;
+            }
+
+            EditorStatus = $"Zaimportowano notatek: {imported}.";
+            await LoadTreeAsync();
+            await LoadParentOptionsAsync();
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
     // ---- Notatka (podglad wybranej w drzewie) ----
 
     [RelayCommand]
     private async Task TogglePinAsync()
     {
-        if (SelectedNote is null || SelectedFolder is null)
+        if (SelectedNote is null)
             return;
 
         var note = await noteStore.LoadAsync(SelectedNote.FilePath);
         note = note with { Pinned = !note.Pinned, UpdatedAt = DateTimeOffset.UtcNow };
-        await noteStore.SaveAsync(SelectedFolder, note);
+        await noteStore.SaveAsync(SelectedNote.Folder, note);
 
-        SelectedNote = ToItem(note);
+        SelectedNote = ToItem(note, SelectedNote.Folder);
         await LoadTreeAsync();
     }
 
     private async Task LoadBacklinksAsync()
     {
         BacklinksText = "";
-        if (SelectedNote is null || SelectedFolder is null)
+        if (SelectedNote is null)
             return;
 
-        var notes = await noteStore.ListAsync(SelectedFolder);
+        var notes = await noteStore.ListAsync(SelectedNote.Folder);
         var referencing = notes
             .Where(n => n.Id != SelectedNote.Id &&
                         n.RawContent.Contains($"[[{SelectedNote.Title}]]", StringComparison.OrdinalIgnoreCase))
@@ -307,11 +344,11 @@ public partial class MainViewModel(
     private async Task DeleteNoteAsync(SearchResultItem? item)
     {
         item ??= SelectedNote;
-        if (item is null || SelectedFolder is null || string.IsNullOrEmpty(item.FilePath))
+        if (item is null || string.IsNullOrEmpty(item.FilePath) || string.IsNullOrEmpty(item.Folder))
             return;
 
-        await vectorIndex.DeleteNoteAsync(SelectedFolder, item.Id);
-        await noteStore.MoveToTrashAsync(SelectedFolder, item.FilePath);
+        await vectorIndex.DeleteNoteAsync(item.Folder, item.Id);
+        await noteStore.MoveToTrashAsync(item.Folder, item.FilePath);
 
         if (SelectedResult == item)
             SelectedResult = null;
@@ -324,7 +361,7 @@ public partial class MainViewModel(
         await LoadTreeAsync();
     }
 
-    // ---- Wyszukiwanie ----
+    // ---- Wyszukiwanie (globalne, po wszystkich folderach) ----
 
     [ObservableProperty]
     public partial string SearchQuery { get; set; } = "";
@@ -355,15 +392,23 @@ public partial class MainViewModel(
         SynthesizedAnswer = "";
         HasAnswer = false;
 
-        if (SelectedFolder is null || string.IsNullOrWhiteSpace(SearchQuery))
+        if (string.IsNullOrWhiteSpace(SearchQuery))
             return;
 
         IsBusy = true;
         try
         {
             var queryVector = await embedder.EmbedAsync(SearchQuery);
-            var candidates = await vectorIndex.SearchAsync(SelectedFolder, queryVector, limit: 20);
-            var reranked = await reranker.RerankAsync(SearchQuery, candidates);
+
+            var candidatesWithFolder = new List<(string Folder, ScoredNote Scored)>();
+            foreach (var folder in await vectorIndex.ListFoldersAsync())
+            {
+                var candidates = await vectorIndex.SearchAsync(folder, queryVector, limit: 20);
+                candidatesWithFolder.AddRange(candidates.Select(c => (folder, c)));
+            }
+
+            var folderById = candidatesWithFolder.ToDictionary(c => c.Scored.Note.Id, c => c.Folder);
+            var reranked = await reranker.RerankAsync(SearchQuery, candidatesWithFolder.Select(c => c.Scored).ToList());
 
             var notesForAnswer = new List<Note>();
 
@@ -373,7 +418,8 @@ public partial class MainViewModel(
                 if (!string.IsNullOrEmpty(r.Note.FilePath) && File.Exists(r.Note.FilePath))
                     note = await noteStore.LoadAsync(r.Note.FilePath);
 
-                SearchResults.Add(new SearchResultItem(note.Id, note.Title, string.Join(", ", note.Tags), r.Score, note.RawContent, note.FilePath, note.ParentId, note.Pinned));
+                var folder = folderById.GetValueOrDefault(r.Note.Id, "");
+                SearchResults.Add(new SearchResultItem(note.Id, note.Title, note.Tags, r.Score, note.RawContent, note.FilePath, note.ParentId, note.Pinned, folder));
 
                 if (notesForAnswer.Count < 5)
                     notesForAnswer.Add(note);
@@ -387,6 +433,43 @@ public partial class MainViewModel(
                 SynthesizedAnswer = await answerSynthesizer.SynthesizeAsync(SearchQuery, notesForAnswer);
                 HasAnswer = !string.IsNullOrWhiteSpace(SynthesizedAnswer);
             }
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    // Klikniecie w tag: filtruje notatki po wszystkich folderach (zwykle dopasowanie
+    // tekstowe po pliku, bez embeddingu/rerankera - to nie jest wyszukiwanie semantyczne).
+    [RelayCommand]
+    private async Task FilterByTagAsync(string? tag)
+    {
+        if (string.IsNullOrWhiteSpace(tag))
+            return;
+
+        SearchResults.Clear();
+        SelectedResult = null;
+        SynthesizedAnswer = "";
+        HasAnswer = false;
+        HasSearched = true;
+        SearchQuery = $"#{tag}";
+
+        IsBusy = true;
+        try
+        {
+            foreach (var folder in await vectorIndex.ListFoldersAsync())
+            {
+                foreach (var note in await noteStore.ListAsync(folder))
+                {
+                    if (note.Tags.Any(t => string.Equals(t, tag, StringComparison.OrdinalIgnoreCase)))
+                        SearchResults.Add(ToItem(note, folder));
+                }
+            }
+
+            SelectedResult = SearchResults.FirstOrDefault();
+            HasResults = SearchResults.Count > 0;
+            SelectedTabIndex = TabSearch;
         }
         finally
         {
