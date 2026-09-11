@@ -152,22 +152,22 @@
         <Setter Property="BorderThickness" Value="1.5" />
     </Style>
 
-    <!-- Zakladki -->
-    <Style Selector="TabControl">
+    <!-- Naglowki "zakladek" w prawym panelu - Nowa notatka / Notatka. Szukaj i Kosz
+         nie maja tu naglowka wcale (tylko pasek narzedzi w sidebarze). -->
+    <Style Selector="Button.tabHeader">
         <Setter Property="Background" Value="Transparent" />
-        <Setter Property="Padding" Value="0" />
-    </Style>
-    <Style Selector="TabItem">
-        <Setter Property="Padding" Value="4,10" />
-        <Setter Property="Margin" Value="0,0,20,0" />
+        <Setter Property="BorderThickness" Value="0" />
         <Setter Property="Foreground" Value="{DynamicResource CtpSubtext1}" />
-        <Setter Property="FontWeight" Value="Medium" />
-        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="FontSize" Value="20" />
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="Cursor" Value="Hand" />
     </Style>
-    <Style Selector="TabItem:pointerover">
+    <Style Selector="Button.tabHeader:pointerover">
+        <Setter Property="Background" Value="Transparent" />
         <Setter Property="Foreground" Value="{DynamicResource CtpText}" />
     </Style>
-    <Style Selector="TabItem:selected">
+    <Style Selector="Button.tabHeader.active">
         <Setter Property="Foreground" Value="{DynamicResource CtpMauve}" />
     </Style>
 

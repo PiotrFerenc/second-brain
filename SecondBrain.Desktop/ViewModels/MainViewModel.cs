@@ -442,15 +442,40 @@ public partial class MainViewModel(
     }
 
     // ---- Zakladki / skroty klawiszowe ----
+    // Szukaj i Kosz sa dostepne tylko z paska narzedzi (nie maja wlasnego naglowka
+    // w prawym panelu) - stad wlasne flagi widoczności zamiast TabControl.SelectedIndex.
 
     [ObservableProperty]
-    public partial int SelectedTabIndex { get; set; }
+    public partial int SelectedTabIndex { get; set; } = TabEditor;
+
+    [ObservableProperty]
+    public partial bool IsEditorTabActive { get; set; } = true;
+
+    [ObservableProperty]
+    public partial bool IsSearchTabActive { get; set; }
+
+    [ObservableProperty]
+    public partial bool IsNoteTabActive { get; set; }
+
+    [ObservableProperty]
+    public partial bool IsTrashTabActive { get; set; }
+
+    partial void OnSelectedTabIndexChanged(int value)
+    {
+        IsEditorTabActive = value == TabEditor;
+        IsSearchTabActive = value == TabSearch;
+        IsNoteTabActive = value == TabNote;
+        IsTrashTabActive = value == TabTrash;
+    }
 
     [RelayCommand]
     private void ShowEditorTab() => SelectedTabIndex = TabEditor;
 
     [RelayCommand]
     private void ShowSearchTab() => SelectedTabIndex = TabSearch;
+
+    [RelayCommand]
+    private void ShowNoteTab() => SelectedTabIndex = TabNote;
 
     [RelayCommand]
     private void ShowTrashTab() => SelectedTabIndex = TabTrash;

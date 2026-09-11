@@ -93,10 +93,24 @@
                 Margin="0,12,0,0"
                 BoxShadow="0 0 24 0 #22000000">
 
-            <TabControl Margin="28,20,28,24" SelectedIndex="{Binding SelectedTabIndex}">
+            <DockPanel Margin="28,20,28,24">
 
-                <TabItem Header="Nowa notatka">
-                    <DockPanel Margin="0,20,0,0">
+                <!-- Tylko te dwie maja naglowek w prawym panelu - Szukaj i Kosz sa
+                     dostepne wylacznie z paska narzedzi w sidebarze. -->
+                <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="24" Margin="0,0,0,4">
+                    <Button Content="Nowa notatka"
+                            Classes="tabHeader"
+                            Classes.active="{Binding IsEditorTabActive}"
+                            Command="{Binding ShowEditorTabCommand}" />
+                    <Button Content="Notatka"
+                            Classes="tabHeader"
+                            Classes.active="{Binding IsNoteTabActive}"
+                            Command="{Binding ShowNoteTabCommand}" />
+                </StackPanel>
+
+                <Panel>
+
+                <DockPanel Margin="0,20,0,0" IsVisible="{Binding IsEditorTabActive}">
                         <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="12" Margin="0,16,0,0">
                             <Button Content="Zapisz"
                                     Classes="accent"
@@ -136,10 +150,8 @@
                             <md:MarkdownScrollViewer Grid.Column="2" Markdown="{Binding NoteText}" />
                         </Grid>
                     </DockPanel>
-                </TabItem>
 
-                <TabItem Header="Szukaj">
-                    <DockPanel Margin="0,20,0,0">
+                    <DockPanel Margin="0,20,0,0" IsVisible="{Binding IsSearchTabActive}">
                         <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="10" Margin="0,0,0,16">
                             <TextBox Text="{Binding SearchQuery}" PlaceholderText="Zadaj pytanie..." Width="420" />
                             <Button Content="Szukaj"
@@ -204,11 +216,9 @@
                             </DockPanel>
                         </Grid>
                     </DockPanel>
-                </TabItem>
 
-                <TabItem Header="Notatka">
-                    <DockPanel Margin="0,20,0,0"
-                               IsVisible="{Binding SelectedNote, Converter={x:Static acnv:ObjectConverters.IsNotNull}}">
+                    <DockPanel Margin="0,20,0,0" IsVisible="{Binding IsNoteTabActive}">
+                    <DockPanel IsVisible="{Binding SelectedNote, Converter={x:Static acnv:ObjectConverters.IsNotNull}}">
                         <StackPanel DockPanel.Dock="Top" Spacing="6" Margin="0,0,0,14">
                             <Grid ColumnDefinitions="*,Auto,Auto,Auto">
                                 <TextBlock Grid.Column="0" Text="{Binding SelectedNote.Title}"
@@ -228,10 +238,9 @@
 
                         <md:MarkdownScrollViewer Markdown="{Binding SelectedNote.RawContent}" />
                     </DockPanel>
-                </TabItem>
+                    </DockPanel>
 
-                <TabItem Header="Kosz">
-                    <DockPanel Margin="0,20,0,0">
+                    <DockPanel Margin="0,20,0,0" IsVisible="{Binding IsTrashTabActive}">
                         <Grid ColumnDefinitions="280,*">
 
                             <Panel Grid.Column="0">
@@ -267,9 +276,9 @@
                             </DockPanel>
                         </Grid>
                     </DockPanel>
-                </TabItem>
 
-            </TabControl>
+                </Panel>
+            </DockPanel>
         </Border>
 
     </Grid>
