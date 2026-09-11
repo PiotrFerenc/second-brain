@@ -97,15 +97,18 @@
 
                 <!-- Tylko te dwie maja naglowek w prawym panelu - Szukaj i Kosz sa
                      dostepne wylacznie z paska narzedzi w sidebarze. -->
-                <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="24" Margin="0,0,0,4">
-                    <Button Content="Nowa notatka"
-                            Classes="tabHeader"
-                            Classes.active="{Binding IsEditorTabActive}"
-                            Command="{Binding ShowEditorTabCommand}" />
+                <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="24" Margin="0,0,0,4"
+                            IsVisible="{Binding IsContentHeaderVisible}">
                     <Button Content="Notatka"
                             Classes="tabHeader"
                             Classes.active="{Binding IsNoteTabActive}"
                             Command="{Binding ShowNoteTabCommand}" />
+                    <Button Content="+"
+                            Classes="tabHeader"
+                            Classes.active="{Binding IsEditorTabActive}"
+                            FontSize="24"
+                            Command="{Binding ShowEditorTabCommand}"
+                            ToolTip.Tip="Nowa notatka" />
                 </StackPanel>
 
                 <Panel>

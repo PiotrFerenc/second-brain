@@ -460,12 +460,18 @@ public partial class MainViewModel(
     [ObservableProperty]
     public partial bool IsTrashTabActive { get; set; }
 
+    // Naglowek "Notatka / +" w prawym panelu ma sens tylko dla tych dwoch widokow -
+    // Szukaj i Kosz maja wlasna zawartosc od samej gory.
+    [ObservableProperty]
+    public partial bool IsContentHeaderVisible { get; set; } = true;
+
     partial void OnSelectedTabIndexChanged(int value)
     {
         IsEditorTabActive = value == TabEditor;
         IsSearchTabActive = value == TabSearch;
         IsNoteTabActive = value == TabNote;
         IsTrashTabActive = value == TabTrash;
+        IsContentHeaderVisible = value is TabEditor or TabNote;
     }
 
     [RelayCommand]
