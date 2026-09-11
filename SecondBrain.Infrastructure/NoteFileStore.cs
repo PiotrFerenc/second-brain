@@ -126,6 +126,53 @@ public class FileNoteStore(IOptions<StorageOptions> options) : INoteStore
         return templates;
     }
 
+    public async Task LogGapAsync(string query, CancellationToken ct = default)
+    {
+        var dir = Path.Combine(_root, ".gaps");
+        Directory.CreateDirectory(dir);
+        var path = Path.Combine(dir, $"{Guid.NewGuid()}.md");
+
+        var content = $"""
+            ---
+            asked: {DateTimeOffset.UtcNow:O}
+            ---
+            {query}
+            """;
+
+        await File.WriteAllTextAsync(path, content, ct);
+    }
+
+    public async Task<IReadOnlyList<KnowledgeGap>> ListGapsAsync(CancellationToken ct = default)
+    {
+        var dir = Path.Combine(_root, ".gaps");
+        if (!Directory.Exists(dir))
+            return [];
+
+        var gaps = new List<KnowledgeGap>();
+        foreach (var file in Directory.EnumerateFiles(dir, "*.md"))
+        {
+            var lines = await File.ReadAllLinesAsync(file, ct);
+            if (lines.Length < 3 || lines[0] != "---" || lines[2] != "---")
+                continue;
+
+            var askedValue = lines[1][(lines[1].IndexOf(':') + 1)..].Trim();
+            var asked = DateTimeOffset.Parse(askedValue);
+            var query = string.Join('\n', lines[3..]).Trim();
+
+            gaps.Add(new KnowledgeGap(query, asked, file));
+        }
+
+        return gaps.OrderByDescending(g => g.AskedAt).ToList();
+    }
+
+    public Task ResolveGapAsync(string path, CancellationToken ct = default)
+    {
+        if (File.Exists(path))
+            File.Delete(path);
+
+        return Task.CompletedTask;
+    }
+
     private static string ExtractTrashFolder(string trashPath)
     {
         var name = Path.GetFileNameWithoutExtension(trashPath);

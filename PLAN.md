@@ -49,7 +49,9 @@ SecondBrain.slnx
     Embedding.cs                OpenAiEmbedder (realny) + MockEmbedder (aktywny, patrz nizej)
     Compression.cs              OpenAiCompressor (chat/completions, response_format json_object,
                                  zwraca tytul+tresc+tagi jednym wywolaniem) — dziala
-    AnswerSynthesis.cs           OpenAiAnswerSynthesizer (chat/completions) — dziala
+    AnswerSynthesis.cs           OpenAiAnswerSynthesizer (chat/completions, json_object,
+                                 zwraca AnswerResult{Answered,Answer} - jawny sygnal
+                                 "nie wiem" zamiast parsowania wolnego tekstu) — dziala
     Reranking.cs                MockReranker (aktywny) + CohereReranker (v2/rerank, gotowy,
                                  nieprzetestowany — provider dostepny tylko na 2. maszynie)
     NoteFileStore.cs             FileNoteStore — front matter (+parent/pinned), ListAsync
@@ -178,6 +180,7 @@ Te ustalenia są wiążące — nie zmieniaj ich bez wyraźnej prośby użytkown
 | **Sidebar jako `TreeView`** (foldery = korzenie, notatki = dzieci, podstrony = dzieci notatek), zakładka "Notatki" usunięta na rzecz zakładki "Notatka" (podgląd tego, co zaznaczone w drzewie) | Wprost zażądane przez użytkownika; drzewo naturalnie łączy przeglądanie folderów z hierarchią notatek (podstrony) bez dwóch osobnych list |
 | **Drzewo ładowane w całości przy starcie/odświeżeniu** (nie leniwie przy rozwinięciu węzła) | Prostszy kod (jeden `LoadTreeAsync` zamiast obsługi zdarzenia rozwinięcia); do zmiany gdy liczba notatek realnie zacznie spowalniać start |
 | **Kosz zamiast trwałego usuwania notatek** — plik trafia do `.trash/<folder>___<id>.md`, punkt usuwany z Qdrant od razu (nie da się go "skosić") | Wprost zażądane przez użytkownika |
+| **Luki w wiedzy** (`.gaps/<guid>.md`) — gdy RAG jawnie zwróci `Answered:false`, pytanie zapisuje się jako trwały, samo-generujący się backlog rzeczy do dopisania; usuwane tylko ręcznie ("Odrzuć"), bez auto-czyszczenia po dodaniu pasującej notatki | Własny pomysł (nie kopia konkurencji) — żadna popularna apka notatkowa nie ma kroku RAG z jawnym "nie wiem", więc nikt nie robi z porażki wyszukiwania trwałego TODO. Auto-zamykanie luk po dopisaniu notatki to świadomie odłożone v2 |
 | **Usuwanie folderu zostaje trwałe** (nie trafia do kosza) | Pełne cofnięcie wymagałoby klonowania całej kolekcji Qdrant zamiast jednego `DeleteCollectionAsync` — niewspółmiernie drogie do tego jak rzadko się kasuje cały folder; dwa kliknięcia jako jedyna ochrona |
 | **Tagi: pole wpisywane ręcznie, puste = LLM proponuje** (`CompressionResult.Tags` z tego samego wywołania co tytuł/treść) | Wprost zażądane przez użytkownika; brak osobnego wywołania LLM tylko po tagi |
 | **Filtrowanie po tagach NIE zostało zrobione** | Świadomy cios w zakres — drzewo+5 zakładek to już duża zmiana za jeden raz; tagi są zapisywane i widoczne w zakładce "Notatka", ale nie ma jeszcze UI do filtrowania po nich |

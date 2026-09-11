@@ -17,6 +17,7 @@ public partial class MainViewModel(
     public const int TabSearch = 1;
     public const int TabNote = 2;
     public const int TabTrash = 3;
+    public const int TabGaps = 4;
 
     // ---- Drzewo (foldery + notatki, w tym zagniezdzone podstrony) ----
 
@@ -459,8 +460,14 @@ public partial class MainViewModel(
 
             if (notesForAnswer.Count > 0)
             {
-                SynthesizedAnswer = await answerSynthesizer.SynthesizeAsync(SearchQuery, notesForAnswer);
+                var answer = await answerSynthesizer.SynthesizeAsync(SearchQuery, notesForAnswer);
+                SynthesizedAnswer = answer.Answer;
                 HasAnswer = !string.IsNullOrWhiteSpace(SynthesizedAnswer);
+
+                // "Luka w wiedzy": RAG jawnie mowi ze notatki nie zawieraja odpowiedzi -
+                // zapisujemy pytanie, zeby nie zginelo, i user mial co dopisac.
+                if (!answer.Answered)
+                    await noteStore.LogGapAsync(SearchQuery);
             }
         }
         finally
@@ -528,6 +535,50 @@ public partial class MainViewModel(
         await LoadTrashAsync();
     }
 
+    // ---- Luki w wiedzy ----
+
+    public ObservableCollection<GapItem> Gaps { get; } = [];
+
+    [ObservableProperty]
+    public partial GapItem? SelectedGap { get; set; }
+
+    [ObservableProperty]
+    public partial bool HasGaps { get; set; }
+
+    [RelayCommand]
+    private async Task LoadGapsAsync()
+    {
+        Gaps.Clear();
+        foreach (var g in await noteStore.ListGapsAsync())
+            Gaps.Add(new GapItem(g.Query, g.AskedAt, g.Path));
+
+        HasGaps = Gaps.Count > 0;
+    }
+
+    [RelayCommand]
+    private async Task ResolveGapAsync(GapItem? item)
+    {
+        item ??= SelectedGap;
+        if (item is null)
+            return;
+
+        await noteStore.ResolveGapAsync(item.Path);
+        SelectedGap = null;
+        await LoadGapsAsync();
+    }
+
+    [RelayCommand]
+    private async Task RetryGapSearchAsync(GapItem? item)
+    {
+        item ??= SelectedGap;
+        if (item is null)
+            return;
+
+        SearchQuery = item.Query;
+        SelectedTabIndex = TabSearch;
+        await SearchAsync();
+    }
+
     // ---- Zakladki / skroty klawiszowe ----
     // Szukaj i Kosz sa dostepne tylko z paska narzedzi (nie maja wlasnego naglowka
     // w prawym panelu) - stad wlasne flagi widoczności zamiast TabControl.SelectedIndex.
@@ -547,8 +598,11 @@ public partial class MainViewModel(
     [ObservableProperty]
     public partial bool IsTrashTabActive { get; set; }
 
+    [ObservableProperty]
+    public partial bool IsGapsTabActive { get; set; }
+
     // Naglowek "Notatka / +" w prawym panelu ma sens tylko dla tych dwoch widokow -
-    // Szukaj i Kosz maja wlasna zawartosc od samej gory.
+    // Szukaj, Kosz i Luki maja wlasna zawartosc od samej gory.
     [ObservableProperty]
     public partial bool IsContentHeaderVisible { get; set; } = true;
 
@@ -558,6 +612,7 @@ public partial class MainViewModel(
         IsSearchTabActive = value == TabSearch;
         IsNoteTabActive = value == TabNote;
         IsTrashTabActive = value == TabTrash;
+        IsGapsTabActive = value == TabGaps;
         IsContentHeaderVisible = value is TabEditor or TabNote;
     }
 
@@ -573,6 +628,9 @@ public partial class MainViewModel(
     [RelayCommand]
     private void ShowTrashTab() => SelectedTabIndex = TabTrash;
 
+    [RelayCommand]
+    private void ShowGapsTab() => SelectedTabIndex = TabGaps;
+
     // ---- Start ----
 
     [RelayCommand]
@@ -581,5 +639,6 @@ public partial class MainViewModel(
         await LoadTreeAsync();
         await LoadTrashAsync();
         await LoadTemplatesAsync();
+        await LoadGapsAsync();
     }
 }

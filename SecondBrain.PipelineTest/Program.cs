@@ -168,8 +168,35 @@ switch (args.ElementAtOrDefault(0))
         if (fullNotes.Count > 0)
         {
             var answer = await answerSynthesizer.SynthesizeAsync(query, fullNotes);
-            Console.WriteLine($"\nOdpowiedz:\n{answer}");
+            Console.WriteLine($"\nOdpowiedz:\n{answer.Answer}");
+
+            if (!answer.Answered)
+            {
+                await noteStore.LogGapAsync(query);
+                Console.WriteLine("(zapisano jako luka w wiedzy)");
+            }
         }
+        break;
+    }
+
+    case "gaps":
+    {
+        var gaps = await noteStore.ListGapsAsync();
+        if (gaps.Count == 0)
+        {
+            Console.WriteLine("Brak luk w wiedzy.");
+            break;
+        }
+
+        foreach (var g in gaps)
+            Console.WriteLine($"{g.Path}  {g.AskedAt:yyyy-MM-dd HH:mm}  {g.Query}");
+        break;
+    }
+
+    case "resolve-gap" when args.Length >= 2:
+    {
+        await noteStore.ResolveGapAsync(args[1]);
+        Console.WriteLine("Odrzucono luke.");
         break;
     }
 
@@ -187,6 +214,8 @@ switch (args.ElementAtOrDefault(0))
               dotnet run -- restore <sciezka z list-trash>
               dotnet run -- purge <sciezka z list-trash>        (trwale)
               dotnet run -- search <folder> <zapytanie...>
+              dotnet run -- gaps
+              dotnet run -- resolve-gap <sciezka z gaps>
             """);
         break;
 }

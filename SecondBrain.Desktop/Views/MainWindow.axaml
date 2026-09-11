@@ -33,6 +33,8 @@
             <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="0,0,0,20">
                 <Button Content="Szukaj" Classes="subtleAction" Command="{Binding ShowSearchTabCommand}" />
                 <Button Content="Kosz" Classes="subtleAction" Command="{Binding ShowTrashTabCommand}" />
+                <Button Content="{Binding Gaps.Count, StringFormat='Luki ({0})'}"
+                        Classes="subtleAction" Command="{Binding ShowGapsTabCommand}" />
             </StackPanel>
 
             <StackPanel DockPanel.Dock="Bottom" Spacing="8" Margin="0,20,0,0">
@@ -306,6 +308,44 @@
                                             CommandParameter="{Binding SelectedTrashItem}" />
                                 </StackPanel>
                                 <md:MarkdownScrollViewer Markdown="{Binding SelectedTrashItem.RawContent}" />
+                            </DockPanel>
+                        </Grid>
+                    </DockPanel>
+
+                    <DockPanel Margin="0,20,0,0" IsVisible="{Binding IsGapsTabActive}">
+                        <Grid ColumnDefinitions="280,*">
+
+                            <Panel Grid.Column="0">
+                                <TextBlock Text="Brak luk w wiedzy - na wszystko masz odpowiedź w notatkach."
+                                           Classes="subtle" TextWrapping="Wrap"
+                                           IsVisible="{Binding !HasGaps}" />
+
+                                <ListBox ItemsSource="{Binding Gaps}"
+                                         SelectedItem="{Binding SelectedGap}"
+                                         IsVisible="{Binding HasGaps}">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:GapItem">
+                                            <StackPanel Spacing="2">
+                                                <TextBlock Text="{Binding Query}" FontWeight="Medium" TextWrapping="Wrap" />
+                                                <TextBlock Text="{Binding AskedAt, StringFormat='{}{0:yyyy-MM-dd HH:mm}'}"
+                                                           Classes="subtle" FontSize="11.5" />
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                            </Panel>
+
+                            <DockPanel Grid.Column="1" Margin="20,0,0,0"
+                                       IsVisible="{Binding SelectedGap, Converter={x:Static acnv:ObjectConverters.IsNotNull}}">
+                                <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
+                                    <Button Content="Szukaj ponownie" Classes="accent"
+                                            Command="{Binding RetryGapSearchCommand}"
+                                            CommandParameter="{Binding SelectedGap}" />
+                                    <Button Content="Odrzuć" Classes="danger"
+                                            Command="{Binding ResolveGapCommand}"
+                                            CommandParameter="{Binding SelectedGap}" />
+                                </StackPanel>
+                                <TextBlock Text="{Binding SelectedGap.Query}" TextWrapping="Wrap" FontSize="15" LineHeight="22" />
                             </DockPanel>
                         </Grid>
                     </DockPanel>

@@ -11,6 +11,12 @@ public record TrashedNote(Note Note, string OriginalFolder, string TrashPath);
 
 public record NoteTemplate(string Name, string Content);
 
+public record AnswerResult(
+    [property: JsonPropertyName("answered")] bool Answered,
+    [property: JsonPropertyName("answer")] string Answer);
+
+public record KnowledgeGap(string Query, DateTimeOffset AskedAt, string Path);
+
 public interface ICompressor
 {
     Task<CompressionResult> CompressAsync(string rawText, CancellationToken ct = default);
@@ -28,9 +34,11 @@ public interface IReranker
 
 // Osobny krok od wyszukiwania: bierze juz-znalezione notatki i syntetyzuje z nich
 // bezposrednia odpowiedz na pytanie. Wyszukiwanie samo w sobie dziala bez tego kroku.
+// Answered=false to jawny sygnal "notatki nie zawieraja odpowiedzi", uzywany do logowania
+// luk w wiedzy - nie parsujemy tego z wolnego tekstu, LLM zwraca to jako pole JSON.
 public interface IAnswerSynthesizer
 {
-    Task<string> SynthesizeAsync(string query, IReadOnlyList<Note> notes, CancellationToken ct = default);
+    Task<AnswerResult> SynthesizeAsync(string query, IReadOnlyList<Note> notes, CancellationToken ct = default);
 }
 
 public interface INoteStore
@@ -48,6 +56,11 @@ public interface INoteStore
 
     // Szablony notatek - pliki .md czytelne i edytowalne przez uzytkownika poza aplikacja.
     Task<IReadOnlyList<NoteTemplate>> ListTemplatesAsync(CancellationToken ct = default);
+
+    // Luki w wiedzy: pytania, na ktore RAG jawnie odpowiedzial "notatki tego nie zawieraja".
+    Task LogGapAsync(string query, CancellationToken ct = default);
+    Task<IReadOnlyList<KnowledgeGap>> ListGapsAsync(CancellationToken ct = default);
+    Task ResolveGapAsync(string path, CancellationToken ct = default);
 }
 
 // Folder = kolekcja w bazie wektorowej. Jedna implementacja (Qdrant) na razie,
