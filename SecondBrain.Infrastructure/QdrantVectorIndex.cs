@@ -38,6 +38,11 @@ public class QdrantVectorIndex : IVectorIndex
         return true;
     }
 
+    public async Task DeleteFolderAsync(string name, CancellationToken ct = default)
+    {
+        await _client.DeleteCollectionAsync(name, cancellationToken: ct);
+    }
+
     public async Task UpsertAsync(string folder, Note note, float[] vector, CancellationToken ct = default)
     {
         var point = new PointStruct
@@ -56,6 +61,11 @@ public class QdrantVectorIndex : IVectorIndex
         };
 
         await _client.UpsertAsync(folder, [point], cancellationToken: ct);
+    }
+
+    public async Task DeleteNoteAsync(string folder, Guid noteId, CancellationToken ct = default)
+    {
+        await _client.DeleteAsync(folder, noteId, cancellationToken: ct);
     }
 
     public async Task<IReadOnlyList<ScoredNote>> SearchAsync(string folder, float[] vector, ulong limit, CancellationToken ct = default)

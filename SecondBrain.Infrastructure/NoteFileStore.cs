@@ -89,4 +89,21 @@ public class FileNoteStore(IOptions<StorageOptions> options) : INoteStore
 
         return notes.OrderByDescending(n => n.UpdatedAt).ToList();
     }
+
+    public Task DeleteAsync(string filePath, CancellationToken ct = default)
+    {
+        if (File.Exists(filePath))
+            File.Delete(filePath);
+
+        return Task.CompletedTask;
+    }
+
+    public Task DeleteFolderAsync(string folder, CancellationToken ct = default)
+    {
+        var dir = Path.Combine(_root, folder);
+        if (Directory.Exists(dir))
+            Directory.Delete(dir, recursive: true);
+
+        return Task.CompletedTask;
+    }
 }

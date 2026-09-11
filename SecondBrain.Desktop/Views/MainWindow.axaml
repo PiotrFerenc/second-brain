@@ -2,6 +2,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:SecondBrain.Desktop.ViewModels"
         xmlns:conv="using:SecondBrain.Desktop.Converters"
+        xmlns:acnv="using:Avalonia.Data.Converters"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d" d:DesignWidth="1040" d:DesignHeight="680"
@@ -28,6 +29,20 @@
                         Command="{Binding CreateFolderCommand}"
                         HorizontalAlignment="Stretch"
                         HorizontalContentAlignment="Center" />
+
+                <Button Content="Usuń folder"
+                        Classes="danger"
+                        Command="{Binding DeleteFolderCommand}"
+                        IsVisible="{Binding !ConfirmDeleteFolder}"
+                        IsEnabled="{Binding SelectedFolder, Converter={x:Static acnv:ObjectConverters.IsNotNull}}"
+                        HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                        Margin="0,8,0,0" />
+                <Button Content="Na pewno? Kliknij ponownie"
+                        Classes="danger"
+                        Command="{Binding DeleteFolderCommand}"
+                        IsVisible="{Binding ConfirmDeleteFolder}"
+                        HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                        Margin="0,8,0,0" />
             </StackPanel>
 
             <DockPanel>
@@ -96,6 +111,22 @@
                                     IsEnabled="{Binding !IsBusy}" />
                         </StackPanel>
 
+                        <Border DockPanel.Dock="Top"
+                                IsVisible="{Binding HasAnswer}"
+                                Background="{DynamicResource CtpSurface0}"
+                                CornerRadius="10"
+                                Padding="16,14"
+                                Margin="0,0,0,16">
+                            <StackPanel Spacing="6">
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <TextBlock Grid.Column="0" Text="ODPOWIEDŹ" Classes="label" VerticalAlignment="Center" />
+                                    <Button Grid.Column="1" Content="Kopiuj" Classes="subtleAction" Click="CopyAnswer_Click" />
+                                </Grid>
+                                <TextBlock Text="{Binding SynthesizedAnswer}"
+                                           TextWrapping="Wrap" FontSize="14.5" LineHeight="21" />
+                            </StackPanel>
+                        </Border>
+
                         <Grid ColumnDefinitions="280,*">
 
                             <Panel Grid.Column="0">
@@ -123,12 +154,22 @@
                                 </ListBox>
                             </Panel>
 
-                            <ScrollViewer Grid.Column="1" Margin="20,0,0,0">
-                                <TextBlock Text="{Binding SelectedResult.RawContent}"
-                                           TextWrapping="Wrap"
-                                           FontSize="15"
-                                           LineHeight="22" />
-                            </ScrollViewer>
+                            <DockPanel Grid.Column="1" Margin="20,0,0,0"
+                                       IsVisible="{Binding SelectedResult, Converter={x:Static acnv:ObjectConverters.IsNotNull}}">
+                                <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto,Auto" Margin="0,0,0,8">
+                                    <Button Grid.Column="1" Content="Kopiuj" Classes="subtleAction" Click="CopySearchResult_Click" />
+                                    <Button Grid.Column="2" Content="Usuń"
+                                            Classes="subtleAction"
+                                            Command="{Binding DeleteNoteCommand}"
+                                            CommandParameter="{Binding SelectedResult}" />
+                                </Grid>
+                                <ScrollViewer>
+                                    <TextBlock Text="{Binding SelectedResult.RawContent}"
+                                               TextWrapping="Wrap"
+                                               FontSize="15"
+                                               LineHeight="22" />
+                                </ScrollViewer>
+                            </DockPanel>
                         </Grid>
                     </DockPanel>
                 </TabItem>
@@ -153,12 +194,22 @@
                                 </ListBox>
                             </Panel>
 
-                            <ScrollViewer Grid.Column="1" Margin="20,0,0,0">
-                                <TextBlock Text="{Binding SelectedFolderNote.RawContent}"
-                                           TextWrapping="Wrap"
-                                           FontSize="15"
-                                           LineHeight="22" />
-                            </ScrollViewer>
+                            <DockPanel Grid.Column="1" Margin="20,0,0,0"
+                                       IsVisible="{Binding SelectedFolderNote, Converter={x:Static acnv:ObjectConverters.IsNotNull}}">
+                                <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto,Auto" Margin="0,0,0,8">
+                                    <Button Grid.Column="1" Content="Kopiuj" Classes="subtleAction" Click="CopyFolderNote_Click" />
+                                    <Button Grid.Column="2" Content="Usuń"
+                                            Classes="subtleAction"
+                                            Command="{Binding DeleteNoteCommand}"
+                                            CommandParameter="{Binding SelectedFolderNote}" />
+                                </Grid>
+                                <ScrollViewer>
+                                    <TextBlock Text="{Binding SelectedFolderNote.RawContent}"
+                                               TextWrapping="Wrap"
+                                               FontSize="15"
+                                               LineHeight="22" />
+                                </ScrollViewer>
+                            </DockPanel>
                         </Grid>
                     </DockPanel>
                 </TabItem>

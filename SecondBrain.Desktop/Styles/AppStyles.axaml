@@ -63,6 +63,30 @@
         <Setter Property="Opacity" Value="0.4" />
     </Style>
 
+    <!-- Akcje niszczace (usuwanie) - osobny, "niebezpieczny" kolor zamiast domyslnego -->
+    <Style Selector="Button.danger">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Foreground" Value="{DynamicResource CtpRed}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource CtpRed}" />
+    </Style>
+    <Style Selector="Button.danger:pointerover">
+        <Setter Property="Background" Value="{DynamicResource CtpRed}" />
+        <Setter Property="Foreground" Value="{DynamicResource CtpBase}" />
+    </Style>
+
+    <!-- Drobne akcje (kopiuj) - male, bez ramki -->
+    <Style Selector="Button.subtleAction">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Foreground" Value="{DynamicResource CtpSubtext1}" />
+        <Setter Property="Padding" Value="8,4" />
+        <Setter Property="FontSize" Value="12.5" />
+    </Style>
+    <Style Selector="Button.subtleAction:pointerover">
+        <Setter Property="Background" Value="{DynamicResource CtpSurface0}" />
+        <Setter Property="Foreground" Value="{DynamicResource CtpText}" />
+    </Style>
+
     <!-- Pola tekstowe -->
     <Style Selector="TextBox">
         <Setter Property="Background" Value="{DynamicResource CtpSurface0}" />

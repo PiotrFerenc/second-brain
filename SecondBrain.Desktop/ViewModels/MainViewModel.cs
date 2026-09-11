@@ -10,6 +10,7 @@ public partial class MainViewModel(
     IEmbedder embedder,
     IReranker reranker,
     ICompressor compressor,
+    IAnswerSynthesizer answerSynthesizer,
     INoteStore noteStore) : ViewModelBase
 {
     public ObservableCollection<string> Folders { get; } = [];
@@ -19,6 +20,9 @@ public partial class MainViewModel(
 
     [ObservableProperty]
     public partial string NewFolderName { get; set; } = "";
+
+    [ObservableProperty]
+    public partial bool ConfirmDeleteFolder { get; set; }
 
     [ObservableProperty]
     public partial string NoteText { get; set; } = "";
@@ -31,6 +35,12 @@ public partial class MainViewModel(
 
     [ObservableProperty]
     public partial SearchResultItem? SelectedResult { get; set; }
+
+    [ObservableProperty]
+    public partial string SynthesizedAnswer { get; set; } = "";
+
+    [ObservableProperty]
+    public partial bool HasAnswer { get; set; }
 
     [ObservableProperty]
     public partial SearchResultItem? SelectedFolderNote { get; set; }
@@ -58,10 +68,13 @@ public partial class MainViewModel(
         NoteText = "";
         EditorStatus = "";
         SearchQuery = "";
+        SynthesizedAnswer = "";
+        HasAnswer = false;
         SearchResults.Clear();
         SelectedResult = null;
         HasSearched = false;
         HasResults = false;
+        ConfirmDeleteFolder = false;
 
         _ = LoadFolderNotesCommand.ExecuteAsync(null);
     }
@@ -92,6 +105,31 @@ public partial class MainViewModel(
         HasFolders = Folders.Count > 0;
     }
 
+    // ponytail: usuniecie folderu kasuje kolekcje w Qdrant i cale notatki na dysku -
+    // wymaga dwoch klikniec (ConfirmDeleteFolder), zeby przypadkowy klik nie skasowal
+    // wszystkich notatek z folderu bez ostrzezenia.
+    [RelayCommand]
+    private async Task DeleteFolderAsync()
+    {
+        if (SelectedFolder is null)
+            return;
+
+        if (!ConfirmDeleteFolder)
+        {
+            ConfirmDeleteFolder = true;
+            return;
+        }
+
+        var folder = SelectedFolder;
+
+        await vectorIndex.DeleteFolderAsync(folder);
+        await noteStore.DeleteFolderAsync(folder);
+
+        Folders.Remove(folder);
+        HasFolders = Folders.Count > 0;
+        SelectedFolder = Folders.FirstOrDefault();
+    }
+
     [RelayCommand]
     private async Task LoadFolderNotesAsync()
     {
@@ -105,10 +143,31 @@ public partial class MainViewModel(
         }
 
         foreach (var note in await noteStore.ListAsync(SelectedFolder))
-            FolderNotes.Add(new SearchResultItem(note.Title, string.Join(", ", note.Tags), 0f, note.RawContent));
+            FolderNotes.Add(new SearchResultItem(note.Id, note.Title, string.Join(", ", note.Tags), 0f, note.RawContent, note.FilePath));
 
         SelectedFolderNote = FolderNotes.FirstOrDefault();
         HasFolderNotes = FolderNotes.Count > 0;
+    }
+
+    [RelayCommand]
+    private async Task DeleteNoteAsync(SearchResultItem? item)
+    {
+        if (item is null || SelectedFolder is null || string.IsNullOrEmpty(item.FilePath))
+            return;
+
+        await vectorIndex.DeleteNoteAsync(SelectedFolder, item.Id);
+        await noteStore.DeleteAsync(item.FilePath);
+
+        FolderNotes.Remove(item);
+        SearchResults.Remove(item);
+
+        if (SelectedFolderNote == item)
+            SelectedFolderNote = FolderNotes.FirstOrDefault();
+        if (SelectedResult == item)
+            SelectedResult = SearchResults.FirstOrDefault();
+
+        HasFolderNotes = FolderNotes.Count > 0;
+        HasResults = SearchResults.Count > 0;
     }
 
     [RelayCommand]
@@ -154,6 +213,8 @@ public partial class MainViewModel(
         SearchResults.Clear();
         SelectedResult = null;
         HasSearched = true;
+        SynthesizedAnswer = "";
+        HasAnswer = false;
 
         if (SelectedFolder is null || string.IsNullOrWhiteSpace(SearchQuery))
             return;
@@ -165,17 +226,28 @@ public partial class MainViewModel(
             var candidates = await vectorIndex.SearchAsync(SelectedFolder, queryVector, limit: 20);
             var reranked = await reranker.RerankAsync(SearchQuery, candidates);
 
+            var notesForAnswer = new List<Note>();
+
             foreach (var r in reranked.Take(10))
             {
                 var note = r.Note;
                 if (!string.IsNullOrEmpty(r.Note.FilePath) && File.Exists(r.Note.FilePath))
                     note = await noteStore.LoadAsync(r.Note.FilePath);
 
-                SearchResults.Add(new SearchResultItem(note.Title, string.Join(", ", note.Tags), r.Score, note.RawContent));
+                SearchResults.Add(new SearchResultItem(note.Id, note.Title, string.Join(", ", note.Tags), r.Score, note.RawContent, note.FilePath));
+
+                if (notesForAnswer.Count < 5)
+                    notesForAnswer.Add(note);
             }
 
             SelectedResult = SearchResults.FirstOrDefault();
             HasResults = SearchResults.Count > 0;
+
+            if (notesForAnswer.Count > 0)
+            {
+                SynthesizedAnswer = await answerSynthesizer.SynthesizeAsync(SearchQuery, notesForAnswer);
+                HasAnswer = !string.IsNullOrWhiteSpace(SynthesizedAnswer);
+            }
         }
         finally
         {

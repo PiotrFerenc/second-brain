@@ -27,6 +27,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IEmbedder, MockEmbedder>();
         services.AddSingleton<IReranker, MockReranker>();
         services.AddSingleton<ICompressor, OpenAiCompressor>();
+        services.AddSingleton<IAnswerSynthesizer, OpenAiAnswerSynthesizer>();
         services.AddSingleton<INoteStore, FileNoteStore>();
         services.AddSingleton<IVectorIndex, QdrantVectorIndex>();
 

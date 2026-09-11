@@ -19,6 +19,7 @@ var store = provider.GetRequiredService<IVectorIndex>();
 var embedder = provider.GetRequiredService<IEmbedder>();
 var reranker = provider.GetRequiredService<IReranker>();
 var compressor = provider.GetRequiredService<ICompressor>();
+var answerSynthesizer = provider.GetRequiredService<IAnswerSynthesizer>();
 var noteStore = provider.GetRequiredService<INoteStore>();
 
 switch (args.ElementAtOrDefault(0))
@@ -34,6 +35,15 @@ switch (args.ElementAtOrDefault(0))
     {
         var created = await store.CreateFolderAsync(args[1]);
         Console.WriteLine(created ? $"Utworzono folder '{args[1]}'." : $"Folder '{args[1]}' juz istnieje.");
+        break;
+    }
+
+    case "delete-folder" when args.Length >= 2:
+    {
+        var folder = args[1];
+        await store.DeleteFolderAsync(folder);
+        await noteStore.DeleteFolderAsync(folder);
+        Console.WriteLine($"Usunieto folder '{folder}' (kolekcja Qdrant + pliki na dysku).");
         break;
     }
 
@@ -64,7 +74,7 @@ switch (args.ElementAtOrDefault(0))
         var vector = await embedder.EmbedAsync(note.CompressedContent);
         await store.UpsertAsync(folder, note, vector);
 
-        Console.WriteLine($"Zapisano: {path}\nTytul (LLM): {result.Title}\nSkompresowano do: {result.CompressedContent}");
+        Console.WriteLine($"Zapisano: {path}\nId: {note.Id}\nTytul (LLM): {result.Title}\nSkompresowano do: {result.CompressedContent}");
         break;
     }
 
@@ -78,7 +88,26 @@ switch (args.ElementAtOrDefault(0))
         }
 
         foreach (var note in notes)
-            Console.WriteLine($"{note.UpdatedAt:yyyy-MM-dd HH:mm}  {note.Title}");
+            Console.WriteLine($"{note.Id}  {note.UpdatedAt:yyyy-MM-dd HH:mm}  {note.Title}");
+        break;
+    }
+
+    case "delete-note" when args.Length >= 3:
+    {
+        var folder = args[1];
+        var noteId = Guid.Parse(args[2]);
+
+        var notes = await noteStore.ListAsync(folder);
+        var note = notes.FirstOrDefault(n => n.Id == noteId);
+        if (note is null)
+        {
+            Console.WriteLine($"Nie znaleziono notatki {noteId} w folderze '{folder}'.");
+            break;
+        }
+
+        await store.DeleteNoteAsync(folder, noteId);
+        await noteStore.DeleteAsync(note.FilePath);
+        Console.WriteLine($"Usunieto: {note.Title}");
         break;
     }
 
@@ -91,6 +120,8 @@ switch (args.ElementAtOrDefault(0))
         var candidates = await store.SearchAsync(folder, queryVector, limit: 20);
         var reranked = await reranker.RerankAsync(query, candidates);
 
+        var fullNotes = new List<Note>();
+
         Console.WriteLine($"Wyniki dla: \"{query}\"\n");
         foreach (var r in reranked.Take(5))
         {
@@ -100,6 +131,13 @@ switch (args.ElementAtOrDefault(0))
 
             Console.WriteLine($"[{r.Score:0.00}] {note.Title} — tagi: {string.Join(", ", note.Tags)}");
             Console.WriteLine($"    {note.RawContent}");
+            fullNotes.Add(note);
+        }
+
+        if (fullNotes.Count > 0)
+        {
+            var answer = await answerSynthesizer.SynthesizeAsync(query, fullNotes);
+            Console.WriteLine($"\nOdpowiedz:\n{answer}");
         }
         break;
     }
@@ -109,9 +147,11 @@ switch (args.ElementAtOrDefault(0))
             Uzycie:
               dotnet run -- list
               dotnet run -- create <folder>
+              dotnet run -- delete-folder <folder>
               dotnet run -- seed <folder>
               dotnet run -- add <folder> <tekst notatki...>
               dotnet run -- notes <folder>
+              dotnet run -- delete-note <folder> <id notatki>
               dotnet run -- search <folder> <zapytanie...>
             """);
         break;
