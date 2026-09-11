@@ -173,6 +173,57 @@ public class FileNoteStore(IOptions<StorageOptions> options) : INoteStore
         return Task.CompletedTask;
     }
 
+    public async Task SaveGlossaryEntryAsync(string term, string definition, string sourceTitle, CancellationToken ct = default)
+    {
+        var dir = Path.Combine(_root, ".glossary");
+        Directory.CreateDirectory(dir);
+
+        var slug = Slugify(term);
+        var path = Path.Combine(dir, $"{slug}.md");
+
+        var content = $"""
+            ---
+            term: {term}
+            source: {sourceTitle}
+            updated: {DateTimeOffset.UtcNow:O}
+            ---
+            {definition}
+            """;
+
+        await File.WriteAllTextAsync(path, content, ct);
+    }
+
+    public async Task<IReadOnlyList<GlossaryEntry>> ListGlossaryAsync(CancellationToken ct = default)
+    {
+        var dir = Path.Combine(_root, ".glossary");
+        if (!Directory.Exists(dir))
+            return [];
+
+        var entries = new List<GlossaryEntry>();
+        foreach (var file in Directory.EnumerateFiles(dir, "*.md"))
+        {
+            var lines = await File.ReadAllLinesAsync(file, ct);
+            if (lines.Length < 5 || lines[0] != "---" || lines[4] != "---")
+                continue;
+
+            var term = lines[1][(lines[1].IndexOf(':') + 1)..].Trim();
+            var source = lines[2][(lines[2].IndexOf(':') + 1)..].Trim();
+            var definition = string.Join('\n', lines[5..]).Trim();
+
+            entries.Add(new GlossaryEntry(term, definition, source));
+        }
+
+        return entries.OrderBy(e => e.Term, StringComparer.OrdinalIgnoreCase).ToList();
+    }
+
+    // ponytail: slug bez zaleznosci (bez diakrytykow, male litery, myslniki) -
+    // wystarczy zeby ten sam termin nadpisywal poprzedni wpis pod ta sama nazwa pliku.
+    private static string Slugify(string term)
+    {
+        var slug = string.Concat(term.Trim().ToLowerInvariant().Select(c => char.IsLetterOrDigit(c) ? c : '-')).Trim('-');
+        return slug.Length > 0 ? slug : Guid.NewGuid().ToString();
+    }
+
     private static string ExtractTrashFolder(string trashPath)
     {
         var name = Path.GetFileNameWithoutExtension(trashPath);

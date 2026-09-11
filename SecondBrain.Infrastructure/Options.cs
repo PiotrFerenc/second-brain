@@ -12,6 +12,11 @@ public class OpenAiOptions : HttpClientOptions
 {
     public string EmbeddingModel { get; set; } = "text-embedding-3-small";
     public string CompressionModel { get; set; } = "gpt-3.5-turbo";
+
+    // Wykrywanie sprzecznosci to realne zadanie rozumowania, nie streszczanie -
+    // gpt-3.5-turbo myli sie tu nawet przy temperature=0 (zmierzone: ~2/3 trafien
+    // na tym samym przykladzie). gpt-5 rozwiazuje to poprawnie za kazdym razem.
+    public string ConflictModel { get; set; } = "gpt-5";
 }
 
 public class RerankerOptions : HttpClientOptions

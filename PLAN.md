@@ -152,6 +152,10 @@ Stan weryfikacji:
   `text-embedding-3-small` mimo widocznego dostępu — patrz decyzje, sekcja 3).
 - ⏳ `CohereReranker` — kod gotowy pod wire-format Cohere v2/rerank, nieprzetestowany
   (provider dostępny tylko na drugiej maszynie użytkownika).
+- ✅ Auto-słownik (`.glossary/`) i wykrywacz sprzeczności (`gpt-5`, `ConflictModel`) —
+  oba przetestowane end-to-end przez CLI: `add` z definicją zapisuje wpis do słownika
+  (`glossary` go listuje), `add` z notatką sprzeczną z istniejącą w tym samym folderze
+  poprawnie drukuje `UWAGA - mozliwa sprzecznosc` z tytułem i wyjaśnieniem.
 
 ## 3. Decyzje i ich powody
 
@@ -188,6 +192,9 @@ Te ustalenia są wiążące — nie zmieniaj ich bez wyraźnej prośby użytkown
 | **"Auto-linkowanie" przez wyszukiwanie wektorowe, nie przez LLM** — po zapisaniu notatki program szuka top-3 podobnych własnym wektorem notatki i pokazuje w statusie | Tańsze i bez ryzyka halucynacji (LLM proszony o zgadywanie tytułów notatek mógłby wymyślić nieistniejący tytuł); reużywa już policzony embedding |
 | **Renderowanie Markdown: `Markdown.Avalonia.Tight` (12.0.0-a3, alpha)** | Jedyny pakiet kompatybilny z Avalonia 12 + net10.0 w chwili pisania; ręczne pisanie renderera Markdown byłoby dużo większym nakładem niż ryzyko alpha-wersji biblioteki |
 | **Zakładka "Dziś" (dziennik) usunięta** po przetestowaniu przez użytkownika | Wprost zażądane; folder `Dziennik` i notatki w nim utworzone podczas testów **zostają** — to realne dane użytkownika, usunięcie dotyczyło tylko dedykowanej zakładki/UX, nie danych |
+| **Auto-słownik** (`.glossary/<slug>.md`) — kompresja LLM zwraca dodatkowo pole `definitions` (zdania typu "X to Y"), każda definicja zapisywana jako osobny plik, nazwa pliku = slug terminu (ten sam termin nadpisuje) | Własny pomysł, drugi z dwóch zaproponowanych obok "Luk w wiedzy"; jedno wywołanie LLM (to samo co kompresja) zamiast osobnego promptu tylko po definicje |
+| **Wykrywacz sprzeczności używa osobnego modelu `ConflictModel` (`gpt-5`), różnego od `CompressionModel` (`gpt-3.5-turbo`)** | Zmierzone na żywo: `gpt-3.5-turbo` w trybie `json_object` myli się na tym zadaniu ok. 1/3 przypadków nawet przy `temperature:0` — `response_format: json_object` odbiera modelowi miejsce na chain-of-thought, co potwierdzone porównaniem z odpowiedzią tego samego promptu bez trybu JSON (poprawna za każdym razem). `gpt-5` ma natywne rozumowanie i rozwiązuje to poprawnie bez żadnych sztuczek w prompcie |
+| **Wykrywanie sprzeczności tylko przy `add` (pojedyncza notatka), pominięte przy `import` (import z pliku, N linii)** | N notatek importu to już N wywołań LLM (kompresja); podwojenie do 2N przez conflict-check na każdej linii byłoby zbyt kosztowne/wolne, a import z pliku to zwykle świeże dane, nie duplikaty istniejących faktów |
 
 ## 4. Co dalej
 

@@ -8,13 +8,21 @@ namespace SecondBrain.Infrastructure;
 
 public class OpenAiCompressor(IHttpClientFactory httpClientFactory, IOptions<OpenAiOptions> options) : ICompressor
 {
+    // ponytail: dlugie, bardzo dosadne wyliczenie 4 pol (zawsze wszystkie cztery) nie jest
+    // przypadkowe - krotsze/mniej nachalne wersje tego promptu testowane na zywo (curl)
+    // albo gubily pole "definitions" calkowicie, albo zwracaly je puste nawet dla
+    // oczywistych definicji typu "RAG (Retrieval-Augmented Generation) to technika...".
     private const string SystemPrompt =
-        "Jestes asystentem kompresujacym notatki uzytkownika do osobistej bazy wiedzy. " +
-        "Zwroc WYLACZNIE obiekt JSON o polach: \"title\" (krotki, zwiezly tytul notatki " +
-        "ustalony przez Ciebie na podstawie tresci, maks. 80 znakow), \"content\" " +
-        "(skompresowana, ustrukturyzowana tresc notatki zachowujaca kluczowe fakty, " +
-        "bez powtorzen i dygresji) oraz \"tags\" (2-5 krotkich tagow jednowyrazowych " +
-        "po polsku, malymi literami, opisujacych temat notatki).";
+        "Jestes asystentem kompresujacym notatki do osobistej bazy wiedzy. Zwroc WYLACZNIE " +
+        "obiekt JSON z DOKLADNIE czterema polami, zawsze wszystkimi czterema: " +
+        "\"title\" (krotki, zwiezly tytul notatki ustalony przez Ciebie na podstawie tresci, " +
+        "maks. 80 znakow), \"content\" (skompresowana, ustrukturyzowana tresc notatki " +
+        "zachowujaca kluczowe fakty, bez powtorzen i dygresji), \"tags\" (tablica 2-5 " +
+        "krotkich tagow jednowyrazowych po polsku, malymi literami), \"definitions\" " +
+        "(tablica obiektow {\"term\",\"definition\"} - wyciagnij z tekstu kazde zdanie " +
+        "postaci \"X to Y\", \"X oznacza Y\" lub rozwiniecie skrotu w nawiasie jak " +
+        "\"RAG (Retrieval-Augmented Generation)\"; jesli notatka nie zawiera takiego " +
+        "zdania, zwroc pusta tablice [], ale pole \"definitions\" MUSI byc obecne zawsze).";
 
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
 

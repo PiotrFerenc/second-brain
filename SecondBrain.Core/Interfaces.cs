@@ -2,10 +2,15 @@ using System.Text.Json.Serialization;
 
 namespace SecondBrain.Core;
 
+public record GlossaryTerm(
+    [property: JsonPropertyName("term")] string Term,
+    [property: JsonPropertyName("definition")] string Definition);
+
 public record CompressionResult(
     [property: JsonPropertyName("title")] string Title,
     [property: JsonPropertyName("content")] string CompressedContent,
-    [property: JsonPropertyName("tags")] string[] Tags);
+    [property: JsonPropertyName("tags")] string[] Tags,
+    [property: JsonPropertyName("definitions")] GlossaryTerm[] Definitions);
 
 public record TrashedNote(Note Note, string OriginalFolder, string TrashPath);
 
@@ -16,6 +21,13 @@ public record AnswerResult(
     [property: JsonPropertyName("answer")] string Answer);
 
 public record KnowledgeGap(string Query, DateTimeOffset AskedAt, string Path);
+
+public record ConflictResult(
+    [property: JsonPropertyName("hasConflict")] bool HasConflict,
+    [property: JsonPropertyName("conflictingTitle")] string? ConflictingTitle,
+    [property: JsonPropertyName("explanation")] string? Explanation);
+
+public record GlossaryEntry(string Term, string Definition, string SourceTitle);
 
 public interface ICompressor
 {
@@ -41,6 +53,13 @@ public interface IAnswerSynthesizer
     Task<AnswerResult> SynthesizeAsync(string query, IReadOnlyList<Note> notes, CancellationToken ct = default);
 }
 
+// Porownuje tresc nowej notatki z juz istniejacymi (podobnymi) notatkami i probuje
+// wykryc sprzecznosc faktow (np. dwie rozne godziny tego samego spotkania).
+public interface IConflictDetector
+{
+    Task<ConflictResult> DetectAsync(string newContent, IReadOnlyList<Note> candidates, CancellationToken ct = default);
+}
+
 public interface INoteStore
 {
     Task<string> SaveAsync(string folder, Note note, CancellationToken ct = default);
@@ -61,6 +80,11 @@ public interface INoteStore
     Task LogGapAsync(string query, CancellationToken ct = default);
     Task<IReadOnlyList<KnowledgeGap>> ListGapsAsync(CancellationToken ct = default);
     Task ResolveGapAsync(string path, CancellationToken ct = default);
+
+    // Auto-slownik: definicje wylapane przy kompresji, globalne (nie per-folder).
+    // Ten sam termin nadpisuje poprzedni wpis (najnowsza definicja wygrywa).
+    Task SaveGlossaryEntryAsync(string term, string definition, string sourceTitle, CancellationToken ct = default);
+    Task<IReadOnlyList<GlossaryEntry>> ListGlossaryAsync(CancellationToken ct = default);
 }
 
 // Folder = kolekcja w bazie wektorowej. Jedna implementacja (Qdrant) na razie,

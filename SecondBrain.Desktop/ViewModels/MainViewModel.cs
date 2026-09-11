@@ -11,6 +11,7 @@ public partial class MainViewModel(
     IReranker reranker,
     ICompressor compressor,
     IAnswerSynthesizer answerSynthesizer,
+    IConflictDetector conflictDetector,
     INoteStore noteStore) : ViewModelBase
 {
     public const int TabEditor = 0;
@@ -18,6 +19,7 @@ public partial class MainViewModel(
     public const int TabNote = 2;
     public const int TabTrash = 3;
     public const int TabGaps = 4;
+    public const int TabGlossary = 5;
 
     // ---- Drzewo (foldery + notatki, w tym zagniezdzone podstrony) ----
 
@@ -259,6 +261,9 @@ public partial class MainViewModel(
             var path = await noteStore.SaveAsync(SelectedFolder, note);
             note = note with { FilePath = path };
 
+            foreach (var def in result.Definitions ?? [])
+                await noteStore.SaveGlossaryEntryAsync(def.Term, def.Definition, result.Title);
+
             EditorStatus = "Licze embedding...";
             var vector = await embedder.EmbedAsync(note.CompressedContent);
             await vectorIndex.UpsertAsync(SelectedFolder, note, vector);
@@ -266,11 +271,21 @@ public partial class MainViewModel(
             // "Auto-linkowanie": zamiast prosic LLM o zgadywanie tytulow (ryzyko halucynacji),
             // uzywamy juz policzonego wektora notatki do wyszukania faktycznie podobnych.
             var related = await vectorIndex.SearchAsync(SelectedFolder, vector, limit: 4);
-            var relatedTitles = related.Where(r => r.Note.Id != note.Id).Take(3).Select(r => r.Note.Title).ToList();
+            var relatedNotes = related.Where(r => r.Note.Id != note.Id).Take(3).Select(r => r.Note).ToList();
+            var relatedTitles = relatedNotes.Select(n => n.Title).ToList();
 
-            EditorStatus = relatedTitles.Count > 0
-                ? $"Zapisano: {result.Title}\nMoże powiązane: {string.Join(", ", relatedTitles)}"
-                : $"Zapisano: {result.Title}";
+            var statusLines = new List<string> { $"Zapisano: {result.Title}" };
+            if (relatedTitles.Count > 0)
+                statusLines.Add($"Może powiązane: {string.Join(", ", relatedTitles)}");
+
+            if (relatedNotes.Count > 0)
+            {
+                var conflict = await conflictDetector.DetectAsync(note.CompressedContent, relatedNotes);
+                if (conflict.HasConflict)
+                    statusLines.Add($"Możliwa sprzeczność z \"{conflict.ConflictingTitle}\": {conflict.Explanation}");
+            }
+
+            EditorStatus = string.Join("\n", statusLines);
 
             NoteText = "";
             NoteTagsInput = "";
@@ -278,6 +293,7 @@ public partial class MainViewModel(
 
             await LoadTreeAsync();
             await LoadParentOptionsAsync();
+            await LoadGlossaryAsync();
         }
         finally
         {
@@ -286,7 +302,9 @@ public partial class MainViewModel(
     }
 
     // Import zbiorczy: kazda niepusta linia pliku przechodzi przez ten sam pipeline
-    // co pojedyncza notatka (kompresja -> zapis -> embedding -> upsert).
+    // co pojedyncza notatka (kompresja -> zapis -> embedding -> upsert). Bez wykrywacza
+    // sprzecznosci - N linii to juz N wywolan LLM, kolejne podwoilyby koszt/czas importu.
+    // Definicje do slownika zostaja, bo pochodza z tej samej kompresji (bez dodatkowego kosztu).
     [RelayCommand]
     private async Task ImportLinesAsync(IReadOnlyList<string> lines)
     {
@@ -314,6 +332,9 @@ public partial class MainViewModel(
                 var path = await noteStore.SaveAsync(SelectedFolder, note);
                 note = note with { FilePath = path };
 
+                foreach (var def in result.Definitions ?? [])
+                    await noteStore.SaveGlossaryEntryAsync(def.Term, def.Definition, result.Title);
+
                 var vector = await embedder.EmbedAsync(note.CompressedContent);
                 await vectorIndex.UpsertAsync(SelectedFolder, note, vector);
                 imported++;
@@ -322,6 +343,7 @@ public partial class MainViewModel(
             EditorStatus = $"Zaimportowano notatek: {imported}.";
             await LoadTreeAsync();
             await LoadParentOptionsAsync();
+            await LoadGlossaryAsync();
         }
         finally
         {
@@ -579,6 +601,26 @@ public partial class MainViewModel(
         await SearchAsync();
     }
 
+    // ---- Auto-slownik ----
+
+    public ObservableCollection<GlossaryEntry> GlossaryEntries { get; } = [];
+
+    [ObservableProperty]
+    public partial GlossaryEntry? SelectedGlossaryEntry { get; set; }
+
+    [ObservableProperty]
+    public partial bool HasGlossary { get; set; }
+
+    [RelayCommand]
+    private async Task LoadGlossaryAsync()
+    {
+        GlossaryEntries.Clear();
+        foreach (var e in await noteStore.ListGlossaryAsync())
+            GlossaryEntries.Add(e);
+
+        HasGlossary = GlossaryEntries.Count > 0;
+    }
+
     // ---- Zakladki / skroty klawiszowe ----
     // Szukaj i Kosz sa dostepne tylko z paska narzedzi (nie maja wlasnego naglowka
     // w prawym panelu) - stad wlasne flagi widoczności zamiast TabControl.SelectedIndex.
@@ -601,8 +643,11 @@ public partial class MainViewModel(
     [ObservableProperty]
     public partial bool IsGapsTabActive { get; set; }
 
+    [ObservableProperty]
+    public partial bool IsGlossaryTabActive { get; set; }
+
     // Naglowek "Notatka / +" w prawym panelu ma sens tylko dla tych dwoch widokow -
-    // Szukaj, Kosz i Luki maja wlasna zawartosc od samej gory.
+    // Szukaj, Kosz, Luki i Slownik maja wlasna zawartosc od samej gory.
     [ObservableProperty]
     public partial bool IsContentHeaderVisible { get; set; } = true;
 
@@ -613,6 +658,7 @@ public partial class MainViewModel(
         IsNoteTabActive = value == TabNote;
         IsTrashTabActive = value == TabTrash;
         IsGapsTabActive = value == TabGaps;
+        IsGlossaryTabActive = value == TabGlossary;
         IsContentHeaderVisible = value is TabEditor or TabNote;
     }
 
@@ -624,6 +670,9 @@ public partial class MainViewModel(
 
     [RelayCommand]
     private void ShowNoteTab() => SelectedTabIndex = TabNote;
+
+    [RelayCommand]
+    private void ShowGlossaryTab() => SelectedTabIndex = TabGlossary;
 
     [RelayCommand]
     private void ShowTrashTab() => SelectedTabIndex = TabTrash;
@@ -640,5 +689,6 @@ public partial class MainViewModel(
         await LoadTrashAsync();
         await LoadTemplatesAsync();
         await LoadGapsAsync();
+        await LoadGlossaryAsync();
     }
 }

@@ -20,6 +20,7 @@ var embedder = provider.GetRequiredService<IEmbedder>();
 var reranker = provider.GetRequiredService<IReranker>();
 var compressor = provider.GetRequiredService<ICompressor>();
 var answerSynthesizer = provider.GetRequiredService<IAnswerSynthesizer>();
+var conflictDetector = provider.GetRequiredService<IConflictDetector>();
 var noteStore = provider.GetRequiredService<INoteStore>();
 
 switch (args.ElementAtOrDefault(0))
@@ -71,10 +72,26 @@ switch (args.ElementAtOrDefault(0))
         var path = await noteStore.SaveAsync(folder, note);
         note = note with { FilePath = path };
 
+        foreach (var def in result.Definitions ?? [])
+            await noteStore.SaveGlossaryEntryAsync(def.Term, def.Definition, result.Title);
+
         var vector = await embedder.EmbedAsync(note.CompressedContent);
         await store.UpsertAsync(folder, note, vector);
 
+        var related = await store.SearchAsync(folder, vector, limit: 4);
+        var relatedNotes = related.Where(r => r.Note.Id != note.Id).Take(3).Select(r => r.Note).ToList();
+
         Console.WriteLine($"Zapisano: {path}\nId: {note.Id}\nTytul (LLM): {result.Title}\nTagi (LLM): {string.Join(", ", result.Tags)}\nSkompresowano do: {result.CompressedContent}");
+
+        if ((result.Definitions ?? []).Length > 0)
+            Console.WriteLine($"Definicje do slownika: {string.Join(", ", result.Definitions!.Select(d => d.Term))}");
+
+        if (relatedNotes.Count > 0)
+        {
+            var conflict = await conflictDetector.DetectAsync(note.CompressedContent, relatedNotes);
+            if (conflict.HasConflict)
+                Console.WriteLine($"UWAGA - mozliwa sprzecznosc z \"{conflict.ConflictingTitle}\": {conflict.Explanation}");
+        }
         break;
     }
 
@@ -200,6 +217,20 @@ switch (args.ElementAtOrDefault(0))
         break;
     }
 
+    case "glossary":
+    {
+        var entries = await noteStore.ListGlossaryAsync();
+        if (entries.Count == 0)
+        {
+            Console.WriteLine("Slownik jest pusty.");
+            break;
+        }
+
+        foreach (var e in entries)
+            Console.WriteLine($"{e.Term} ({e.SourceTitle}): {e.Definition}");
+        break;
+    }
+
     default:
         Console.WriteLine("""
             Uzycie:
@@ -216,6 +247,7 @@ switch (args.ElementAtOrDefault(0))
               dotnet run -- search <folder> <zapytanie...>
               dotnet run -- gaps
               dotnet run -- resolve-gap <sciezka z gaps>
+              dotnet run -- glossary
             """);
         break;
 }
