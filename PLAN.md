@@ -288,3 +288,20 @@ reagującym na klik — nietrywialne, nie zaczynaj bez wyraźnej prośby.
   się symulować kliknięć/klawiatury. Zrzuty ekranu = tylko stan spoczynkowy po starcie.
   Weryfikacja interakcji (klikanie, rozwijanie drzewa, skróty klawiszowe) wymaga
   przejścia przez Ciebie ręcznie — patrz Zadanie 8.
+- Build Desktop do jednego pliku wykonywalnego (self-contained, bez osobnych `.dll`):
+
+  ```bash
+  cd SecondBrain.Desktop
+  dotnet publish -c Release -r linux-x64 --self-contained true \
+    -p:PublishSingleFile=true \
+    -p:IncludeNativeLibrariesForSelfExtract=true \
+    -p:DebugType=none \
+    -o ./publish
+  ```
+
+  Wynik: `publish/SecondBrain.Desktop` (~103MB, .NET runtime + Avalonia + Skia/HarfBuzz
+  wbudowane) + `publish/appsettings.json` obok, osobno (świadomie nie wbudowany w plik —
+  konfiguracja/klucz API mają iść bez rebuildu). Przetestowane: publish czysty, plik
+  startuje bez błędów. `-r linux-x64` dobrać pod docelową maszynę (np. `win-x64`,
+  `osx-arm64`); to nie jest krok w CI (`.github/workflows/package.yml` dalej tylko pakuje
+  źródła do zipa), robi się ręcznie na żądanie.
