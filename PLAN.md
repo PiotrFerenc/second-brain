@@ -258,7 +258,9 @@ wszystko renderuje się poprawnie). Nie sprawdzono jeszcze realnym klikaniem:
 8. Skróty Ctrl+N/F/D przełączają zakładki, Ctrl+S zapisuje z zakładki edytora.
 9. Zakładka "Agent": wysłanie wiadomości pokazuje dymek usera + odpowiedź agenta; akcja
    mutująca (np. "dodaj notatkę o...") pokazuje kartę Tak/Nie zamiast wykonać się od razu;
-   "Tak" wykonuje i pokazuje wynik, "Nie" pokazuje że akcja odrzucona.
+   "Tak" wykonuje i pokazuje wynik, "Nie" pokazuje że akcja odrzucona. Enter w polu
+   wpisywania wysyła wiadomość tak samo jak przycisk "Wyślij" (`KeyBinding` na `TextBox`,
+   niesprawdzone ręcznie z tego samego powodu co reszta tego zadania).
 
 **Odbiór:** wszystkie dziewięć punktów działa bez wyjątków w oknie aplikacji.
 

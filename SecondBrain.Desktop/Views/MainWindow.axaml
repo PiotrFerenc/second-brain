@@ -400,7 +400,11 @@
                             </Border>
                             <Grid ColumnDefinitions="*,Auto">
                                 <TextBox Grid.Column="0" Text="{Binding AgentInputText}" PlaceholderText="Napisz do agenta..."
-                                         IsEnabled="{Binding !IsAgentBusy}" Margin="0,0,8,0" />
+                                         IsEnabled="{Binding !IsAgentBusy}" Margin="0,0,8,0">
+                                    <TextBox.KeyBindings>
+                                        <KeyBinding Gesture="Enter" Command="{Binding SendAgentMessageCommand}" />
+                                    </TextBox.KeyBindings>
+                                </TextBox>
                                 <Button Grid.Column="1" Content="Wyślij" Classes="accent"
                                         Command="{Binding SendAgentMessageCommand}"
                                         IsEnabled="{Binding !IsAgentBusy}" />
