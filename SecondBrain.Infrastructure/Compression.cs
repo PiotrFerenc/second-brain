@@ -17,7 +17,8 @@ public class OpenAiCompressor(IHttpClientFactory httpClientFactory, IOptions<Ope
         "obiekt JSON z DOKLADNIE czterema polami, zawsze wszystkimi czterema: " +
         "\"title\" (krotki, zwiezly tytul notatki ustalony przez Ciebie na podstawie tresci, " +
         "maks. 80 znakow), \"content\" (skompresowana, ustrukturyzowana tresc notatki " +
-        "zachowujaca kluczowe fakty, bez powtorzen i dygresji), \"tags\" (tablica 2-5 " +
+        "zachowujaca kluczowe fakty, bez powtorzen i dygresji, z poprawionymi bledami " +
+        "ortograficznymi, gramatycznymi i interpunkcyjnymi z tekstu zrodlowego), \"tags\" (tablica 2-5 " +
         "krotkich tagow jednowyrazowych po polsku, malymi literami), \"definitions\" " +
         "(tablica obiektow {\"term\",\"definition\"} - wyciagnij z tekstu kazde zdanie " +
         "postaci \"X to Y\", \"X oznacza Y\" lub rozwiniecie skrotu w nawiasie jak " +

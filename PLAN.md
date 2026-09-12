@@ -171,6 +171,7 @@ Te ustalenia są wiążące — nie zmieniaj ich bez wyraźnej prośby użytkown
 | **Wyszukiwanie pokazuje cały dokument ORAZ syntezowaną odpowiedź LLM** (`IAnswerSynthesizer`, osobny interfejs od `ICompressor`) | Wprost zażądane przez użytkownika (RAG); trzymane jako osobny krok od czystego wyszukiwania — wyszukiwanie samo w sobie nadal działa bez tego kroku, to nakładka na wynik |
 | **Zmiana folderu czyści wszystkie pola** (edytor, zapytanie, wyniki, odpowiedź) i przeładowuje listę notatek folderu | Wprost zażądane przez użytkownika — unika mylącego stanu z poprzedniego folderu |
 | **Kompresja LLM: `gpt-3.5-turbo` przez `chat/completions`** | Ten model jest faktycznie dostępny na kluczu użytkownika (w przeciwieństwie do embeddingu) — zweryfikowane działającym wywołaniem w `add` |
+| **Kompresja poprawia błędy ortograficzne/gramatyczne/interpunkcyjne z tekstu źródłowego** | Wprost zażądane przez użytkownika; jedna instrukcja w istniejącym prompcie `content`, bez osobnego wywołania LLM — zweryfikowane na notatce z celowymi literówkami |
 | **Qdrant lokalnie w Dockerze**, gRPC na porcie 6334 | Pełna kontrola nad danymi, brak zależności od konta w chmurze |
 | **Jedna notatka = jeden wektor**, bez chunkowania | LLM kompresuje całą notatkę przed embeddingiem; prostsze niż agregacja wyników z wielu chunków |
 | **Pliki Markdown na dysku są źródłem prawdy**, Qdrant to odtwarzalny indeks; payload Qdrant trzyma `file_path` żeby wynik wyszukiwania mógł doczytać pełną treść z dysku | Notatki czytelne i edytowalne poza aplikacją; indeks można skasować i odbudować |
