@@ -171,4 +171,21 @@
         <Setter Property="Foreground" Value="{DynamicResource CtpMauve}" />
     </Style>
 
+    <!-- Dymki czatu z Agentem -->
+    <Style Selector="Border.chatUser">
+        <Setter Property="Background" Value="{DynamicResource CtpMauve}" />
+        <Setter Property="CornerRadius" Value="10" />
+        <Setter Property="Padding" Value="10,7" />
+        <Setter Property="HorizontalAlignment" Value="Right" />
+    </Style>
+    <Style Selector="Border.chatUser TextBlock">
+        <Setter Property="Foreground" Value="{DynamicResource CtpBase}" />
+    </Style>
+    <Style Selector="Border.chatAgent">
+        <Setter Property="Background" Value="{DynamicResource CtpSurface0}" />
+        <Setter Property="CornerRadius" Value="10" />
+        <Setter Property="Padding" Value="10,7" />
+        <Setter Property="HorizontalAlignment" Value="Left" />
+    </Style>
+
 </Styles>

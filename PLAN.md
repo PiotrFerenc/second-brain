@@ -156,6 +156,14 @@ Stan weryfikacji:
   oba przetestowane end-to-end przez CLI: `add` z definicją zapisuje wpis do słownika
   (`glossary` go listuje), `add` z notatką sprzeczną z istniejącą w tym samym folderze
   poprawnie drukuje `UWAGA - mozliwa sprzecznosc` z tytułem i wyjaśnieniem.
+- ✅ Agent czatowy (`IAgent`/`OpenAiAgent`, 15 narzędzi, `gpt-5`) — przetestowany end-to-end
+  przez `dotnet run -- agent`: listowanie folderów, pytanie RAG, `add_note` z potwierdzeniem
+  "tak" (notatka realnie zapisana i zaindeksowana), `trash_note` z odmową "nie" (poprawnie
+  niewykonane). W Desktopie zakładka "Agent" (przycisk w pasku narzędzi) zweryfikowana
+  zrzutem ekranu — widoczna, poprawnie zawija się do drugiej linii wraz ze "Słownik" (pasek
+  narzędzi w sidebarze 270px zmieniony ze `StackPanel` na `WrapPanel` przy tej okazji, bo
+  piąty przycisk wypadał poza widoczny obszar). Samo kliknięcie w zakładkę nieprzeklikane
+  ręcznie (brak `xdotool`) — patrz Zadanie 8.
 
 ## 3. Decyzje i ich powody
 
@@ -196,6 +204,12 @@ Te ustalenia są wiążące — nie zmieniaj ich bez wyraźnej prośby użytkown
 | **Auto-słownik** (`.glossary/<slug>.md`) — kompresja LLM zwraca dodatkowo pole `definitions` (zdania typu "X to Y"), każda definicja zapisywana jako osobny plik, nazwa pliku = slug terminu (ten sam termin nadpisuje) | Własny pomysł, drugi z dwóch zaproponowanych obok "Luk w wiedzy"; jedno wywołanie LLM (to samo co kompresja) zamiast osobnego promptu tylko po definicje |
 | **Wykrywacz sprzeczności używa osobnego modelu `ConflictModel` (`gpt-5`), różnego od `CompressionModel` (`gpt-3.5-turbo`)** | Zmierzone na żywo: `gpt-3.5-turbo` w trybie `json_object` myli się na tym zadaniu ok. 1/3 przypadków nawet przy `temperature:0` — `response_format: json_object` odbiera modelowi miejsce na chain-of-thought, co potwierdzone porównaniem z odpowiedzią tego samego promptu bez trybu JSON (poprawna za każdym razem). `gpt-5` ma natywne rozumowanie i rozwiązuje to poprawnie bez żadnych sztuczek w prompcie |
 | **Wykrywanie sprzeczności tylko przy `add` (pojedyncza notatka), pominięte przy `import` (import z pliku, N linii)** | N notatek importu to już N wywołań LLM (kompresja); podwojenie do 2N przez conflict-check na każdej linii byłoby zbyt kosztowne/wolne, a import z pliku to zwykle świeże dane, nie duplikaty istniejących faktów |
+| **Agent czatowy: zawsze globalny** (nie ograniczony do aktualnie otwartego folderu/zakładki), pełny zestaw 15 narzędzi od razu (foldery, notatki, szukaj, RAG, dodaj, kosz, przywróć/usuń trwale, luki, słownik) | Wprost wybrane przez użytkownika (AskUserQuestion) zamiast kontekstu per-zakładka i okrojonego zestawu odczyt-only |
+| **Narzędzia agenta modyfikujące dane wymagaja potwierdzenia w czacie (Tak/Nie) przed wykonaniem**; czyste odczyty wykonują się od razu bez pytania | Wprost wybrane przez użytkownika; lista mutujących: `create_folder`, `add_note`, `trash_note`, `restore_note`, `purge_note`, `delete_folder`, `resolve_gap` — wszystko inne to odczyt |
+| **Agent: `gpt-5` (`AgentModel`), `parallel_tool_calls:false`** | Orkiestracja (co wywołać, w jakiej kolejności) to zadanie rozumowania jak wykrywanie sprzeczności — ten sam wybór modelu i powód (patrz `ConflictModel` wyżej). `parallel_tool_calls:false` wymusza jedno wywołanie narzędzia na turę, co upraszcza flow potwierdzeń (zawsze dokładnie jedno oczekujące wywołanie do zaakceptowania/odrzucenia, nie trzeba godzić czesciowo odpowiedzianych batchy) |
+| **`ConversationState` w `IAgent` to nieprzezroczysty string** (cała historia + wywołania narzędzi w formacie OpenAI, serializowana do JSON) | Wywołujący (CLI, `MainViewModel`) tylko przechowuje i oddaje blob z powrotem, nie zna wewnętrznego formatu providera; nie jest zapisywany na dysk — rozmowa żyje tylko w pamięci na czas działania aplikacji, tak jak reszta stanu edytora |
+| **Agent: nowa zakładka "Agent"** (przycisk w pasku narzędzi obok Słownika), dymki czatu (user/asystent), karta potwierdzenia Tak/Nie nad polem wpisywania | Wprost wybrane przez użytkownika (nowa zakładka zamiast zadokowanego panelu); Tak/Nie jako dwie osobne komendy bez parametru (nie `CommandParameter="True"/"False"` rzutowane z string na bool w runtime — kruche) |
+| **Pasek narzędzi w sidebarze: `WrapPanel` zamiast `StackPanel`** | Piąty przycisk ("Agent") wypadał poza widoczny obszar sidebaru (stała szerokość 270px, `StackPanel` nie zawija) — złapane dopiero zrzutem ekranu po realnym uruchomieniu, nie na etapie budowania. `WrapPanel` zawija do kolejnej linii zamiast obcinać |
 
 ## 4. Co dalej
 
@@ -242,8 +256,11 @@ wszystko renderuje się poprawnie). Nie sprawdzono jeszcze realnym klikaniem:
 5. Przypnij/Odepnij w zakładce "Notatka" przenosi notatkę na górę drzewa przy odświeżeniu.
 6. Kosz: usuń notatkę → pojawia się w zakładce "Kosz" → "Przywróć" wraca do drzewa.
 8. Skróty Ctrl+N/F/D przełączają zakładki, Ctrl+S zapisuje z zakładki edytora.
+9. Zakładka "Agent": wysłanie wiadomości pokazuje dymek usera + odpowiedź agenta; akcja
+   mutująca (np. "dodaj notatkę o...") pokazuje kartę Tak/Nie zamiast wykonać się od razu;
+   "Tak" wykonuje i pokazuje wynik, "Nie" pokazuje że akcja odrzucona.
 
-**Odbiór:** wszystkie osiem punktów działa bez wyjątków w oknie aplikacji.
+**Odbiór:** wszystkie dziewięć punktów działa bez wyjątków w oknie aplikacji.
 
 ### Zadanie 9 — filtrowanie notatek po tagach (świadomie pominięte w tej turze)
 

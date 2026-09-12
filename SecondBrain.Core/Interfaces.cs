@@ -98,3 +98,23 @@ public interface IVectorIndex
     Task DeleteNoteAsync(string folder, Guid noteId, CancellationToken ct = default);
     Task<IReadOnlyList<ScoredNote>> SearchAsync(string folder, float[] vector, ulong limit, CancellationToken ct = default);
 }
+
+// Agent czatowy z dostepem do calego programu przez narzedzia (function calling).
+// ConversationState to nieprzezroczysty blob (historia rozmowy + wywolan narzedzi w formacie
+// providera) - wywolujacy tylko go przechowuje i oddaje z powrotem, nie zagladajac w srodek.
+public record AgentPendingAction(string ToolName, string ArgumentsJson, string Summary);
+
+public record AgentStepResult(
+    string ConversationState,
+    string? ReplyText,
+    AgentPendingAction? PendingAction,
+    IReadOnlyList<string> ExecutedActions);
+
+public interface IAgent
+{
+    // conversationState = "" dla nowej rozmowy.
+    Task<AgentStepResult> SendAsync(string conversationState, string userMessage, CancellationToken ct = default);
+
+    // Wywolywane gdy poprzedni wynik mial PendingAction != null - user zaakceptowal/odrzucil w UI.
+    Task<AgentStepResult> ConfirmAsync(string conversationState, bool approved, CancellationToken ct = default);
+}

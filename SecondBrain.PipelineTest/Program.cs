@@ -22,6 +22,7 @@ var compressor = provider.GetRequiredService<ICompressor>();
 var answerSynthesizer = provider.GetRequiredService<IAnswerSynthesizer>();
 var conflictDetector = provider.GetRequiredService<IConflictDetector>();
 var noteStore = provider.GetRequiredService<INoteStore>();
+var agent = provider.GetRequiredService<IAgent>();
 
 switch (args.ElementAtOrDefault(0))
 {
@@ -217,6 +218,34 @@ switch (args.ElementAtOrDefault(0))
         break;
     }
 
+    case "agent":
+    {
+        Console.WriteLine("Czat z agentem. Pusta linia = wyjscie.\n");
+        var state = "";
+
+        while (true)
+        {
+            Console.Write("Ty: ");
+            var input = Console.ReadLine();
+            if (string.IsNullOrWhiteSpace(input))
+                break;
+
+            var step = await agent.SendAsync(state, input);
+            state = step.ConversationState;
+
+            while (step.PendingAction is { } pending)
+            {
+                Console.WriteLine($"Agent chce: {pending.Summary} [t/n]");
+                var confirm = Console.ReadLine();
+                step = await agent.ConfirmAsync(state, confirm?.Trim().Equals("t", StringComparison.OrdinalIgnoreCase) ?? false);
+                state = step.ConversationState;
+            }
+
+            Console.WriteLine($"Agent: {step.ReplyText}\n");
+        }
+        break;
+    }
+
     case "glossary":
     {
         var entries = await noteStore.ListGlossaryAsync();
@@ -248,6 +277,7 @@ switch (args.ElementAtOrDefault(0))
               dotnet run -- gaps
               dotnet run -- resolve-gap <sciezka z gaps>
               dotnet run -- glossary
+              dotnet run -- agent
             """);
         break;
 }

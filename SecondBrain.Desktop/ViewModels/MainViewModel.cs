@@ -12,7 +12,8 @@ public partial class MainViewModel(
     ICompressor compressor,
     IAnswerSynthesizer answerSynthesizer,
     IConflictDetector conflictDetector,
-    INoteStore noteStore) : ViewModelBase
+    INoteStore noteStore,
+    IAgent agent) : ViewModelBase
 {
     public const int TabEditor = 0;
     public const int TabSearch = 1;
@@ -20,6 +21,7 @@ public partial class MainViewModel(
     public const int TabTrash = 3;
     public const int TabGaps = 4;
     public const int TabGlossary = 5;
+    public const int TabAgent = 6;
 
     // ---- Drzewo (foldery + notatki, w tym zagniezdzone podstrony) ----
 
@@ -621,6 +623,81 @@ public partial class MainViewModel(
         HasGlossary = GlossaryEntries.Count > 0;
     }
 
+    // ---- Agent (czat z dostepem do calego programu przez narzedzia) ----
+    // Globalny, nie ograniczony do aktualnie wybranego folderu - agent sam decyduje ktorych
+    // narzedzi/folderow uzyc. Historia rozmowy zyje tylko w pamieci na czas dzialania appki
+    // (ConversationState z IAgent), tak jak reszta stanu edytora/wyszukiwania.
+
+    private string _agentConversationState = "";
+
+    public ObservableCollection<AgentChatItem> AgentMessages { get; } = [];
+
+    [ObservableProperty]
+    public partial string AgentInputText { get; set; } = "";
+
+    [ObservableProperty]
+    public partial bool IsAgentBusy { get; set; }
+
+    [ObservableProperty]
+    public partial AgentPendingAction? AgentPending { get; set; }
+
+    [RelayCommand]
+    private async Task SendAgentMessageAsync()
+    {
+        var message = AgentInputText.Trim();
+        if (string.IsNullOrWhiteSpace(message) || IsAgentBusy)
+            return;
+
+        AgentMessages.Add(new AgentChatItem("user", message));
+        AgentInputText = "";
+
+        IsAgentBusy = true;
+        try
+        {
+            var step = await agent.SendAsync(_agentConversationState, message);
+            ApplyAgentStep(step);
+        }
+        finally
+        {
+            IsAgentBusy = false;
+        }
+    }
+
+    [RelayCommand]
+    private Task AcceptAgentActionAsync() => ConfirmAgentActionAsync(approved: true);
+
+    [RelayCommand]
+    private Task RejectAgentActionAsync() => ConfirmAgentActionAsync(approved: false);
+
+    private async Task ConfirmAgentActionAsync(bool approved)
+    {
+        if (AgentPending is null)
+            return;
+
+        AgentPending = null;
+        IsAgentBusy = true;
+        try
+        {
+            var step = await agent.ConfirmAsync(_agentConversationState, approved);
+            ApplyAgentStep(step);
+        }
+        finally
+        {
+            IsAgentBusy = false;
+        }
+    }
+
+    private void ApplyAgentStep(AgentStepResult step)
+    {
+        _agentConversationState = step.ConversationState;
+        AgentPending = step.PendingAction;
+
+        if (step.PendingAction is { } pending)
+            AgentMessages.Add(new AgentChatItem("assistant", $"Chce: {pending.Summary}"));
+        else if (!string.IsNullOrWhiteSpace(step.ReplyText))
+            AgentMessages.Add(new AgentChatItem("assistant", step.ReplyText));
+    }
+
     // ---- Zakladki / skroty klawiszowe ----
     // Szukaj i Kosz sa dostepne tylko z paska narzedzi (nie maja wlasnego naglowka
     // w prawym panelu) - stad wlasne flagi widoczności zamiast TabControl.SelectedIndex.
@@ -646,6 +723,9 @@ public partial class MainViewModel(
     [ObservableProperty]
     public partial bool IsGlossaryTabActive { get; set; }
 
+    [ObservableProperty]
+    public partial bool IsAgentTabActive { get; set; }
+
     // Naglowek "Notatka / +" w prawym panelu ma sens tylko dla tych dwoch widokow -
     // Szukaj, Kosz, Luki i Slownik maja wlasna zawartosc od samej gory.
     [ObservableProperty]
@@ -659,6 +739,7 @@ public partial class MainViewModel(
         IsTrashTabActive = value == TabTrash;
         IsGapsTabActive = value == TabGaps;
         IsGlossaryTabActive = value == TabGlossary;
+        IsAgentTabActive = value == TabAgent;
         IsContentHeaderVisible = value is TabEditor or TabNote;
     }
 
@@ -679,6 +760,9 @@ public partial class MainViewModel(
 
     [RelayCommand]
     private void ShowGapsTab() => SelectedTabIndex = TabGaps;
+
+    [RelayCommand]
+    private void ShowAgentTab() => SelectedTabIndex = TabAgent;
 
     // ---- Start ----
 

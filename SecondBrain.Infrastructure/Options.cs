@@ -17,6 +17,11 @@ public class OpenAiOptions : HttpClientOptions
     // gpt-3.5-turbo myli sie tu nawet przy temperature=0 (zmierzone: ~2/3 trafien
     // na tym samym przykladzie). gpt-5 rozwiazuje to poprawnie za kazdym razem.
     public string ConflictModel { get; set; } = "gpt-5";
+
+    // Agent orkiestruje wywolania narzedzi (co wywolac, w jakiej kolejnosci, kiedy skonczyc) -
+    // to tez zadanie rozumowania jak wykrywanie sprzecznosci, nie ekstrakcja/streszczanie,
+    // wiec ten sam silniejszy model co ConflictModel.
+    public string AgentModel { get; set; } = "gpt-5";
 }
 
 public class RerankerOptions : HttpClientOptions
