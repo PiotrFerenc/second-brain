@@ -48,7 +48,7 @@ public class FileNoteStore(IOptions<StorageOptions> options) : INoteStore
         foreach (var file in Directory.EnumerateFiles(dir, "*.md", SearchOption.AllDirectories))
             notes.Add(await LoadAsync(file, ct));
 
-        return notes.OrderByDescending(n => n.Pinned).ThenByDescending(n => n.UpdatedAt).ToList();
+        return notes.OrderByDescending(n => n.Pinned).ThenBy(n => n.Title, StringComparer.OrdinalIgnoreCase).ToList();
     }
 
     public Task DeleteFolderAsync(string folder, CancellationToken ct = default)

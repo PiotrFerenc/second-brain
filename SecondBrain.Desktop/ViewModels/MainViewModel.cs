@@ -680,6 +680,17 @@ public partial class MainViewModel(
         {
             var step = await agent.ConfirmAsync(_agentConversationState, approved);
             ApplyAgentStep(step);
+
+            // Agent dziala na noteStore/vectorIndex bezposrednio, mijajac te same komendy
+            // ktore normalnie odswiezaja UI (SaveNoteAsync, DeleteNoteAsync, itd.) - po
+            // zaakceptowanej akcji trzeba wiec dociagnac stan recznie.
+            if (approved)
+            {
+                await LoadTreeAsync();
+                await LoadTrashAsync();
+                await LoadGapsAsync();
+                await LoadGlossaryAsync();
+            }
         }
         finally
         {

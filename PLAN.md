@@ -163,7 +163,14 @@ Stan weryfikacji:
   zrzutem ekranu — widoczna, poprawnie zawija się do drugiej linii wraz ze "Słownik" (pasek
   narzędzi w sidebarze 270px zmieniony ze `StackPanel` na `WrapPanel` przy tej okazji, bo
   piąty przycisk wypadał poza widoczny obszar). Samo kliknięcie w zakładkę nieprzeklikane
-  ręcznie (brak `xdotool`) — patrz Zadanie 8.
+  ręcznie (brak `xdotool`) — patrz Zadanie 8. Dodatkowo przetestowane: `add_note` przez
+  agenta z potwierdzeniem "tak" faktycznie zapisuje plik, indeksuje w Qdrant (widoczne w
+  `search`) i dopisuje definicję do słownika; z "nie" nie zostawia żadnego śladu.
+- ✅ Notatki sortowane alfabetycznie po tytule (`FileNoteStore.ListAsync`) — przetestowane
+  CLI (`notes`) na trzech notatkach (Antylopa/Mrówka/Zebra), kolejność poprawna.
+- ✅ Odświeżanie drzewa/kosza/luk/słownika po akcji agenta (`ConfirmAgentActionAsync`) —
+  poprawka w kodzie (build czysty), niesprawdzona ręcznym klikiem w oknie z tego samego
+  powodu co reszta interakcji Desktop (brak `xdotool`).
 
 ## 3. Decyzje i ich powody
 
@@ -210,6 +217,8 @@ Te ustalenia są wiążące — nie zmieniaj ich bez wyraźnej prośby użytkown
 | **`ConversationState` w `IAgent` to nieprzezroczysty string** (cała historia + wywołania narzędzi w formacie OpenAI, serializowana do JSON) | Wywołujący (CLI, `MainViewModel`) tylko przechowuje i oddaje blob z powrotem, nie zna wewnętrznego formatu providera; nie jest zapisywany na dysk — rozmowa żyje tylko w pamięci na czas działania aplikacji, tak jak reszta stanu edytora |
 | **Agent: nowa zakładka "Agent"** (przycisk w pasku narzędzi obok Słownika), dymki czatu (user/asystent), karta potwierdzenia Tak/Nie nad polem wpisywania | Wprost wybrane przez użytkownika (nowa zakładka zamiast zadokowanego panelu); Tak/Nie jako dwie osobne komendy bez parametru (nie `CommandParameter="True"/"False"` rzutowane z string na bool w runtime — kruche) |
 | **Pasek narzędzi w sidebarze: `WrapPanel` zamiast `StackPanel`** | Piąty przycisk ("Agent") wypadał poza widoczny obszar sidebaru (stała szerokość 270px, `StackPanel` nie zawija) — złapane dopiero zrzutem ekranu po realnym uruchomieniu, nie na etapie budowania. `WrapPanel` zawija do kolejnej linii zamiast obcinać |
+| **Notatki w folderze sortowane alfabetycznie po tytule** (`FileNoteStore.ListAsync`, `Pinned` dalej ma priorytet, potem `Title` przez `StringComparer.OrdinalIgnoreCase`) | Wprost zażądane przez użytkownika; wczesniej sortowanie bylo po `UpdatedAt` malejąco. Ta sama lista zasila i CLI (`notes`), i drzewo w Desktopie (`LoadTreeAsync` -> `BuildNoteTree` zachowuje kolejnosc z `ListAsync`) — jedna zmiana naprawia oba miejsca |
+| **Po zaakceptowanej akcji agenta: `MainViewModel` ręcznie odświeża Drzewo/Kosz/Luki/Słownik** (`LoadTreeAsync`/`LoadTrashAsync`/`LoadGapsAsync`/`LoadGlossaryAsync` w `ConfirmAgentActionAsync`) | `OpenAiAgent` działa bezpośrednio na `INoteStore`/`IVectorIndex`, mijając komendy VM (`SaveNoteAsync` itp.), które normalnie same odświeżają UI po zmianie — bez tego np. `create_folder` przez agenta nie pojawiał się w drzewie bez ręcznego odświeżenia |
 
 ## 4. Co dalej
 
