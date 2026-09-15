@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Linq;
+using System.Text.Json;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
@@ -11,9 +12,18 @@ namespace SecondBrain.Desktop.Views;
 
 public partial class MainWindow : Window
 {
+    // Stan okna (rozmiar) obok katalogu notatek (~/SecondBrain/), nie w appsettings.json -
+    // to czysto lokalny stan UI, nie konfiguracja providerow/kluczy API.
+    private static readonly string SavedWindowSizePath = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "SecondBrain", "window.json");
+
+    private record SavedWindowSize(double Width, double Height);
+
     public MainWindow()
     {
         InitializeComponent();
+        LoadWindowSize();
+
         Opened += async (_, _) =>
         {
             if (DataContext is MainViewModel vm)
@@ -24,6 +34,48 @@ public partial class MainWindow : Window
                 BuildTagChips(vm);
             }
         };
+
+        Closing += (_, _) => SaveWindowSize();
+    }
+
+    // ponytail: tylko Width/Height, bez pozycji/SavedWindowSize (maksymalizacja) - jedno pole
+    // wiecej do walidowania na wielomonitorowych ukladach za niewielka korzysc; dopisac
+    // gdy realnie zabraknie.
+    private void LoadWindowSize()
+    {
+        try
+        {
+            if (!File.Exists(SavedWindowSizePath))
+                return;
+
+            var state = JsonSerializer.Deserialize<SavedWindowSize>(File.ReadAllText(SavedWindowSizePath));
+            if (state is null)
+                return;
+
+            // Wartosci z poprzedniego uruchomienia (np. na innym/wiekszym monitorze) moga
+            // byc bezsensowne - trzymamy w rozsadnych granicach zamiast ich odrzucac calkiem.
+            if (state.Width is >= 400 and <= 10000)
+                Width = state.Width;
+            if (state.Height is >= 300 and <= 10000)
+                Height = state.Height;
+        }
+        catch
+        {
+            // Uszkodzony/nieczytelny plik - zostaja domyslne wymiary z XAML.
+        }
+    }
+
+    private void SaveWindowSize()
+    {
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(SavedWindowSizePath)!);
+            File.WriteAllText(SavedWindowSizePath, JsonSerializer.Serialize(new SavedWindowSize(Width, Height)));
+        }
+        catch
+        {
+            // Zapis stanu okna to najlepszy wysilek - awaria nie moze zablokowac zamkniecia.
+        }
     }
 
     private void OnViewModelPropertyChanged(MainViewModel vm, PropertyChangedEventArgs e)
