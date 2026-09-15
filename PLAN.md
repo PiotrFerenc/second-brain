@@ -187,6 +187,14 @@ Stan weryfikacji:
   bazie. OCR i wykrywacz duplikatów zweryfikowane w izolacji przez fork (patrz decyzje
   niżej — oba wymagają realnego, nie-mockowego providera żeby dać sensowny wynik na
   żywym `add`/`search`).
+- ✅ Dwie kolejne funkcje Desktop zbudowane równolegle (2 agenty, 2 worktree, scalone
+  bezkonfliktowo): zapamiętywanie rozmiaru okna (`~/SecondBrain/window.json`) i rozciągana
+  belka boczna (`GridSplitter`, `MinWidth=200`/`MaxWidth=500`). Przetestowane razem:
+  ręcznie spreparowany `window.json` (950×650) → uruchomienie realnej aplikacji →
+  zrzut ekranu potwierdza mniejsze okno niż domyślne 1100×700, layout (w tym pasek
+  narzędzi, drzewo, GridSplitter) renderuje się poprawnie, bez połamania. Zapis rozmiaru
+  przy zamknięciu (`Window.Closing`) i samo przeciąganie belki myszką nieprzeklikane
+  ręcznie (brak `xdotool`) — patrz Zadanie 8.
 
 ## 3. Decyzje i ich powody
 
@@ -242,6 +250,9 @@ Te ustalenia są wiążące — nie zmieniaj ich bez wyraźnej prośby użytkown
 | **OCR: `IOcrExtractor`/`LightOnOcrExtractor`, model `LightOnOCR-2-1B` (self-hosted), `OcrOptions.BaseAddress` pusty domyślnie** | Model wskazany przez użytkownika; to nie publiczne SaaS jak OpenAI, wzorzec identyczny jak `RerankerOptions`/Cohere (uzupełniane per-maszyna). Wyciągnięty tekst trafia do pola edytora do wglądu, NIE zapisuje się automatycznie — OCR bywa niedokładny. `add`/`ocr` w CLI dzielą wspólną funkcję `AddNoteAsync` (unika duplikacji całego pipeline'u kompresja→zapis→słownik→embedding→upsert→sprzeczność→domykanie luk dla drugiego punktu wejścia) |
 | **Wersjonowanie faktów: `.facts/<slug>.md` (append-only, styl jak `.glossary`/`.gaps`)**, zapisywane obok istniejącego ostrzeżenia o sprzeczności (nie zamiast) | Jednorazowe ostrzeżenie w statusie łatwo przewinąć/przegapić; trwała historia per temat jest przeszukiwalna (`fact-history`). Przy PIERWSZEJ wykrytej sprzeczności dla danego tematu zapisywana jest też wersja PIERWOTNA (nie tylko nowa), inaczej historia zaczynałaby się od jednej strony sprzeczności |
 | **Wykrywacz duplikatów międzyfolderowych (`DuplicateScanner`) czysto informacyjny** (`find-duplicates`), próg podobieństwa 0.92, bez interfejsu (jedna implementacja) | Scalanie/kasowanie duplikatów to świadomy ręczny follow-up przez `trash_note`/agenta, nie automatyzowane. Wektor notatki do porównania liczony przez ponowny `IEmbedder.EmbedAsync` (nie odczyt surowego wektora z Qdrant) — spójne z resztą kodu. **Nieprzetestowane na sensownych danych**: `MockEmbedder` to hash MD5 tekstu, nie semantyczny — dwie parafrazy dostają kompletnie różne wektory, więc realne wykrywanie bliskich (nie identycznych) duplikatów wymaga prawdziwego embeddera (patrz Zadanie 6) |
+| **Rozmiar okna: `~/SecondBrain/window.json`, nie `appsettings.json`** | Czysto lokalny stan UI, nie konfiguracja/klucz API — osobny plik, zero zależności od DI/`StorageOptions`. Zapisywane tylko `Width`/`Height` (bez pozycji/maksymalizacji) — świadomie okrojone na start, mniej pól do walidowania na układach wielomonitorowych. Zapisane wartości walidowane do sensownego zakresu (400–10000 / 300–10000) zanim zostaną zastosowane — inaczej rozmiar zapisany na innym/większym monitorze dawałby bezsensowne okno; poza zakresem używane są domyślne z XAML (`Width="1100" Height="700"`, zostają jako fallback na pierwsze uruchomienie). Zapis/odczyt best-effort — uszkodzony plik lub błąd zapisu przy zamykaniu nie blokuje startu/zamknięcia aplikacji |
+| **Rozciągana belka boczna: natywny `GridSplitter` Avalonia**, `MinWidth=200`/`MaxWidth=500` na kolumnie sidebaru, szerokość NIE jest zapamiętywana między uruchomieniami | Wprost zażądane (długie tytuły notatek się nie mieściły w stałych 270px). Standardowa kontrolka zamiast własnej implementacji przeciągania. Brak trwałego zapisu szerokości to świadome cięcie zakresu (osobne zadanie od zapisu rozmiaru całego okna, budowane równolegle) — dodanie tu dublowałoby mechanizm zapisu stanu |
+| **5+2 funkcje w tej turze budowane przez agenty w równoległych `git worktree`**, `Agent(isolation:"worktree")` nie działa w tym środowisku (sesja w tle, brak `WorktreeCreate` hooka) — worktree zakładane ręcznie (`git worktree add`) | Wprost zażądane przez użytkownika, powtórzone jako wzorzec pracy. Każdy fork dostaje instrukcję pracy wyłącznie w swoim katalogu, kopiowania gitignorowanego `appsettings.json` (worktree nie kopiuje plików niewersjonowanych) i unikalnego prefiksu folderu testowego (Qdrant + `~/SecondBrain/notes` to współdzielona żywa infrastruktura między wszystkimi równoległymi forkami) |
 
 ## 4. Co dalej
 
