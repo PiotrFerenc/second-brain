@@ -3,7 +3,10 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using SecondBrain.Desktop.ViewModels;
 using SecondBrain.Infrastructure;
+using Serilog;
 using System;
+using System.Diagnostics;
+using System.IO;
 
 namespace SecondBrain.Desktop;
 
@@ -15,17 +18,26 @@ sealed class Program
     [STAThread]
     public static void Main(string[] args)
     {
-        var config = new ConfigurationBuilder()
-            .SetBasePath(AppContext.BaseDirectory)
-            .AddJsonFile("appsettings.json")
-            .Build();
+        SetupFileLogging();
 
-        var services = new ServiceCollection();
-        services.AddSecondBrainInfrastructure(config);
-        services.AddTransient<MainViewModel>();
-        App.Services = services.BuildServiceProvider();
+        try
+        {
+            var config = new ConfigurationBuilder()
+                .SetBasePath(AppContext.BaseDirectory)
+                .AddJsonFile("appsettings.json")
+                .Build();
 
-        BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+            var services = new ServiceCollection();
+            services.AddSecondBrainInfrastructure(config);
+            services.AddTransient<MainViewModel>();
+            App.Services = services.BuildServiceProvider();
+
+            BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+        }
+        finally
+        {
+            Log.CloseAndFlush();
+        }
     }
 
     // Avalonia configuration, don't remove; also used by visual designer.
@@ -37,4 +49,27 @@ sealed class Program
 #endif
             .WithInterFont()
             .LogToTrace();
+
+    private static void SetupFileLogging()
+    {
+        var logPath = Path.Combine(AppContext.BaseDirectory, "logs", "app-.log");
+
+        Log.Logger = new LoggerConfiguration()
+            .WriteTo.File(logPath, rollingInterval: RollingInterval.Day, retainedFileCountLimit: 14)
+            .CreateLogger();
+
+        // Avalonia's .LogToTrace() writes to System.Diagnostics.Trace - forward it into Serilog too.
+        Trace.Listeners.Add(new SerilogTraceListener());
+    }
+
+    private sealed class SerilogTraceListener : TraceListener
+    {
+        public override void Write(string? message) { }
+
+        public override void WriteLine(string? message)
+        {
+            if (!string.IsNullOrEmpty(message))
+                Log.Information("{AvaloniaTrace}", message);
+        }
+    }
 }
