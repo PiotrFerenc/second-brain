@@ -247,6 +247,61 @@ public class FileNoteStore(IOptions<StorageOptions> options) : INoteStore
         return updated;
     }
 
+    public async Task RecordFactVersionAsync(string subject, string statement, string sourceTitle, CancellationToken ct = default)
+    {
+        var dir = Path.Combine(_root, ".facts");
+        Directory.CreateDirectory(dir);
+        var path = Path.Combine(dir, $"{Slugify(subject)}.md");
+
+        var entry = $"""
+            ---
+            date: {DateTimeOffset.UtcNow:O}
+            source: {sourceTitle}
+            ---
+            {statement}
+            """;
+
+        // Append-only: kazda wersja to kolejny blok front-matter+tresc w tym samym pliku,
+        // oddzielony pusta linia zamiast osobnego pliku na wersje - prostszy odczyt calej
+        // historii na raz.
+        var existing = File.Exists(path) ? await File.ReadAllTextAsync(path, ct) + "\n\n" : "";
+        await File.WriteAllTextAsync(path, existing + entry, ct);
+    }
+
+    public async Task<IReadOnlyList<FactVersion>> ListFactHistoryAsync(string subject, CancellationToken ct = default)
+    {
+        var path = Path.Combine(_root, ".facts", $"{Slugify(subject)}.md");
+        if (!File.Exists(path))
+            return [];
+
+        var lines = await File.ReadAllLinesAsync(path, ct);
+        var versions = new List<FactVersion>();
+
+        var i = 0;
+        while (i < lines.Length)
+        {
+            if (lines[i] != "---")
+            {
+                i++;
+                continue;
+            }
+
+            var date = lines[i + 1][(lines[i + 1].IndexOf(':') + 1)..].Trim();
+            var source = lines[i + 2][(lines[i + 2].IndexOf(':') + 1)..].Trim();
+            // lines[i + 3] to zamykajace "---" bloku
+
+            var bodyStart = i + 4;
+            var bodyEnd = bodyStart;
+            while (bodyEnd < lines.Length && lines[bodyEnd] != "---")
+                bodyEnd++;
+
+            versions.Add(new FactVersion(DateTimeOffset.Parse(date), source, string.Join('\n', lines[bodyStart..bodyEnd]).Trim()));
+            i = bodyEnd;
+        }
+
+        return versions.OrderBy(v => v.RecordedAt).ToList();
+    }
+
     // ponytail: slug bez zaleznosci (bez diakrytykow, male litery, myslniki) -
     // wystarczy zeby ten sam termin nadpisywal poprzedni wpis pod ta sama nazwa pliku.
     private static string Slugify(string term)

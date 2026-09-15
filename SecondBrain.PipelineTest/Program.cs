@@ -27,6 +27,7 @@ var gapAutoCloser = provider.GetRequiredService<GapAutoCloser>();
 var tagCleaner = provider.GetRequiredService<ITagCleaner>();
 var tagMerger = provider.GetRequiredService<TagMerger>();
 var ocrExtractor = provider.GetRequiredService<IOcrExtractor>();
+var duplicateScanner = provider.GetRequiredService<DuplicateScanner>();
 
 async Task AddNoteAsync(string folder, string rawText)
 {
@@ -56,7 +57,18 @@ async Task AddNoteAsync(string folder, string rawText)
     {
         var conflict = await conflictDetector.DetectAsync(note.CompressedContent, relatedNotes);
         if (conflict.HasConflict)
+        {
             Console.WriteLine($"UWAGA - mozliwa sprzecznosc z \"{conflict.ConflictingTitle}\": {conflict.Explanation}");
+
+            // Pierwsza wykryta sprzecznosc dla tego tematu - dopisz tez PIERWOTNA
+            // (konfliktujaca) wersje, zeby historia od razu miala obie strony sprzecznosci.
+            if ((await noteStore.ListFactHistoryAsync(conflict.ConflictingTitle!)).Count == 0)
+            {
+                var original = relatedNotes.First(n => n.Title == conflict.ConflictingTitle);
+                await noteStore.RecordFactVersionAsync(conflict.ConflictingTitle!, original.CompressedContent, original.Title);
+            }
+            await noteStore.RecordFactVersionAsync(conflict.ConflictingTitle!, note.CompressedContent, result.Title);
+        }
     }
 
     var closedGaps = await gapAutoCloser.TryCloseMatchingGapsAsync();
@@ -333,6 +345,35 @@ switch (args.ElementAtOrDefault(0))
         break;
     }
 
+    case "fact-history" when args.Length >= 2:
+    {
+        var subject = string.Join(' ', args.Skip(1));
+        var history = await noteStore.ListFactHistoryAsync(subject);
+        if (history.Count == 0)
+        {
+            Console.WriteLine($"Brak historii dla '{subject}'.");
+            break;
+        }
+
+        foreach (var v in history)
+            Console.WriteLine($"{v.RecordedAt:yyyy-MM-dd HH:mm}  ({v.SourceTitle}): {v.Statement}");
+        break;
+    }
+
+    case "find-duplicates":
+    {
+        var duplicates = await duplicateScanner.FindCrossFolderDuplicatesAsync();
+        if (duplicates.Count == 0)
+        {
+            Console.WriteLine("Nie znaleziono duplikatow miedzyfolderowych.");
+            break;
+        }
+
+        foreach (var (a, b, similarity) in duplicates)
+            Console.WriteLine($"[{similarity:0.000}] \"{a.Title}\" <-> \"{b.Title}\"");
+        break;
+    }
+
     default:
         Console.WriteLine("""
             Uzycie:
@@ -354,6 +395,8 @@ switch (args.ElementAtOrDefault(0))
               dotnet run -- agent
               dotnet run -- tags
               dotnet run -- merge-tags <docelowy-tag> <tag1> [tag2 ...]
+              dotnet run -- fact-history <temat>
+              dotnet run -- find-duplicates
             """);
         break;
 }

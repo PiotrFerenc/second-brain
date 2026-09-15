@@ -36,6 +36,11 @@ public record TagGroup(string[] Tags, string SuggestedCanonical);
 // musi wiedziec do ktorej kolekcji Qdrant doupsertowac notatke po zmianie na dysku.
 public record FolderedNote(string Folder, Note Note);
 
+// Wersjonowanie faktow: gdy wykrywacz sprzecznosci zlapie sprzeczna wartosc dla tego
+// samego tematu, obie wersje trafiaja tu jako trwala historia (nie tylko jednorazowe
+// ostrzezenie w statusie, ktore latwo przewinac/przegapic).
+public record FactVersion(DateTimeOffset RecordedAt, string SourceTitle, string Statement);
+
 public interface ICompressor
 {
     Task<CompressionResult> CompressAsync(string rawText, CancellationToken ct = default);
@@ -104,6 +109,10 @@ public interface INoteStore
     // (wszystkie foldery), przepisujac pliki na dysku. Zwraca zaktualizowane notatki wraz
     // z folderem, zeby wywolujacy mogl doupsertowac je do Qdrant (tagi sa tez w payloadzie).
     Task<IReadOnlyList<FolderedNote>> MergeTagsAsync(string[] fromTags, string toTag, CancellationToken ct = default);
+
+    // Wersjonowanie faktow (patrz FactVersion) - append-only historia per temat.
+    Task RecordFactVersionAsync(string subject, string statement, string sourceTitle, CancellationToken ct = default);
+    Task<IReadOnlyList<FactVersion>> ListFactHistoryAsync(string subject, CancellationToken ct = default);
 }
 
 // Folder = kolekcja w bazie wektorowej. Jedna implementacja (Qdrant) na razie,

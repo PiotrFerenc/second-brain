@@ -42,6 +42,7 @@ public static class ServiceCollectionExtensions
             new FileNoteStore(sp.GetRequiredService<IOptions<StorageOptions>>()),
             sp.GetRequiredService<IOptions<StorageOptions>>()));
         services.AddSingleton<IVectorIndex, QdrantVectorIndex>();
+        services.AddSingleton<DuplicateScanner>();
 
         return services;
     }
