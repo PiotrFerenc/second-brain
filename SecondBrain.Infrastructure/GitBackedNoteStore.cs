@@ -60,6 +60,12 @@ public class GitBackedNoteStore(INoteStore inner, IOptions<StorageOptions> optio
     public Task<IReadOnlyList<FolderedNote>> MergeTagsAsync(string[] fromTags, string toTag, CancellationToken ct = default) =>
         WithCommitAsync(() => inner.MergeTagsAsync(fromTags, toTag, ct), $"Scalono tagi: {string.Join(", ", fromTags)} -> {toTag}");
 
+    public Task RecordFactVersionAsync(string subject, string statement, string sourceTitle, CancellationToken ct = default) =>
+        WithCommitAsync(() => inner.RecordFactVersionAsync(subject, statement, sourceTitle, ct), $"Wersja faktu: {subject}");
+
+    public Task<IReadOnlyList<FactVersion>> ListFactHistoryAsync(string subject, CancellationToken ct = default) =>
+        inner.ListFactHistoryAsync(subject, ct);
+
     private async Task WithCommitAsync(Func<Task> action, string message)
     {
         await action();
