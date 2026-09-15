@@ -284,7 +284,16 @@ public partial class MainViewModel(
             {
                 var conflict = await conflictDetector.DetectAsync(note.CompressedContent, relatedNotes);
                 if (conflict.HasConflict)
+                {
                     statusLines.Add($"Możliwa sprzeczność z \"{conflict.ConflictingTitle}\": {conflict.Explanation}");
+
+                    if ((await noteStore.ListFactHistoryAsync(conflict.ConflictingTitle!)).Count == 0)
+                    {
+                        var original = relatedNotes.First(n => n.Title == conflict.ConflictingTitle);
+                        await noteStore.RecordFactVersionAsync(conflict.ConflictingTitle!, original.CompressedContent, original.Title);
+                    }
+                    await noteStore.RecordFactVersionAsync(conflict.ConflictingTitle!, note.CompressedContent, result.Title);
+                }
             }
 
             EditorStatus = string.Join("\n", statusLines);

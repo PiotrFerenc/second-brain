@@ -32,6 +32,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IAgent, OpenAiAgent>();
         services.AddSingleton<INoteStore, FileNoteStore>();
         services.AddSingleton<IVectorIndex, QdrantVectorIndex>();
+        services.AddSingleton<DuplicateScanner>();
 
         return services;
     }

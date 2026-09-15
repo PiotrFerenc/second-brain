@@ -29,6 +29,11 @@ public record ConflictResult(
 
 public record GlossaryEntry(string Term, string Definition, string SourceTitle);
 
+// Wersjonowanie faktow: gdy wykrywacz sprzecznosci zlapie sprzeczna wartosc dla tego
+// samego tematu, obie wersje trafiaja tu jako trwala historia (nie tylko jednorazowe
+// ostrzezenie w statusie, ktore latwo przewinac/przegapic).
+public record FactVersion(DateTimeOffset RecordedAt, string SourceTitle, string Statement);
+
 public interface ICompressor
 {
     Task<CompressionResult> CompressAsync(string rawText, CancellationToken ct = default);
@@ -85,6 +90,10 @@ public interface INoteStore
     // Ten sam termin nadpisuje poprzedni wpis (najnowsza definicja wygrywa).
     Task SaveGlossaryEntryAsync(string term, string definition, string sourceTitle, CancellationToken ct = default);
     Task<IReadOnlyList<GlossaryEntry>> ListGlossaryAsync(CancellationToken ct = default);
+
+    // Wersjonowanie faktow (patrz FactVersion) - append-only historia per temat.
+    Task RecordFactVersionAsync(string subject, string statement, string sourceTitle, CancellationToken ct = default);
+    Task<IReadOnlyList<FactVersion>> ListFactHistoryAsync(string subject, CancellationToken ct = default);
 }
 
 // Folder = kolekcja w bazie wektorowej. Jedna implementacja (Qdrant) na razie,

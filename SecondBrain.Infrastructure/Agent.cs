@@ -270,7 +270,16 @@ public class OpenAiAgent(
                 {
                     var conflict = await conflictDetector.DetectAsync(note.CompressedContent, relatedNotes, ct);
                     if (conflict.HasConflict)
+                    {
                         reply += $" UWAGA - mozliwa sprzecznosc z \"{conflict.ConflictingTitle}\": {conflict.Explanation}";
+
+                        if ((await noteStore.ListFactHistoryAsync(conflict.ConflictingTitle!, ct)).Count == 0)
+                        {
+                            var original = relatedNotes.First(n => n.Title == conflict.ConflictingTitle);
+                            await noteStore.RecordFactVersionAsync(conflict.ConflictingTitle!, original.CompressedContent, original.Title, ct);
+                        }
+                        await noteStore.RecordFactVersionAsync(conflict.ConflictingTitle!, note.CompressedContent, result.Title, ct);
+                    }
                 }
                 return reply;
             }
