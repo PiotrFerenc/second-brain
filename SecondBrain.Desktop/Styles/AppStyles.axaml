@@ -188,4 +188,12 @@
         <Setter Property="HorizontalAlignment" Value="Left" />
     </Style>
 
+    <!-- Uchwyt rozciagania sidebaru - niewidoczny w spoczynku, subtelna kreska na hover/drag -->
+    <Style Selector="GridSplitter:pointerover">
+        <Setter Property="Background" Value="{DynamicResource CtpSurface2}" />
+    </Style>
+    <Style Selector="GridSplitter:pressed">
+        <Setter Property="Background" Value="{DynamicResource CtpMauve}" />
+    </Style>
+
 </Styles>
