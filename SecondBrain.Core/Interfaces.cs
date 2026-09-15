@@ -29,6 +29,13 @@ public record ConflictResult(
 
 public record GlossaryEntry(string Term, string Definition, string SourceTitle);
 
+// Sugestia grupy tagow-duplikatow (np. "spotkanie"/"spotkania") do reczengo scalenia.
+public record TagGroup(string[] Tags, string SuggestedCanonical);
+
+// Notatka wraz z folderem, w ktorym lezy - zwracana tam gdzie wywolujacy (np. TagMerger)
+// musi wiedziec do ktorej kolekcji Qdrant doupsertowac notatke po zmianie na dysku.
+public record FolderedNote(string Folder, Note Note);
+
 public interface ICompressor
 {
     Task<CompressionResult> CompressAsync(string rawText, CancellationToken ct = default);
@@ -60,6 +67,13 @@ public interface IConflictDetector
     Task<ConflictResult> DetectAsync(string newContent, IReadOnlyList<Note> candidates, CancellationToken ct = default);
 }
 
+// Grupuje semantycznie zduplikowane tagi z calej bazy (liczba pojedyncza/mnoga, literowki,
+// synonimy) i sugeruje jedna kanoniczna forme na grupe - do recznego scalenia przez usera.
+public interface ITagCleaner
+{
+    Task<IReadOnlyList<TagGroup>> FindDuplicateGroupsAsync(IReadOnlyList<string> allTags, CancellationToken ct = default);
+}
+
 public interface INoteStore
 {
     Task<string> SaveAsync(string folder, Note note, CancellationToken ct = default);
@@ -85,6 +99,11 @@ public interface INoteStore
     // Ten sam termin nadpisuje poprzedni wpis (najnowsza definicja wygrywa).
     Task SaveGlossaryEntryAsync(string term, string definition, string sourceTitle, CancellationToken ct = default);
     Task<IReadOnlyList<GlossaryEntry>> ListGlossaryAsync(CancellationToken ct = default);
+
+    // Czyszczenie tagow: podmienia kazdy tag z fromTags na toTag we wszystkich notatkach
+    // (wszystkie foldery), przepisujac pliki na dysku. Zwraca zaktualizowane notatki wraz
+    // z folderem, zeby wywolujacy mogl doupsertowac je do Qdrant (tagi sa tez w payloadzie).
+    Task<IReadOnlyList<FolderedNote>> MergeTagsAsync(string[] fromTags, string toTag, CancellationToken ct = default);
 }
 
 // Folder = kolekcja w bazie wektorowej. Jedna implementacja (Qdrant) na razie,
