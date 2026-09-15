@@ -23,6 +23,8 @@ var answerSynthesizer = provider.GetRequiredService<IAnswerSynthesizer>();
 var conflictDetector = provider.GetRequiredService<IConflictDetector>();
 var noteStore = provider.GetRequiredService<INoteStore>();
 var agent = provider.GetRequiredService<IAgent>();
+var tagCleaner = provider.GetRequiredService<ITagCleaner>();
+var tagMerger = provider.GetRequiredService<TagMerger>();
 
 switch (args.ElementAtOrDefault(0))
 {
@@ -246,6 +248,47 @@ switch (args.ElementAtOrDefault(0))
         break;
     }
 
+    case "tags":
+    {
+        var allTags = new List<string>();
+        foreach (var folder in await store.ListFoldersAsync())
+            foreach (var note in await noteStore.ListAsync(folder))
+                allTags.AddRange(note.Tags);
+
+        var counts = allTags.GroupBy(t => t, StringComparer.OrdinalIgnoreCase)
+            .OrderByDescending(g => g.Count())
+            .ThenBy(g => g.Key, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (counts.Count == 0)
+        {
+            Console.WriteLine("Brak tagow.");
+            break;
+        }
+
+        foreach (var g in counts)
+            Console.WriteLine($"{g.Key} ({g.Count()})");
+
+        var groups = await tagCleaner.FindDuplicateGroupsAsync(counts.Select(g => g.Key).ToList());
+        if (groups.Count > 0)
+        {
+            Console.WriteLine("\nMozliwe duplikaty:");
+            foreach (var group in groups)
+                Console.WriteLine($"  [{string.Join(", ", group.Tags)}] -> {group.SuggestedCanonical}  (dotnet run -- merge-tags {group.SuggestedCanonical} {string.Join(' ', group.Tags.Where(t => !string.Equals(t, group.SuggestedCanonical, StringComparison.OrdinalIgnoreCase)))})");
+        }
+        break;
+    }
+
+    case "merge-tags" when args.Length >= 3:
+    {
+        var toTag = args[1];
+        var fromTags = args.Skip(2).ToArray();
+
+        var count = await tagMerger.MergeAsync(fromTags, toTag);
+        Console.WriteLine($"Scalono {string.Join(", ", fromTags)} -> {toTag} w {count} notatce/-ach.");
+        break;
+    }
+
     case "glossary":
     {
         var entries = await noteStore.ListGlossaryAsync();
@@ -278,6 +321,8 @@ switch (args.ElementAtOrDefault(0))
               dotnet run -- resolve-gap <sciezka z gaps>
               dotnet run -- glossary
               dotnet run -- agent
+              dotnet run -- tags
+              dotnet run -- merge-tags <docelowy-tag> <tag1> [tag2 ...]
             """);
         break;
 }

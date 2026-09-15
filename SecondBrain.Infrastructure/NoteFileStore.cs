@@ -216,6 +216,37 @@ public class FileNoteStore(IOptions<StorageOptions> options) : INoteStore
         return entries.OrderBy(e => e.Term, StringComparer.OrdinalIgnoreCase).ToList();
     }
 
+    public async Task<IReadOnlyList<FolderedNote>> MergeTagsAsync(string[] fromTags, string toTag, CancellationToken ct = default)
+    {
+        var fromSet = new HashSet<string>(fromTags, StringComparer.OrdinalIgnoreCase);
+        var updated = new List<FolderedNote>();
+
+        if (!Directory.Exists(_root))
+            return updated;
+
+        foreach (var folderDir in Directory.EnumerateDirectories(_root))
+        {
+            var folder = Path.GetFileName(folderDir);
+            if (folder.StartsWith('.'))
+                continue;
+
+            foreach (var note in await ListAsync(folder, ct))
+            {
+                if (!note.Tags.Any(t => fromSet.Contains(t)))
+                    continue;
+
+                var newTags = note.Tags.Where(t => !fromSet.Contains(t)).Append(toTag)
+                    .Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+                var merged = note with { Tags = newTags };
+
+                await File.WriteAllTextAsync(merged.FilePath, Render(merged), ct);
+                updated.Add(new FolderedNote(folder, merged));
+            }
+        }
+
+        return updated;
+    }
+
     // ponytail: slug bez zaleznosci (bez diakrytykow, male litery, myslniki) -
     // wystarczy zeby ten sam termin nadpisywal poprzedni wpis pod ta sama nazwa pliku.
     private static string Slugify(string term)

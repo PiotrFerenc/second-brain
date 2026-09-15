@@ -30,6 +30,8 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IAnswerSynthesizer, OpenAiAnswerSynthesizer>();
         services.AddSingleton<IConflictDetector, OpenAiConflictDetector>();
         services.AddSingleton<IAgent, OpenAiAgent>();
+        services.AddSingleton<ITagCleaner, OpenAiTagCleaner>();
+        services.AddSingleton<TagMerger>();
         services.AddSingleton<INoteStore, FileNoteStore>();
         services.AddSingleton<IVectorIndex, QdrantVectorIndex>();
 
