@@ -26,6 +26,43 @@ var agent = provider.GetRequiredService<IAgent>();
 var gapAutoCloser = provider.GetRequiredService<GapAutoCloser>();
 var tagCleaner = provider.GetRequiredService<ITagCleaner>();
 var tagMerger = provider.GetRequiredService<TagMerger>();
+var ocrExtractor = provider.GetRequiredService<IOcrExtractor>();
+
+async Task AddNoteAsync(string folder, string rawText)
+{
+    var now = DateTimeOffset.UtcNow;
+
+    var result = await compressor.CompressAsync(rawText);
+    var note = new Note(Guid.NewGuid(), result.Title, rawText, result.CompressedContent, result.Tags, now, now);
+
+    var path = await noteStore.SaveAsync(folder, note);
+    note = note with { FilePath = path };
+
+    foreach (var def in result.Definitions ?? [])
+        await noteStore.SaveGlossaryEntryAsync(def.Term, def.Definition, result.Title);
+
+    var vector = await embedder.EmbedAsync(note.CompressedContent);
+    await store.UpsertAsync(folder, note, vector);
+
+    var related = await store.SearchAsync(folder, vector, limit: 4);
+    var relatedNotes = related.Where(r => r.Note.Id != note.Id).Take(3).Select(r => r.Note).ToList();
+
+    Console.WriteLine($"Zapisano: {path}\nId: {note.Id}\nTytul (LLM): {result.Title}\nTagi (LLM): {string.Join(", ", result.Tags)}\nSkompresowano do: {result.CompressedContent}");
+
+    if ((result.Definitions ?? []).Length > 0)
+        Console.WriteLine($"Definicje do slownika: {string.Join(", ", result.Definitions!.Select(d => d.Term))}");
+
+    if (relatedNotes.Count > 0)
+    {
+        var conflict = await conflictDetector.DetectAsync(note.CompressedContent, relatedNotes);
+        if (conflict.HasConflict)
+            Console.WriteLine($"UWAGA - mozliwa sprzecznosc z \"{conflict.ConflictingTitle}\": {conflict.Explanation}");
+    }
+
+    var closedGaps = await gapAutoCloser.TryCloseMatchingGapsAsync();
+    if (closedGaps > 0)
+        Console.WriteLine($"Zamknieto {closedGaps} luk(i) w wiedzy.");
+}
 
 switch (args.ElementAtOrDefault(0))
 {
@@ -68,38 +105,26 @@ switch (args.ElementAtOrDefault(0))
     {
         var folder = args[1];
         var rawText = string.Join(' ', args.Skip(2));
-        var now = DateTimeOffset.UtcNow;
+        await AddNoteAsync(folder, rawText);
+        break;
+    }
 
-        var result = await compressor.CompressAsync(rawText);
-        var note = new Note(Guid.NewGuid(), result.Title, rawText, result.CompressedContent, result.Tags, now, now);
-
-        var path = await noteStore.SaveAsync(folder, note);
-        note = note with { FilePath = path };
-
-        foreach (var def in result.Definitions ?? [])
-            await noteStore.SaveGlossaryEntryAsync(def.Term, def.Definition, result.Title);
-
-        var vector = await embedder.EmbedAsync(note.CompressedContent);
-        await store.UpsertAsync(folder, note, vector);
-
-        var related = await store.SearchAsync(folder, vector, limit: 4);
-        var relatedNotes = related.Where(r => r.Note.Id != note.Id).Take(3).Select(r => r.Note).ToList();
-
-        Console.WriteLine($"Zapisano: {path}\nId: {note.Id}\nTytul (LLM): {result.Title}\nTagi (LLM): {string.Join(", ", result.Tags)}\nSkompresowano do: {result.CompressedContent}");
-
-        if ((result.Definitions ?? []).Length > 0)
-            Console.WriteLine($"Definicje do slownika: {string.Join(", ", result.Definitions!.Select(d => d.Term))}");
-
-        if (relatedNotes.Count > 0)
+    case "ocr" when args.Length >= 3:
+    {
+        var folder = args[1];
+        var imagePath = args[2];
+        var mimeType = Path.GetExtension(imagePath).ToLowerInvariant() switch
         {
-            var conflict = await conflictDetector.DetectAsync(note.CompressedContent, relatedNotes);
-            if (conflict.HasConflict)
-                Console.WriteLine($"UWAGA - mozliwa sprzecznosc z \"{conflict.ConflictingTitle}\": {conflict.Explanation}");
-        }
+            ".png" => "image/png",
+            ".jpg" or ".jpeg" => "image/jpeg",
+            var ext => throw new InvalidOperationException($"Nieobslugiwane rozszerzenie obrazka: {ext}")
+        };
 
-        var closedGaps = await gapAutoCloser.TryCloseMatchingGapsAsync();
-        if (closedGaps > 0)
-            Console.WriteLine($"Zamknieto {closedGaps} luk(i) w wiedzy.");
+        var imageBytes = await File.ReadAllBytesAsync(imagePath);
+        var extractedText = await ocrExtractor.ExtractTextAsync(imageBytes, mimeType);
+        Console.WriteLine($"OCR odczytal:\n{extractedText}\n");
+
+        await AddNoteAsync(folder, extractedText);
         break;
     }
 
@@ -316,6 +341,7 @@ switch (args.ElementAtOrDefault(0))
               dotnet run -- delete-folder <folder>
               dotnet run -- seed <folder>
               dotnet run -- add <folder> <tekst notatki...>
+              dotnet run -- ocr <folder> <sciezka do obrazka .png/.jpg>
               dotnet run -- notes <folder>
               dotnet run -- delete-note <folder> <id notatki>   (do kosza)
               dotnet run -- list-trash

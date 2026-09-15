@@ -137,3 +137,10 @@ public interface IAgent
     // Wywolywane gdy poprzedni wynik mial PendingAction != null - user zaakceptowal/odrzucil w UI.
     Task<AgentStepResult> ConfirmAsync(string conversationState, bool approved, CancellationToken ct = default);
 }
+
+// OCR zrzutu ekranu / obrazka - wyciagniety tekst leci dalej przez zwykly ICompressor,
+// tak samo jak notatka wpisana recznie.
+public interface IOcrExtractor
+{
+    Task<string> ExtractTextAsync(byte[] imageBytes, string mimeType, CancellationToken ct = default);
+}

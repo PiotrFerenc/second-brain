@@ -29,6 +29,13 @@ public class RerankerOptions : HttpClientOptions
     public string Model { get; set; } = "rerank-v3.5";
 }
 
+// LightOnOCR-2-1B to zwykle self-hosted serwer (np. vLLM), nie publiczne SaaS jak OpenAI -
+// BaseAddress pusty domyslnie, do uzupelnienia per-maszyna (ten sam wzorzec co Reranker/Cohere).
+public class OcrOptions : HttpClientOptions
+{
+    public string Model { get; set; } = "LightOnOCR-2-1B";
+}
+
 public class QdrantOptions
 {
     public string Host { get; set; } = "localhost";

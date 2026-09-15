@@ -17,12 +17,16 @@ public static class ServiceCollectionExtensions
         services.Configure<RerankerOptions>(config.GetSection("Reranker"));
         services.Configure<QdrantOptions>(config.GetSection("Qdrant"));
         services.Configure<StorageOptions>(config.GetSection("Storage"));
+        services.Configure<OcrOptions>(config.GetSection("Ocr"));
 
         services.AddHttpClient("OpenAI", (sp, client) =>
             HttpClientHeaders.Apply(client, sp.GetRequiredService<IOptions<OpenAiOptions>>().Value));
 
         services.AddHttpClient("Reranker", (sp, client) =>
             HttpClientHeaders.Apply(client, sp.GetRequiredService<IOptions<RerankerOptions>>().Value));
+
+        services.AddHttpClient("Ocr", (sp, client) =>
+            HttpClientHeaders.Apply(client, sp.GetRequiredService<IOptions<OcrOptions>>().Value));
 
         services.AddSingleton<IEmbedder, MockEmbedder>();
         services.AddSingleton<IReranker, MockReranker>();
@@ -33,6 +37,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<GapAutoCloser>();
         services.AddSingleton<ITagCleaner, OpenAiTagCleaner>();
         services.AddSingleton<TagMerger>();
+        services.AddSingleton<IOcrExtractor, LightOnOcrExtractor>();
         services.AddSingleton<INoteStore>(sp => new GitBackedNoteStore(
             new FileNoteStore(sp.GetRequiredService<IOptions<StorageOptions>>()),
             sp.GetRequiredService<IOptions<StorageOptions>>()));
