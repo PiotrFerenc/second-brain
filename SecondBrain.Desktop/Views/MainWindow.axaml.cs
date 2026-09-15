@@ -1,7 +1,9 @@
 using System.ComponentModel;
+using System.Linq;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Media.Imaging;
 using Avalonia.Platform.Storage;
 using SecondBrain.Desktop.ViewModels;
 
@@ -77,6 +79,34 @@ public partial class MainWindow : Window
             lines.Add(line);
 
         await vm.ImportLinesCommand.ExecuteAsync(lines);
+    }
+
+    // OCR ze schowka: obraz -> base64 -> IOcrExtractor -> tekst do wglądu w polu notatki
+    // (nie zapisujemy od razu - OCR bywa niedokladny, user ma szanse poprawic przed Zapisz).
+    private async void PasteImage_Click(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainViewModel vm)
+            return;
+
+        var clipboard = GetTopLevel(this)?.Clipboard;
+        var data = clipboard is null ? null : await clipboard.TryGetDataAsync();
+        var bitmapItem = data?.Items.FirstOrDefault(i => i.Formats.Contains(DataFormat.Bitmap));
+        if (bitmapItem is null)
+        {
+            vm.EditorStatus = "Brak obrazka w schowku.";
+            return;
+        }
+
+        if (await bitmapItem.TryGetRawAsync(DataFormat.Bitmap) is not Bitmap bitmap)
+        {
+            vm.EditorStatus = "Nie udalo sie odczytac obrazka ze schowka.";
+            return;
+        }
+
+        using var stream = new MemoryStream();
+        bitmap.Save(stream, new PngBitmapEncoderOptions());
+
+        await vm.RunOcrCommand.ExecuteAsync(stream.ToArray());
     }
 
     // Schowek wymaga TopLevel, do ktorego ViewModel nie ma dostepu - stad w code-behind.

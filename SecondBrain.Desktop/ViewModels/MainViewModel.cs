@@ -13,7 +13,8 @@ public partial class MainViewModel(
     IAnswerSynthesizer answerSynthesizer,
     IConflictDetector conflictDetector,
     INoteStore noteStore,
-    IAgent agent) : ViewModelBase
+    IAgent agent,
+    IOcrExtractor ocrExtractor) : ViewModelBase
 {
     public const int TabEditor = 0;
     public const int TabSearch = 1;
@@ -346,6 +347,25 @@ public partial class MainViewModel(
             await LoadTreeAsync();
             await LoadParentOptionsAsync();
             await LoadGlossaryAsync();
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    // OCR ze schowka: wyciagniety tekst laduje w polu notatki do wglądu/edycji, NIE zapisuje
+    // sie automatycznie - OCR bywa niedokladny, user ma szanse poprawic przed "Zapisz".
+    [RelayCommand]
+    private async Task RunOcrAsync(byte[] imageBytes)
+    {
+        IsBusy = true;
+        try
+        {
+            EditorStatus = "Odczytuje tekst z obrazka (OCR)...";
+            var text = await ocrExtractor.ExtractTextAsync(imageBytes, "image/png");
+            NoteText = text;
+            EditorStatus = "Tekst z obrazka wczytany - sprawdz i zapisz.";
         }
         finally
         {

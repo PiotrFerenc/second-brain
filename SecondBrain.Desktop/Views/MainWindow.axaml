@@ -154,9 +154,11 @@
                         </StackPanel>
 
                         <StackPanel DockPanel.Dock="Top" Spacing="8" Margin="0,0,0,12">
-                            <Grid ColumnDefinitions="*,Auto">
+                            <Grid ColumnDefinitions="*,Auto,Auto">
                                 <StackPanel Grid.Column="0" x:Name="TemplatesPanel" Orientation="Horizontal" Spacing="8" />
-                                <Button Grid.Column="1" Content="Importuj z pliku..." Classes="subtleAction" Click="ImportFile_Click" />
+                                <Button Grid.Column="1" Content="Wklej obrazek ze schowka" Classes="subtleAction"
+                                        Click="PasteImage_Click" Margin="0,0,8,0" />
+                                <Button Grid.Column="2" Content="Importuj z pliku..." Classes="subtleAction" Click="ImportFile_Click" />
                             </Grid>
                             <TextBox Text="{Binding NoteTagsInput}" PlaceholderText="tagi po przecinku (puste = LLM zaproponuje)" />
                             <ComboBox ItemsSource="{Binding ParentOptions}"

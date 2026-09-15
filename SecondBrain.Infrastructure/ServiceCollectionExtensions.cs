@@ -17,6 +17,7 @@ public static class ServiceCollectionExtensions
         services.Configure<RerankerOptions>(config.GetSection("Reranker"));
         services.Configure<QdrantOptions>(config.GetSection("Qdrant"));
         services.Configure<StorageOptions>(config.GetSection("Storage"));
+        services.Configure<OcrOptions>(config.GetSection("Ocr"));
 
         services.AddHttpClient("OpenAI", (sp, client) =>
             HttpClientHeaders.Apply(client, sp.GetRequiredService<IOptions<OpenAiOptions>>().Value));
@@ -24,12 +25,16 @@ public static class ServiceCollectionExtensions
         services.AddHttpClient("Reranker", (sp, client) =>
             HttpClientHeaders.Apply(client, sp.GetRequiredService<IOptions<RerankerOptions>>().Value));
 
+        services.AddHttpClient("Ocr", (sp, client) =>
+            HttpClientHeaders.Apply(client, sp.GetRequiredService<IOptions<OcrOptions>>().Value));
+
         services.AddSingleton<IEmbedder, MockEmbedder>();
         services.AddSingleton<IReranker, MockReranker>();
         services.AddSingleton<ICompressor, OpenAiCompressor>();
         services.AddSingleton<IAnswerSynthesizer, OpenAiAnswerSynthesizer>();
         services.AddSingleton<IConflictDetector, OpenAiConflictDetector>();
         services.AddSingleton<IAgent, OpenAiAgent>();
+        services.AddSingleton<IOcrExtractor, LightOnOcrExtractor>();
         services.AddSingleton<INoteStore, FileNoteStore>();
         services.AddSingleton<IVectorIndex, QdrantVectorIndex>();
 
