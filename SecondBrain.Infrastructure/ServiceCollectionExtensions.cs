@@ -30,6 +30,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IAnswerSynthesizer, OpenAiAnswerSynthesizer>();
         services.AddSingleton<IConflictDetector, OpenAiConflictDetector>();
         services.AddSingleton<IAgent, OpenAiAgent>();
+        services.AddSingleton<GapAutoCloser>();
         services.AddSingleton<INoteStore>(sp => new GitBackedNoteStore(
             new FileNoteStore(sp.GetRequiredService<IOptions<StorageOptions>>()),
             sp.GetRequiredService<IOptions<StorageOptions>>()));

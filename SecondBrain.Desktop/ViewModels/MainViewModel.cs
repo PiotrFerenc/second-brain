@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using SecondBrain.Core;
+using SecondBrain.Infrastructure;
 
 namespace SecondBrain.Desktop.ViewModels;
 
@@ -13,7 +14,8 @@ public partial class MainViewModel(
     IAnswerSynthesizer answerSynthesizer,
     IConflictDetector conflictDetector,
     INoteStore noteStore,
-    IAgent agent) : ViewModelBase
+    IAgent agent,
+    GapAutoCloser gapAutoCloser) : ViewModelBase
 {
     public const int TabEditor = 0;
     public const int TabSearch = 1;
@@ -287,6 +289,10 @@ public partial class MainViewModel(
                     statusLines.Add($"Możliwa sprzeczność z \"{conflict.ConflictingTitle}\": {conflict.Explanation}");
             }
 
+            var closedGaps = await gapAutoCloser.TryCloseMatchingGapsAsync();
+            if (closedGaps > 0)
+                statusLines.Add($"Zamknięto {closedGaps} luk(i) w wiedzy.");
+
             EditorStatus = string.Join("\n", statusLines);
 
             NoteText = "";
@@ -296,6 +302,8 @@ public partial class MainViewModel(
             await LoadTreeAsync();
             await LoadParentOptionsAsync();
             await LoadGlossaryAsync();
+            if (closedGaps > 0)
+                await LoadGapsAsync();
         }
         finally
         {
@@ -307,6 +315,8 @@ public partial class MainViewModel(
     // co pojedyncza notatka (kompresja -> zapis -> embedding -> upsert). Bez wykrywacza
     // sprzecznosci - N linii to juz N wywolan LLM, kolejne podwoilyby koszt/czas importu.
     // Definicje do slownika zostaja, bo pochodza z tej samej kompresji (bez dodatkowego kosztu).
+    // Domykanie luk zostaje: LLM leci tylko gdy sa otwarte luki (ListGapsAsync pusta = zero
+    // dodatkowych wywolan), wiec koszt jest zaniedbywalny w porownaniu do wykrywacza sprzecznosci.
     [RelayCommand]
     private async Task ImportLinesAsync(IReadOnlyList<string> lines)
     {
@@ -342,10 +352,19 @@ public partial class MainViewModel(
                 imported++;
             }
 
-            EditorStatus = $"Zaimportowano notatek: {imported}.";
+            // Domykanie luk raz, po calym imporcie (nie per linia) - jedno globalne
+            // przeszukanie zamiast N, spojne z decyzja o pominieciu sprawdzania sprzecznosci tutaj.
+            var closedGaps = await gapAutoCloser.TryCloseMatchingGapsAsync();
+
+            EditorStatus = closedGaps > 0
+                ? $"Zaimportowano notatek: {imported}. Zamknięto {closedGaps} luk(i) w wiedzy."
+                : $"Zaimportowano notatek: {imported}.";
+
             await LoadTreeAsync();
             await LoadParentOptionsAsync();
             await LoadGlossaryAsync();
+            if (closedGaps > 0)
+                await LoadGapsAsync();
         }
         finally
         {

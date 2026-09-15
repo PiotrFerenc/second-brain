@@ -23,6 +23,7 @@ var answerSynthesizer = provider.GetRequiredService<IAnswerSynthesizer>();
 var conflictDetector = provider.GetRequiredService<IConflictDetector>();
 var noteStore = provider.GetRequiredService<INoteStore>();
 var agent = provider.GetRequiredService<IAgent>();
+var gapAutoCloser = provider.GetRequiredService<GapAutoCloser>();
 
 switch (args.ElementAtOrDefault(0))
 {
@@ -93,6 +94,10 @@ switch (args.ElementAtOrDefault(0))
             if (conflict.HasConflict)
                 Console.WriteLine($"UWAGA - mozliwa sprzecznosc z \"{conflict.ConflictingTitle}\": {conflict.Explanation}");
         }
+
+        var closedGaps = await gapAutoCloser.TryCloseMatchingGapsAsync();
+        if (closedGaps > 0)
+            Console.WriteLine($"Zamknieto {closedGaps} luk(i) w wiedzy.");
         break;
     }
 

@@ -15,7 +15,8 @@ public class OpenAiAgent(
     ICompressor compressor,
     IAnswerSynthesizer answerSynthesizer,
     IConflictDetector conflictDetector,
-    INoteStore noteStore) : IAgent
+    INoteStore noteStore,
+    GapAutoCloser gapAutoCloser) : IAgent
 {
     private readonly OpenAiOptions _options = options.Value;
 
@@ -272,6 +273,11 @@ public class OpenAiAgent(
                     if (conflict.HasConflict)
                         reply += $" UWAGA - mozliwa sprzecznosc z \"{conflict.ConflictingTitle}\": {conflict.Explanation}";
                 }
+
+                var closedGaps = await gapAutoCloser.TryCloseMatchingGapsAsync(ct);
+                if (closedGaps > 0)
+                    reply += $" Zamknieto rowniez {closedGaps} luk(i) w wiedzy.";
+
                 return reply;
             }
 
