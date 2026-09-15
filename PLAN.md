@@ -171,6 +171,22 @@ Stan weryfikacji:
 - ✅ Odświeżanie drzewa/kosza/luk/słownika po akcji agenta (`ConfirmAgentActionAsync`) —
   poprawka w kodzie (build czysty), niesprawdzona ręcznym klikiem w oknie z tego samego
   powodu co reszta interakcji Desktop (brak `xdotool`).
+- ✅ Pięć funkcji zbudowanych równolegle (5 agentów, każdy we własnym `git worktree` na
+  osobnym branchu, scalone ręcznie z rozwiązaniem konfliktów): auto-commit notatek do gita
+  (`GitBackedNoteStore`), auto-domykanie luk w wiedzy (`GapAutoCloser`), czyszczenie
+  zduplikowanych tagów (`ITagCleaner`/`TagMerger`), OCR ze zrzutu ekranu
+  (`IOcrExtractor`/`LightOnOcrExtractor`), wersjonowanie faktów + wykrywacz duplikatów
+  międzyfolderowych (`RecordFactVersionAsync`/`ListFactHistoryAsync`, `DuplicateScanner`).
+  Wszystkie 5 branchy zmergowane do `master`, build solucji czysty (0 warn/err) po każdym
+  scaleniu. Przetestowane razem end-to-end na żywej bazie: dwie sprzeczne notatki o
+  spotkaniu Acme → `fact-history` pokazuje obie wersje, ostrzeżenie o sprzeczności działa;
+  `search` bez trafień → luka zalogowana; kolejny `add` faktycznie odpowiadający na luke →
+  `gaps` pokazuje że zniknęła i wypisuje "Zamknieto N luk(i)"; `git -C ~/SecondBrain/notes
+  log` pokazuje osobny commit na każdą operację (zapis notatki, luka, wersja faktu,
+  odrzucenie luki); `tags` na realnych danych poprawnie znalazł prawdziwe duplikaty w
+  bazie. OCR i wykrywacz duplikatów zweryfikowane w izolacji przez fork (patrz decyzje
+  niżej — oba wymagają realnego, nie-mockowego providera żeby dać sensowny wynik na
+  żywym `add`/`search`).
 
 ## 3. Decyzje i ich powody
 
@@ -219,6 +235,13 @@ Te ustalenia są wiążące — nie zmieniaj ich bez wyraźnej prośby użytkown
 | **Pasek narzędzi w sidebarze: `WrapPanel` zamiast `StackPanel`** | Piąty przycisk ("Agent") wypadał poza widoczny obszar sidebaru (stała szerokość 270px, `StackPanel` nie zawija) — złapane dopiero zrzutem ekranu po realnym uruchomieniu, nie na etapie budowania. `WrapPanel` zawija do kolejnej linii zamiast obcinać |
 | **Notatki w folderze sortowane alfabetycznie po tytule** (`FileNoteStore.ListAsync`, `Pinned` dalej ma priorytet, potem `Title` przez `StringComparer.OrdinalIgnoreCase`) | Wprost zażądane przez użytkownika; wczesniej sortowanie bylo po `UpdatedAt` malejąco. Ta sama lista zasila i CLI (`notes`), i drzewo w Desktopie (`LoadTreeAsync` -> `BuildNoteTree` zachowuje kolejnosc z `ListAsync`) — jedna zmiana naprawia oba miejsca |
 | **Po zaakceptowanej akcji agenta: `MainViewModel` ręcznie odświeża Drzewo/Kosz/Luki/Słownik** (`LoadTreeAsync`/`LoadTrashAsync`/`LoadGapsAsync`/`LoadGlossaryAsync` w `ConfirmAgentActionAsync`) | `OpenAiAgent` działa bezpośrednio na `INoteStore`/`IVectorIndex`, mijając komendy VM (`SaveNoteAsync` itp.), które normalnie same odświeżają UI po zmianie — bez tego np. `create_folder` przez agenta nie pojawiał się w drzewie bez ręcznego odświeżenia |
+| **5 funkcji naraz budowane przez 5 równoległych agentów, każdy we własnym `git worktree` na osobnym branchu** (`feature/git-backup`, `feature/gap-autoclose`, `feature/tag-cleanup`, `feature/ocr`, `feature/facts-duplicates`), scalone ręcznie do `master` jeden po drugim | Wprost zażądane przez użytkownika. `Agent(isolation:"worktree")` nie zadziałało w tym środowisku (sesja w tle, brak `WorktreeCreate` hooka) — worktree założone ręcznie przez `git worktree add`, agentom kazano pracować wyłącznie we wskazanym katalogu. Każdy fork dostał instrukcję skopiowania gitignorowanego `appsettings.json` do swojego worktree (git worktree nie kopiuje plików niewersjonowanych) i używania unikalnego prefiksu folderu testowego (Qdrant + `~/SecondBrain/notes` to współdzielona żywa infrastruktura między wszystkimi 5) |
+| **Auto-commit notatek do gita: dekorator `GitBackedNoteStore` wokół `FileNoteStore`**, nie modyfikacja `FileNoteStore` | Po każdej mutacji (`SaveAsync`, kosz, słownik, luki, scalanie tagów, wersje faktów) cichy `git init`(raz)/`add -A`/`commit` w katalogu notatek — darmowa historia/backup bez akcji usera. Commit best-effort: błąd (brak gita, brak `user.name`/`user.email`, nic do zacommitowania) tylko logowany na stderr, nigdy nie przerywa prawdziwej operacji |
+| **Auto-domykanie luk w wiedzy: `GapAutoCloser`, wołany po `add_note` w 3 miejscach** (CLI `add`/`ocr`, `MainViewModel.SaveNoteAsync` + `ImportLinesAsync`, agent `add_note`) | Świadomie odłożone jako v2 przy budowie Luk w wiedzy — teraz tanie do dopięcia, bo global search/RAG już istnieje. W `ImportLinesAsync` włączone (raz na cały import, nie per linia) w przeciwieństwie do wykrywacza sprzeczności (tam świadomie pominięty) — koszt LLM tylko gdy są otwarte luki, nieporównywalnie tańsze niż N wywołań conflict-detectora |
+| **Czyszczenie tagów: `ITagCleaner` (LLM, `CompressionModel`) sugeruje grupy, `INoteStore.MergeTagsAsync` + `TagMerger` wykonują scalenie** (dysk + re-upsert do Qdrant) | Grupowanie tagów to ekstrakcja/kategoryzacja, nie twarde rozumowanie jak wykrywanie sprzeczności — `CompressionModel` (gpt-3.5-turbo) wystarcza, nie dodano kolejnego dedykowanego modelu. Scalanie musi zaktualizować i plik, i payload Qdrant (tagi tam też są) — zweryfikowane na żywo: `search` po scaleniu zwraca nowy tag, nie stary |
+| **OCR: `IOcrExtractor`/`LightOnOcrExtractor`, model `LightOnOCR-2-1B` (self-hosted), `OcrOptions.BaseAddress` pusty domyślnie** | Model wskazany przez użytkownika; to nie publiczne SaaS jak OpenAI, wzorzec identyczny jak `RerankerOptions`/Cohere (uzupełniane per-maszyna). Wyciągnięty tekst trafia do pola edytora do wglądu, NIE zapisuje się automatycznie — OCR bywa niedokładny. `add`/`ocr` w CLI dzielą wspólną funkcję `AddNoteAsync` (unika duplikacji całego pipeline'u kompresja→zapis→słownik→embedding→upsert→sprzeczność→domykanie luk dla drugiego punktu wejścia) |
+| **Wersjonowanie faktów: `.facts/<slug>.md` (append-only, styl jak `.glossary`/`.gaps`)**, zapisywane obok istniejącego ostrzeżenia o sprzeczności (nie zamiast) | Jednorazowe ostrzeżenie w statusie łatwo przewinąć/przegapić; trwała historia per temat jest przeszukiwalna (`fact-history`). Przy PIERWSZEJ wykrytej sprzeczności dla danego tematu zapisywana jest też wersja PIERWOTNA (nie tylko nowa), inaczej historia zaczynałaby się od jednej strony sprzeczności |
+| **Wykrywacz duplikatów międzyfolderowych (`DuplicateScanner`) czysto informacyjny** (`find-duplicates`), próg podobieństwa 0.92, bez interfejsu (jedna implementacja) | Scalanie/kasowanie duplikatów to świadomy ręczny follow-up przez `trash_note`/agenta, nie automatyzowane. Wektor notatki do porównania liczony przez ponowny `IEmbedder.EmbedAsync` (nie odczyt surowego wektora z Qdrant) — spójne z resztą kodu. **Nieprzetestowane na sensownych danych**: `MockEmbedder` to hash MD5 tekstu, nie semantyczny — dwie parafrazy dostają kompletnie różne wektory, więc realne wykrywanie bliskich (nie identycznych) duplikatów wymaga prawdziwego embeddera (patrz Zadanie 6) |
 
 ## 4. Co dalej
 
