@@ -6,44 +6,32 @@ using SecondBrain.Core;
 
 namespace SecondBrain.Infrastructure;
 
-public class OpenAiTagCleaner(IHttpClientFactory httpClientFactory, IOptions<OpenAiOptions> options) : ITagCleaner
+public class FabrykaTagCleaner(IHttpClientFactory httpClientFactory, IOptions<TagCleaningOptions> options) : ITagCleaner
 {
-    // ponytail: grupowanie tagow to ekstrakcja/kategoryzacja, nie twarde rozumowanie jak
-    // wykrywanie sprzecznosci - CompressionModel wystarcza, nie trzeba osobnego *Model
-    // (patrz PLAN.md decyzje: ConflictModel/AgentModel istnieja bo gpt-3.5-turbo konkretnie
-    // zawodzil na tamtym zadaniu, to tu nie zaobserwowano).
-    private const string SystemPrompt =
-        "Dostajesz liste WSZYSTKICH tagow uzywanych w osobistej bazie notatek uzytkownika. " +
-        "Znajdz grupy tagow ktore znacza to samo (liczba pojedyncza/mnoga, oczywiste literowki, " +
-        "synonimy) i zasugeruj jedna kanoniczna forme dla kazdej grupy. Pomin tagi ktore nie maja " +
-        "duplikatu - nie twórz grup jednoelementowych. Zwroc WYLACZNIE obiekt JSON o jednym polu " +
-        "\"groups\": tablica obiektow {\"tags\": [...], \"suggestedCanonical\": \"...\"}. Jesli nie " +
-        "ma zadnych duplikatow, zwroc {\"groups\": []}.";
-
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
 
-    private readonly OpenAiOptions _options = options.Value;
+    private readonly TagCleaningOptions _options = options.Value;
 
     public async Task<IReadOnlyList<TagGroup>> FindDuplicateGroupsAsync(IReadOnlyList<string> allTags, CancellationToken ct = default)
     {
         if (allTags.Count < 2)
             return [];
 
-        var client = httpClientFactory.CreateClient("OpenAI");
+        var client = httpClientFactory.CreateClient("TagCleaning");
         var response = await client.PostAsJsonAsync("chat/completions", new
         {
-            model = _options.CompressionModel,
+            model = _options.Model,
             response_format = new { type = "json_object" },
             messages = new object[]
             {
-                new { role = "system", content = SystemPrompt },
+                new { role = "system", content = _options.SystemPrompt },
                 new { role = "user", content = string.Join(", ", allTags) }
             }
         }, ct);
         response.EnsureSuccessStatusCode();
 
-        var body = await response.Content.ReadFromJsonAsync<OpenAiChatResponse>(cancellationToken: ct)
-            ?? throw new InvalidOperationException("Pusta odpowiedz OpenAI chat/completions.");
+        var body = await response.Content.ReadFromJsonAsync<FabrykaChatResponse>(cancellationToken: ct)
+            ?? throw new InvalidOperationException("Pusta odpowiedz Fabryka chat/completions.");
 
         var raw = body.Choices[0].Message.Content.Trim();
         var parsed = JsonSerializer.Deserialize<GroupsResult>(raw, JsonOptions)
@@ -53,9 +41,9 @@ public class OpenAiTagCleaner(IHttpClientFactory httpClientFactory, IOptions<Ope
     }
 
     private record GroupsResult([property: JsonPropertyName("groups")] TagGroup[]? Groups);
-    private record OpenAiChatResponse([property: JsonPropertyName("choices")] OpenAiChoice[] Choices);
-    private record OpenAiChoice([property: JsonPropertyName("message")] OpenAiMessage Message);
-    private record OpenAiMessage([property: JsonPropertyName("content")] string Content);
+    private record FabrykaChatResponse([property: JsonPropertyName("choices")] FabrykaChoice[] Choices);
+    private record FabrykaChoice([property: JsonPropertyName("message")] FabrykaMessage Message);
+    private record FabrykaMessage([property: JsonPropertyName("content")] string Content);
 }
 
 // Wykonuje faktyczne scalenie: przepisuje pliki notatek (przez INoteStore.MergeTagsAsync)

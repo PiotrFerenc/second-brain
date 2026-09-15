@@ -7,8 +7,6 @@ namespace SecondBrain.Infrastructure;
 
 public class LightOnOcrExtractor(IHttpClientFactory httpClientFactory, IOptions<OcrOptions> options) : IOcrExtractor
 {
-    private const string Prompt = "Przepisz caly tekst widoczny na tym obrazku, doslownie, bez komentarzy. Sformatuj wynik jako czytelny markdown (naglowki, listy, pogrubienia, akapity zgodnie ze struktura tekstu na obrazku), zachowujac oryginalna tresc bez zmian.";
-
     private readonly OcrOptions _options = options.Value;
 
     public async Task<string> ExtractTextAsync(byte[] imageBytes, string mimeType, CancellationToken ct = default)
@@ -26,7 +24,7 @@ public class LightOnOcrExtractor(IHttpClientFactory httpClientFactory, IOptions<
                     role = "user",
                     content = new object[]
                     {
-                        new { type = "text", text = Prompt },
+                        new { type = "text", text = _options.Prompt },
                         new { type = "image_url", image_url = new { url = dataUri } }
                     }
                 }

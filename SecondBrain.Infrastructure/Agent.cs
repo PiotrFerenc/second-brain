@@ -6,9 +6,9 @@ using SecondBrain.Core;
 
 namespace SecondBrain.Infrastructure;
 
-public class OpenAiAgent(
+public class FabrykaAgent(
     IHttpClientFactory httpClientFactory,
-    IOptions<OpenAiOptions> options,
+    IOptions<AgentOptions> options,
     IVectorIndex vectorIndex,
     IEmbedder embedder,
     IReranker reranker,
@@ -18,15 +18,7 @@ public class OpenAiAgent(
     INoteStore noteStore,
     GapAutoCloser gapAutoCloser) : IAgent
 {
-    private readonly OpenAiOptions _options = options.Value;
-
-    private const string SystemPrompt =
-        "Jestes asystentem osobistej bazy wiedzy uzytkownika (Second Brain), dostepnym jako czat. " +
-        "Masz dostep do narzedzi pozwalajacych przeszukiwac, czytac, dodawac i porzadkowac notatki " +
-        "w folderach uzytkownika. Odpowiadaj po polsku, zwiezle i konkretnie. Gdy uzytkownik pyta o " +
-        "cos co jest w notatkach, uzyj narzedzia zamiast zgadywac. Narzedzia, ktore cos zmieniaja, " +
-        "same poprosza uzytkownika o potwierdzenie zanim sie wykonaja - po prostu je wywoluj, nie " +
-        "pytaj o zgode w tresci wiadomosci.";
+    private readonly AgentOptions _options = options.Value;
 
     // Narzedzia modyfikujace dane - wymagaja potwierdzenia usera przed wykonaniem.
     // Wszystko inne to czysty odczyt i wykonuje sie od razu.
@@ -122,14 +114,14 @@ public class OpenAiAgent(
 
     private async Task<JsonObject> CallChatCompletionsAsync(JsonArray conversation, CancellationToken ct)
     {
-        var allMessages = new JsonArray { new JsonObject { ["role"] = "system", ["content"] = SystemPrompt } };
+        var allMessages = new JsonArray { new JsonObject { ["role"] = "system", ["content"] = _options.SystemPrompt } };
         foreach (var m in conversation)
             allMessages.Add(m!.DeepClone());
 
-        var client = httpClientFactory.CreateClient("OpenAI");
+        var client = httpClientFactory.CreateClient("Agent");
         var requestBody = new JsonObject
         {
-            ["model"] = _options.AgentModel,
+            ["model"] = _options.Model,
             ["messages"] = allMessages,
             ["tools"] = ToolDefinitions.DeepClone(),
             ["tool_choice"] = "auto",
@@ -140,7 +132,7 @@ public class OpenAiAgent(
         response.EnsureSuccessStatusCode();
 
         var raw = await response.Content.ReadAsStringAsync(ct);
-        var doc = JsonNode.Parse(raw) ?? throw new InvalidOperationException("Pusta odpowiedz OpenAI chat/completions.");
+        var doc = JsonNode.Parse(raw) ?? throw new InvalidOperationException("Pusta odpowiedz Fabryka chat/completions.");
         var message = doc["choices"]![0]!["message"]!.AsObject();
         return (JsonObject)message.DeepClone();
     }
