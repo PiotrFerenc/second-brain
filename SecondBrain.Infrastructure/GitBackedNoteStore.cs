@@ -1,4 +1,5 @@
-using System.Diagnostics;
+using CliWrap;
+using CliWrap.Buffered;
 using Microsoft.Extensions.Options;
 using SecondBrain.Core;
 
@@ -14,6 +15,12 @@ public class GitBackedNoteStore(INoteStore inner, IOptions<StorageOptions> optio
     private readonly string _root = string.IsNullOrWhiteSpace(options.Value.NotesRootPath)
         ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "SecondBrain", "notes")
         : options.Value.NotesRootPath;
+
+    // Commity leca w tle (nie blokuja zwrotu z SaveAsync/etc. do UI), ale jeden po drugim -
+    // rownolegle "git commit" na tym samym repo walczylyby o .git/index.lock. Lock tylko
+    // na doklejenie kolejnego ogniwa lancucha, nie na sam commit (ten dalej biegnie w tle).
+    private readonly object _commitChainLock = new();
+    private Task _commitChain = Task.CompletedTask;
 
     public Task<string> SaveAsync(string folder, Note note, CancellationToken ct = default) =>
         WithCommitAsync(() => inner.SaveAsync(folder, note, ct), $"Zapisano notatke: {note.Title}");
@@ -69,26 +76,32 @@ public class GitBackedNoteStore(INoteStore inner, IOptions<StorageOptions> optio
     private async Task WithCommitAsync(Func<Task> action, string message)
     {
         await action();
-        Commit(message);
+        ScheduleCommit(message);
     }
 
     private async Task<T> WithCommitAsync<T>(Func<Task<T>> action, string message)
     {
         var result = await action();
-        Commit(message);
+        ScheduleCommit(message);
         return result;
     }
 
-    private void Commit(string message)
+    private void ScheduleCommit(string message)
+    {
+        lock (_commitChainLock)
+            _commitChain = _commitChain.ContinueWith(_ => CommitAsync(message), TaskScheduler.Default).Unwrap();
+    }
+
+    private async Task CommitAsync(string message)
     {
         try
         {
             Directory.CreateDirectory(_root);
             if (!Directory.Exists(Path.Combine(_root, ".git")))
-                RunGit("init");
+                await RunGitAsync("init");
 
-            RunGit("add", "-A");
-            RunGit("commit", "-m", message);
+            await RunGitAsync("add", "-A");
+            await RunGitAsync("commit", "--no-gpg-sign", "-m", message);
         }
         catch (Exception ex)
         {
@@ -99,27 +112,20 @@ public class GitBackedNoteStore(INoteStore inner, IOptions<StorageOptions> optio
         }
     }
 
-    private void RunGit(params string[] args)
+    private async Task RunGitAsync(params string[] args)
     {
-        var psi = new ProcessStartInfo("git")
-        {
-            WorkingDirectory = _root,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false
-        };
-        foreach (var arg in args)
-            psi.ArgumentList.Add(arg);
+        // Best-effort backup - musi nigdy nie zawiesic prawdziwej operacji na notatce
+        // czekajac na interaktywny prompt (haslo GPG, login credential managera windows).
+        // CliWrap domyslnie nie podpina stdin procesu-rodzica pod dziecko, wiec kazdy taki
+        // prompt dostaje natychmiastowe EOF zamiast wisiec.
+        var result = await Cli.Wrap("git")
+            .WithArguments(args)
+            .WithWorkingDirectory(_root)
+            .WithValidation(CommandResultValidation.None)
+            .WithEnvironmentVariables(env => env.Set("GIT_TERMINAL_PROMPT", "0"))
+            .ExecuteBufferedAsync();
 
-        using var process = Process.Start(psi);
-        if (process is null)
-            return;
-
-        process.WaitForExit();
-        if (process.ExitCode != 0)
-        {
-            var stderr = process.StandardError.ReadToEnd();
-            Console.Error.WriteLine($"Git backup notatek: 'git {string.Join(' ', args)}' zwrocilo {process.ExitCode}: {stderr.Trim()}");
-        }
+        if (result.ExitCode != 0)
+            Console.Error.WriteLine($"Git backup notatek: 'git {string.Join(' ', args)}' zwrocilo {result.ExitCode}: {result.StandardError.Trim()}");
     }
 }
