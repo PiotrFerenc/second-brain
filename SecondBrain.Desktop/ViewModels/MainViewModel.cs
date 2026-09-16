@@ -72,6 +72,12 @@ public partial class MainViewModel(
         }
     }
 
+    partial void OnSelectedNoteChanged(SearchResultItem? value)
+    {
+        IsEditingNote = false;
+        NoteEditStatus = "";
+    }
+
     [RelayCommand]
     private async Task LoadTreeAsync()
     {
@@ -415,6 +421,84 @@ public partial class MainViewModel(
 
         SelectedNote = ToItem(note, SelectedNote.Folder);
         await LoadTreeAsync();
+    }
+
+    [ObservableProperty]
+    public partial bool IsEditingNote { get; set; }
+
+    [ObservableProperty]
+    public partial string EditNoteText { get; set; } = "";
+
+    [ObservableProperty]
+    public partial string NoteEditStatus { get; set; } = "";
+
+    [RelayCommand]
+    private void StartEditNote()
+    {
+        if (SelectedNote is null)
+            return;
+
+        EditNoteText = SelectedNote.RawContent;
+        NoteEditStatus = "";
+        IsEditingNote = true;
+    }
+
+    [RelayCommand]
+    private void CancelEditNote()
+    {
+        IsEditingNote = false;
+        NoteEditStatus = "";
+    }
+
+    // Edycja = ten sam pipeline co nowa notatka (rekompresja -> zapis -> embedding -> upsert),
+    // ale nadpisuje istniejacy plik zamiast tworzyc nowy: SaveAsync wylicza sciezke z
+    // Id+CreatedAt.Year, wiec zachowanie tych dwoch pol z `existing` (przez `with`) trafia
+    // z powrotem w ten sam plik i ten sam punkt w Qdrant zamiast duplikowac notatke.
+    [RelayCommand]
+    private async Task SaveNoteEditAsync()
+    {
+        if (SelectedNote is null || string.IsNullOrWhiteSpace(EditNoteText))
+            return;
+
+        IsBusy = true;
+        try
+        {
+            NoteEditStatus = "Kompresuje...";
+            var existing = await noteStore.LoadAsync(SelectedNote.FilePath);
+            var result = await compressor.CompressAsync(EditNoteText);
+
+            var note = existing with
+            {
+                Title = result.Title,
+                RawContent = EditNoteText,
+                CompressedContent = result.CompressedContent,
+                Tags = result.Tags,
+                UpdatedAt = DateTimeOffset.UtcNow
+            };
+
+            NoteEditStatus = "Zapisuje plik...";
+            var path = await noteStore.SaveAsync(SelectedNote.Folder, note);
+            note = note with { FilePath = path };
+
+            foreach (var def in result.Definitions ?? [])
+                await noteStore.SaveGlossaryEntryAsync(def.Term, def.Definition, result.Title);
+
+            NoteEditStatus = "Licze embedding...";
+            var vector = await embedder.EmbedAsync(note.CompressedContent);
+            await vectorIndex.UpsertAsync(SelectedNote.Folder, note, vector);
+
+            SelectedNote = ToItem(note, SelectedNote.Folder);
+            IsEditingNote = false;
+            NoteEditStatus = "";
+
+            await LoadTreeAsync();
+            await LoadBacklinksAsync();
+            await LoadGlossaryAsync();
+        }
+        finally
+        {
+            IsBusy = false;
+        }
     }
 
     private async Task LoadBacklinksAsync()
