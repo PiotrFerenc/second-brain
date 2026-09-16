@@ -321,6 +321,20 @@ Backlinki działają (sekcja "Odnośniki do tej notatki" w zakładce "Notatka"),
 parsera nad `Markdown.Avalonia.Tight` albo TextBlock z `Inlines` i `Run`/`InlineUIContainer`
 reagującym na klik — nietrywialne, nie zaczynaj bez wyraźnej prośby.
 
+### Zadanie 11 — import z OneNote (na razie pominięte, otwarta decyzja o metodzie)
+
+OneNote nie ma prostego formatu eksportu do sparsowania. Trzy opcje, do ustalenia
+z użytkownikiem zanim ktokolwiek zacznie kodować:
+
+1. **Wyeksportowane pliki HTML** (File > Export > strona/sekcja jako HTML w OneNote) —
+   import offline, bez logowania, najmniej pracy po stronie tej aplikacji.
+2. **Microsoft Graph API** — połączenie na żywo z kontem Microsoft (OAuth), bez ręcznego
+   eksportu, ale wymaga rejestracji aplikacji w Azure, obsługi logowania i zależności
+   od internetu — znacznie więcej pracy.
+3. **Wyeksportowane pliki `.docx`** (File > Export jako Word) — alternatywa do HTML.
+
+Nie zaczynaj żadnej z tych ścieżek bez wyraźnej prośby i decyzji, która opcja.
+
 ## 5. Czego nie robić
 
 - Nie dodawaj chunkowania długich notatek — świadomie odrzucone na tym etapie.
