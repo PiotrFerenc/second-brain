@@ -147,6 +147,16 @@ public interface IAgent
     Task<AgentStepResult> ConfirmAsync(string conversationState, bool approved, CancellationToken ct = default);
 }
 
+// Zarzadzanie sesjami czatu z agentem - kazda rozmowa zapisywana osobno, zeby przetrwac
+// restart aplikacji i dalo sie do niej wrocic/przelaczyc. Osobny magazyn od INoteStore
+// (to nie notatki), bez git-backupu - historia rozmow nie potrzebuje wersjonowania.
+public interface IAgentSessionStore
+{
+    Task<IReadOnlyList<AgentSession>> ListAsync(CancellationToken ct = default);
+    Task SaveAsync(AgentSession session, CancellationToken ct = default);
+    Task DeleteAsync(Guid id, CancellationToken ct = default);
+}
+
 // OCR zrzutu ekranu / obrazka - wyciagniety tekst leci dalej przez zwykly ICompressor,
 // tak samo jak notatka wpisana recznie.
 public interface IOcrExtractor

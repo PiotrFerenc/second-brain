@@ -68,6 +68,7 @@ public static class ServiceCollectionExtensions
             sp.GetRequiredService<IOptions<StorageOptions>>()));
         services.AddSingleton<IVectorIndex, QdrantVectorIndex>();
         services.AddSingleton<DuplicateScanner>();
+        services.AddSingleton<IAgentSessionStore, FileAgentSessionStore>();
 
         return services;
     }

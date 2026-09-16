@@ -416,45 +416,66 @@
                         </Grid>
                     </DockPanel>
 
-                    <DockPanel Margin="0,20,0,0" IsVisible="{Binding IsAgentTabActive}">
-                        <StackPanel DockPanel.Dock="Bottom" Spacing="8" Margin="0,14,0,0">
-                            <Border Classes="chatAgent" IsVisible="{Binding AgentPending, Converter={x:Static acnv:ObjectConverters.IsNotNull}}">
-                                <StackPanel Spacing="8">
-                                    <TextBlock Text="{Binding AgentPending.Summary}" TextWrapping="Wrap" />
-                                    <StackPanel Orientation="Horizontal" Spacing="8">
-                                        <Button Content="Tak" Classes="accent"
-                                                Command="{Binding AcceptAgentActionCommand}" />
-                                        <Button Content="Nie" Classes="danger"
-                                                Command="{Binding RejectAgentActionCommand}" />
-                                    </StackPanel>
-                                </StackPanel>
-                            </Border>
-                            <Grid ColumnDefinitions="*,Auto">
-                                <TextBox Grid.Column="0" Text="{Binding AgentInputText}" PlaceholderText="Napisz do agenta..."
-                                         IsEnabled="{Binding !IsAgentBusy}" Margin="0,0,8,0">
-                                    <TextBox.KeyBindings>
-                                        <KeyBinding Gesture="Enter" Command="{Binding SendAgentMessageCommand}" />
-                                    </TextBox.KeyBindings>
-                                </TextBox>
-                                <Button Grid.Column="1" Content="Wyślij" Classes="accent"
-                                        Command="{Binding SendAgentMessageCommand}"
-                                        IsEnabled="{Binding !IsAgentBusy}" />
-                            </Grid>
-                        </StackPanel>
+                    <Grid ColumnDefinitions="220,*" Margin="0,20,0,0" IsVisible="{Binding IsAgentTabActive}">
 
-                        <ScrollViewer>
-                            <ItemsControl ItemsSource="{Binding AgentMessages}">
-                                <ItemsControl.ItemTemplate>
+                        <DockPanel Grid.Column="0">
+                            <Button DockPanel.Dock="Top" Content="Nowa rozmowa" Classes="accent"
+                                    Command="{Binding NewAgentSessionCommand}" Margin="0,0,0,8" HorizontalAlignment="Stretch" />
+                            <ListBox ItemsSource="{Binding AgentSessions}" SelectedItem="{Binding SelectedAgentSession}">
+                                <ListBox.ItemTemplate>
                                     <DataTemplate>
-                                        <Border Classes.chatUser="{Binding IsUser}" Classes.chatAgent="{Binding !IsUser}"
-                                                Margin="0,0,0,8" MaxWidth="520">
-                                            <md:MarkdownScrollViewer Markdown="{Binding Text}" />
-                                        </Border>
+                                        <Grid ColumnDefinitions="*,Auto">
+                                            <TextBlock Grid.Column="0" Text="{Binding Title}" TextWrapping="Wrap"
+                                                       VerticalAlignment="Center" />
+                                            <Button Grid.Column="1" Content="✕" Classes="subtleAction"
+                                                    Command="{Binding $parent[ListBox].((vm:MainViewModel)DataContext).DeleteAgentSessionCommand}"
+                                                    CommandParameter="{Binding}" />
+                                        </Grid>
                                     </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                        </ScrollViewer>
-                    </DockPanel>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                        </DockPanel>
+
+                        <DockPanel Grid.Column="1" Margin="20,0,0,0">
+                            <StackPanel DockPanel.Dock="Bottom" Spacing="8" Margin="0,14,0,0">
+                                <Border Classes="chatAgent" IsVisible="{Binding AgentPending, Converter={x:Static acnv:ObjectConverters.IsNotNull}}">
+                                    <StackPanel Spacing="8">
+                                        <TextBlock Text="{Binding AgentPending.Summary}" TextWrapping="Wrap" />
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <Button Content="Tak" Classes="accent"
+                                                    Command="{Binding AcceptAgentActionCommand}" />
+                                            <Button Content="Nie" Classes="danger"
+                                                    Command="{Binding RejectAgentActionCommand}" />
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Border>
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <TextBox Grid.Column="0" Text="{Binding AgentInputText}" PlaceholderText="Napisz do agenta..."
+                                             IsEnabled="{Binding !IsAgentBusy}" Margin="0,0,8,0">
+                                        <TextBox.KeyBindings>
+                                            <KeyBinding Gesture="Enter" Command="{Binding SendAgentMessageCommand}" />
+                                        </TextBox.KeyBindings>
+                                    </TextBox>
+                                    <Button Grid.Column="1" Content="Wyślij" Classes="accent"
+                                            Command="{Binding SendAgentMessageCommand}"
+                                            IsEnabled="{Binding !IsAgentBusy}" />
+                                </Grid>
+                            </StackPanel>
+
+                            <ScrollViewer>
+                                <ItemsControl ItemsSource="{Binding AgentMessages}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Classes.chatUser="{Binding IsUser}" Classes.chatAgent="{Binding !IsUser}"
+                                                    Margin="0,0,0,8" MaxWidth="520">
+                                                <md:MarkdownScrollViewer Markdown="{Binding Text}" />
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
+                        </DockPanel>
+                    </Grid>
 
                 </Panel>
             </DockPanel>

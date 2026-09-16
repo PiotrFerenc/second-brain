@@ -15,6 +15,7 @@ public partial class MainViewModel(
     IConflictDetector conflictDetector,
     INoteStore noteStore,
     IAgent agent,
+    IAgentSessionStore agentSessionStore,
     GapAutoCloser gapAutoCloser,
     IOcrExtractor ocrExtractor) : ViewModelBase
 {
@@ -757,10 +758,16 @@ public partial class MainViewModel(
 
     // ---- Agent (czat z dostepem do calego programu przez narzedzia) ----
     // Globalny, nie ograniczony do aktualnie wybranego folderu - agent sam decyduje ktorych
-    // narzedzi/folderow uzyc. Historia rozmowy zyje tylko w pamieci na czas dzialania appki
-    // (ConversationState z IAgent), tak jak reszta stanu edytora/wyszukiwania.
+    // narzedzi/folderow uzyc. Kazda rozmowa to osobna sesja zapisywana na dysk (IAgentSessionStore)
+    // po kazdej turze, wiec przetrwa restart aplikacji - patrz sekcja "Sesje" nizej.
 
     private string _agentConversationState = "";
+    private Guid? _currentSessionId;
+
+    // Ustawiane na czas programowej zmiany SelectedAgentSession (po zapisie/nowej sesji),
+    // zeby OnSelectedAgentSessionChanged nie probowal wtedy przeladowac AgentMessages -
+    // to przeladowanie ma sie dziac tylko gdy user rzeczywiscie klika inna sesje na liscie.
+    private bool _suppressSessionLoad;
 
     public ObservableCollection<AgentChatItem> AgentMessages { get; } = [];
 
@@ -788,6 +795,7 @@ public partial class MainViewModel(
         {
             var step = await agent.SendAsync(_agentConversationState, message);
             ApplyAgentStep(step);
+            await PersistCurrentSessionAsync();
         }
         finally
         {
@@ -812,6 +820,7 @@ public partial class MainViewModel(
         {
             var step = await agent.ConfirmAsync(_agentConversationState, approved);
             ApplyAgentStep(step);
+            await PersistCurrentSessionAsync();
 
             // Agent dziala na noteStore/vectorIndex bezposrednio, mijajac te same komendy
             // ktore normalnie odswiezaja UI (SaveNoteAsync, DeleteNoteAsync, itd.) - po
@@ -828,6 +837,94 @@ public partial class MainViewModel(
         {
             IsAgentBusy = false;
         }
+    }
+
+    // ---- Sesje (lista zapisanych rozmow, przelaczanie, nowa, usuwanie) ----
+
+    public ObservableCollection<AgentSession> AgentSessions { get; } = [];
+
+    [ObservableProperty]
+    public partial AgentSession? SelectedAgentSession { get; set; }
+
+    [RelayCommand]
+    private async Task LoadAgentSessionsAsync()
+    {
+        AgentSessions.Clear();
+        foreach (var session in await agentSessionStore.ListAsync())
+            AgentSessions.Add(session);
+    }
+
+    partial void OnSelectedAgentSessionChanged(AgentSession? value)
+    {
+        if (_suppressSessionLoad || value is null)
+            return;
+
+        _currentSessionId = value.Id;
+        _agentConversationState = value.ConversationState;
+        AgentPending = null;
+
+        AgentMessages.Clear();
+        foreach (var m in value.Messages)
+            AgentMessages.Add(new AgentChatItem(m.Role, m.Text));
+    }
+
+    [RelayCommand]
+    private void NewAgentSession()
+    {
+        _currentSessionId = null;
+        _agentConversationState = "";
+        AgentPending = null;
+        AgentMessages.Clear();
+
+        _suppressSessionLoad = true;
+        SelectedAgentSession = null;
+        _suppressSessionLoad = false;
+    }
+
+    [RelayCommand]
+    private async Task DeleteAgentSessionAsync(AgentSession? session)
+    {
+        session ??= SelectedAgentSession;
+        if (session is null)
+            return;
+
+        await agentSessionStore.DeleteAsync(session.Id);
+        AgentSessions.Remove(session);
+
+        if (_currentSessionId == session.Id)
+            NewAgentSession();
+    }
+
+    // Zapisuje biezaca rozmowe na dysk po kazdej turze (nowa wiadomosc usera lub potwierdzona
+    // akcja). Pierwszy zapis nadaje Id i tytul (z pierwszej wiadomosci usera) - kolejne
+    // nadpisuja ten sam plik (SaveAsync w FileAgentSessionStore adresuje po Id).
+    private async Task PersistCurrentSessionAsync()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var existing = _currentSessionId is { } id ? AgentSessions.FirstOrDefault(s => s.Id == id) : null;
+        var sessionId = _currentSessionId ??= Guid.NewGuid();
+
+        var firstUserMessage = AgentMessages.FirstOrDefault(m => m.IsUser)?.Text ?? "Rozmowa";
+        var title = firstUserMessage.Length > 60 ? firstUserMessage[..60] + "..." : firstUserMessage;
+
+        var session = new AgentSession(
+            sessionId,
+            title,
+            _agentConversationState,
+            AgentMessages.Select(m => new AgentSessionMessage(m.Role, m.Text)).ToList(),
+            existing?.CreatedAt ?? now,
+            now);
+
+        await agentSessionStore.SaveAsync(session);
+
+        if (existing is not null)
+            AgentSessions[AgentSessions.IndexOf(existing)] = session;
+        else
+            AgentSessions.Insert(0, session);
+
+        _suppressSessionLoad = true;
+        SelectedAgentSession = session;
+        _suppressSessionLoad = false;
     }
 
     private void ApplyAgentStep(AgentStepResult step)
@@ -917,5 +1014,6 @@ public partial class MainViewModel(
         await LoadTemplatesAsync();
         await LoadGapsAsync();
         await LoadGlossaryAsync();
+        await LoadAgentSessionsAsync();
     }
 }
