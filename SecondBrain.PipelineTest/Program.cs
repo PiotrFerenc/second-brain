@@ -97,7 +97,7 @@ switch (args.ElementAtOrDefault(0))
         var folder = args[1];
         await store.DeleteFolderAsync(folder);
         await noteStore.DeleteFolderAsync(folder);
-        Console.WriteLine($"Usunieto folder '{folder}' (kolekcja Qdrant + pliki na dysku, trwale).");
+        Console.WriteLine($"Usunieto folder '{folder}' (indeks wektorowy + pliki na dysku, trwale).");
         break;
     }
 

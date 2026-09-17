@@ -161,8 +161,8 @@ public partial class MainViewModel(
         await LoadTreeAsync();
     }
 
-    // ponytail: usuniecie folderu kasuje kolekcje w Qdrant i cale notatki na dysku
-    // (trwale, bez kosza - pelne cofniecie wymagaloby klonowania kolekcji Qdrant, co
+    // ponytail: usuniecie folderu kasuje plik indeksu wektorowego i cale notatki na dysku
+    // (trwale, bez kosza - pelne cofniecie wymagaloby klonowania pliku indeksu wektorowego, co
     // jest niewspolmiernie drogie do tego jak rzadko to sie zdarza). Dwa kliknieca jako
     // jedyna ochrona przed pomylka.
     [RelayCommand]
@@ -454,7 +454,7 @@ public partial class MainViewModel(
     // Edycja = ten sam pipeline co nowa notatka (rekompresja -> zapis -> embedding -> upsert),
     // ale nadpisuje istniejacy plik zamiast tworzyc nowy: SaveAsync wylicza sciezke z
     // Id+CreatedAt.Year, wiec zachowanie tych dwoch pol z `existing` (przez `with`) trafia
-    // z powrotem w ten sam plik i ten sam punkt w Qdrant zamiast duplikowac notatke.
+    // z powrotem w ten sam plik i ten sam wpis w indeksie wektorowym zamiast duplikowac notatke.
     [RelayCommand]
     private async Task SaveNoteEditAsync()
     {

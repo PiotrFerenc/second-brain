@@ -15,7 +15,7 @@ public static class ServiceCollectionExtensions
     // Kazdy provider strzelajacy do API ma wlasna sekcje configu i wlasny named HttpClient -
     // Compression/AnswerSynthesis/ConflictDetection/Agent/TagCleaning/Embedding moga wiec
     // wskazywac na rozne adresy/klucze, nawet jesli dzis wszystkie mierza w ta sama infrastrukture.
-    // Qdrant to jedno wspolne polaczenie do bazy wektorowej, nie provider LLM - zostaje jak jest.
+    // VectorIndex to lokalny plikowy magazyn wektorow (FileVectorIndex), nie provider LLM - zostaje jak jest.
     public static IServiceCollection AddSecondBrainInfrastructure(this IServiceCollection services, IConfiguration config)
     {
         services.Configure<CompressionOptions>(config.GetSection("Compression"));
@@ -25,7 +25,7 @@ public static class ServiceCollectionExtensions
         services.Configure<TagCleaningOptions>(config.GetSection("TagCleaning"));
         services.Configure<EmbeddingOptions>(config.GetSection("Embedding"));
         services.Configure<RerankerOptions>(config.GetSection("Reranker"));
-        services.Configure<QdrantOptions>(config.GetSection("Qdrant"));
+        services.Configure<VectorIndexOptions>(config.GetSection("VectorIndex"));
         services.Configure<StorageOptions>(config.GetSection("Storage"));
         services.Configure<OcrOptions>(config.GetSection("Ocr"));
 
@@ -66,7 +66,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<INoteStore>(sp => new GitBackedNoteStore(
             new FileNoteStore(sp.GetRequiredService<IOptions<StorageOptions>>()),
             sp.GetRequiredService<IOptions<StorageOptions>>()));
-        services.AddSingleton<IVectorIndex, QdrantVectorIndex>();
+        services.AddSingleton<IVectorIndex, FileVectorIndex>();
         services.AddSingleton<DuplicateScanner>();
         services.AddSingleton<IAgentSessionStore, FileAgentSessionStore>();
 

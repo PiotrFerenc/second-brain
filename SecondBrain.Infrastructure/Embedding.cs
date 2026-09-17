@@ -33,11 +33,11 @@ public class FabrykaEmbedder(IHttpClientFactory httpClientFactory, IOptions<Embe
 
 // ponytail: zablokowany dostep do modelu embeddingow po stronie OpenAI (403 model_not_found
 // mimo widocznego dostepu w /v1/models) - mock deterministyczny (ten sam tekst = ten sam
-// wektor) zeby pipeline Qdrant dalo sie testowac bez tej zaleznosci. Podmien rejestracje
+// wektor) zeby pipeline dalo sie testowac bez tej zaleznosci. Podmien rejestracje
 // w DI z powrotem na FabrykaEmbedder, gdy klucz zacznie dzialac.
-public class MockEmbedder(IOptions<QdrantOptions> qdrantOptions) : IEmbedder
+public class MockEmbedder(IOptions<VectorIndexOptions> vectorIndexOptions) : IEmbedder
 {
-    private readonly int _size = (int)qdrantOptions.Value.VectorSize;
+    private readonly int _size = (int)vectorIndexOptions.Value.VectorSize;
 
     public Task<float[]> EmbedAsync(string text, CancellationToken ct = default)
     {

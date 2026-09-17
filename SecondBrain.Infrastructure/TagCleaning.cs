@@ -47,7 +47,7 @@ public class FabrykaTagCleaner(IHttpClientFactory httpClientFactory, IOptions<Ta
 }
 
 // Wykonuje faktyczne scalenie: przepisuje pliki notatek (przez INoteStore.MergeTagsAsync)
-// i doupsertowuje kazda zmieniona notatke do Qdrant (tagi sa tez w payloadzie wyszukiwania,
+// i doupsertowuje kazda zmieniona notatke do indeksu wektorowego (tagi sa tez w payloadzie wyszukiwania,
 // wiec bez tego wyniki search/filter pokazywalyby stary tag). Konkretna klasa, jedna
 // implementacja, nie jest mockowana ani bindowana w XAML - bez interfejsu, jak GapAutoCloser.
 public class TagMerger(INoteStore noteStore, IVectorIndex vectorIndex, IEmbedder embedder)

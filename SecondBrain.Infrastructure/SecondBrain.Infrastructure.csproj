@@ -8,7 +8,6 @@
     <PackageReference Include="CliWrap" Version="3.10.5" />
     <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.12" />
     <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.12" />
-    <PackageReference Include="Qdrant.Client" Version="1.19.0" />
   </ItemGroup>
 
   <PropertyGroup>

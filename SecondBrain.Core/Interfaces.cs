@@ -33,7 +33,7 @@ public record GlossaryEntry(string Term, string Definition, string SourceTitle);
 public record TagGroup(string[] Tags, string SuggestedCanonical);
 
 // Notatka wraz z folderem, w ktorym lezy - zwracana tam gdzie wywolujacy (np. TagMerger)
-// musi wiedziec do ktorej kolekcji Qdrant doupsertowac notatke po zmianie na dysku.
+// musi wiedziec do ktorego pliku wektorow doupsertowac notatke po zmianie na dysku.
 public record FolderedNote(string Folder, Note Note);
 
 // Wersjonowanie faktow: gdy wykrywacz sprzecznosci zlapie sprzeczna wartosc dla tego
@@ -107,7 +107,7 @@ public interface INoteStore
 
     // Czyszczenie tagow: podmienia kazdy tag z fromTags na toTag we wszystkich notatkach
     // (wszystkie foldery), przepisujac pliki na dysku. Zwraca zaktualizowane notatki wraz
-    // z folderem, zeby wywolujacy mogl doupsertowac je do Qdrant (tagi sa tez w payloadzie).
+    // z folderem, zeby wywolujacy mogl doupsertowac je do indeksu wektorowego (tagi sa tez w payloadzie).
     Task<IReadOnlyList<FolderedNote>> MergeTagsAsync(string[] fromTags, string toTag, CancellationToken ct = default);
 
     // Wersjonowanie faktow (patrz FactVersion) - append-only historia per temat.
@@ -115,7 +115,7 @@ public interface INoteStore
     Task<IReadOnlyList<FactVersion>> ListFactHistoryAsync(string subject, CancellationToken ct = default);
 }
 
-// Folder = kolekcja w bazie wektorowej. Jedna implementacja (Qdrant) na razie,
+// Folder = jeden plik w lokalnym indeksie wektorowym. Jedna implementacja (FileVectorIndex) na razie,
 // interfejs istnieje żeby Core i Desktop nie zależały od konkretnego klienta bazy.
 public interface IVectorIndex
 {

@@ -115,14 +115,10 @@ public class OcrOptions : HttpClientOptions
         "Przepisz caly tekst widoczny na tym obrazku, doslownie, bez komentarzy. Sformatuj wynik jako czytelny markdown (naglowki, listy, pogrubienia, akapity zgodnie ze struktura tekstu na obrazku), zachowujac oryginalna tresc bez zmian.";
 }
 
-public class QdrantOptions
+public class VectorIndexOptions
 {
-    public string Host { get; set; } = "localhost";
-    public int Port { get; set; } = 6334;
-    public bool UseHttps { get; set; }
-    public string? ApiKey { get; set; }
+    // Rozmiar wektora embeddingu - musi zgadzac sie z modelem w EmbeddingOptions.
     public uint VectorSize { get; set; } = 1536;
-    public string Distance { get; set; } = "Cosine";
 }
 
 public class StorageOptions
