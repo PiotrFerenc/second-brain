@@ -587,12 +587,8 @@ public partial class MainViewModel(
                 ? [SelectedFolder]
                 : await vectorIndex.ListFoldersAsync();
 
-            var candidatesWithFolder = new List<(string Folder, ScoredNote Scored)>();
-            foreach (var folder in foldersToSearch)
-            {
-                var candidates = await vectorIndex.SearchAsync(folder, queryVector, limit: 20);
-                candidatesWithFolder.AddRange(candidates.Select(c => (folder, c)));
-            }
+            var candidatesWithFolder = await HybridNoteSearch.SearchFoldersAsync(
+                vectorIndex, noteStore, foldersToSearch, SearchQuery, queryVector, vectorLimit: 20);
 
             var folderById = candidatesWithFolder.ToDictionary(c => c.Scored.Note.Id, c => c.Folder);
             var reranked = await reranker.RerankAsync(SearchQuery, candidatesWithFolder.Select(c => c.Scored).ToList());

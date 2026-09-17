@@ -334,12 +334,7 @@ public class FabrykaAgent(
         var queryVector = await embedder.EmbedAsync(query, ct);
         IReadOnlyList<string> folders = folder is not null ? [folder] : await vectorIndex.ListFoldersAsync(ct);
 
-        var candidates = new List<(string Folder, ScoredNote Scored)>();
-        foreach (var f in folders)
-        {
-            var results = await vectorIndex.SearchAsync(f, queryVector, limit: 10, ct: ct);
-            candidates.AddRange(results.Select(r => (f, r)));
-        }
+        var candidates = await HybridNoteSearch.SearchFoldersAsync(vectorIndex, noteStore, folders, query, queryVector, vectorLimit: 10, ct);
 
         var folderById = candidates.ToDictionary(c => c.Scored.Note.Id, c => c.Folder);
         var reranked = await reranker.RerankAsync(query, candidates.Select(c => c.Scored).ToList(), ct);
