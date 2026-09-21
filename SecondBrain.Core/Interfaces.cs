@@ -86,6 +86,12 @@ public interface INoteStore
     Task<IReadOnlyList<Note>> ListAsync(string folder, CancellationToken ct = default);
     Task DeleteFolderAsync(string folder, CancellationToken ct = default);
 
+    // Przenosi notatke do innego folderu: zapisuje plik w toFolder i usuwa stary
+    // (note.FilePath musi wciaz wskazywac na oryginalny plik). ParentId niesiony w `note`
+    // idzie tak jak podany - wolajacy odpowiada za jego spojnosc (np. wyzerowanie przy
+    // przenoszeniu miedzy folderami, zeby nie wskazywac na rodzica z innego folderu).
+    Task<string> MoveAsync(string fromFolder, string toFolder, Note note, CancellationToken ct = default);
+
     // Kosz: usuniecie notatki przenosi plik do .trash zamiast go kasowac.
     Task<string> MoveToTrashAsync(string folder, string filePath, CancellationToken ct = default);
     Task<IReadOnlyList<TrashedNote>> ListTrashAsync(CancellationToken ct = default);

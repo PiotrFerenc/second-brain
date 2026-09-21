@@ -34,6 +34,9 @@ public class GitBackedNoteStore(INoteStore inner, IOptions<StorageOptions> optio
     public Task DeleteFolderAsync(string folder, CancellationToken ct = default) =>
         WithCommitAsync(() => inner.DeleteFolderAsync(folder, ct), $"Usunieto folder: {folder}");
 
+    public Task<string> MoveAsync(string fromFolder, string toFolder, Note note, CancellationToken ct = default) =>
+        WithCommitAsync(() => inner.MoveAsync(fromFolder, toFolder, note, ct), $"Przeniesiono notatke: {note.Title} ({fromFolder} -> {toFolder})");
+
     public Task<string> MoveToTrashAsync(string folder, string filePath, CancellationToken ct = default) =>
         WithCommitAsync(() => inner.MoveToTrashAsync(folder, filePath, ct), $"Notatka w koszu (folder {folder})");
 

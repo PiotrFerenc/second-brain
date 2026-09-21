@@ -93,9 +93,23 @@
                     <TreeView ItemsSource="{Binding Tree}"
                               SelectedItem="{Binding SelectedTreeItem}"
                               IsVisible="{Binding HasFolders}">
+                        <TreeView.Styles>
+                            <Style Selector="TreeViewItem" x:DataType="vm:TreeItem">
+                                <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
+                            </Style>
+                        </TreeView.Styles>
                         <TreeView.ItemTemplate>
                             <TreeDataTemplate ItemsSource="{Binding Children}" x:DataType="vm:TreeItem">
-                                <StackPanel Orientation="Horizontal" Spacing="10">
+                                <StackPanel Orientation="Horizontal" Spacing="10" Background="Transparent"
+                                            PointerPressed="TreeItem_PointerPressed" PointerMoved="TreeItem_PointerMoved"
+                                            DragDrop.AllowDrop="True" DragDrop.DragOver="TreeItem_DragOver" DragDrop.Drop="TreeItem_Drop">
+                                    <StackPanel.ContextMenu>
+                                        <ContextMenu>
+                                            <MenuItem Header="Dodaj notatkę"
+                                                      Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).AddNoteHereCommand}"
+                                                      CommandParameter="{Binding}" />
+                                        </ContextMenu>
+                                    </StackPanel.ContextMenu>
                                     <Ellipse Width="8" Height="8"
                                              IsVisible="{Binding IsFolder}"
                                              Fill="{Binding OwningFolder, Converter={x:Static conv:FolderAccentConverter.Instance}}" />
@@ -450,12 +464,24 @@
                                     </StackPanel>
                                 </Border>
                                 <Grid ColumnDefinitions="*,Auto">
-                                    <TextBox Grid.Column="0" Text="{Binding AgentInputText}" PlaceholderText="Napisz do agenta..."
-                                             IsEnabled="{Binding !IsAgentBusy}" Margin="0,0,8,0">
-                                        <TextBox.KeyBindings>
-                                            <KeyBinding Gesture="Enter" Command="{Binding SendAgentMessageCommand}" />
-                                        </TextBox.KeyBindings>
-                                    </TextBox>
+                                    <TextBox x:Name="AgentInputBox" Grid.Column="0" Text="{Binding AgentInputText}"
+                                             PlaceholderText="Napisz do agenta... (@ dla notatek/folderow)"
+                                             IsEnabled="{Binding !IsAgentBusy}" Margin="0,0,8,0"
+                                             TextChanged="AgentInput_TextChanged" KeyDown="AgentInput_KeyDown" />
+                                    <Popup x:Name="MentionPopup" IsOpen="{Binding ShowMentionSuggestions}"
+                                           IsLightDismissEnabled="False" Placement="Bottom">
+                                        <Border Classes="chatAgent" Padding="4" MaxWidth="260" MaxHeight="180">
+                                            <ListBox ItemsSource="{Binding MentionSuggestions}"
+                                                     SelectedIndex="{Binding MentionSuggestionIndex, Mode=OneWay}"
+                                                     PointerPressed="MentionList_PointerPressed">
+                                                <ListBox.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <TextBlock Text="{Binding}" Padding="4,2" />
+                                                    </DataTemplate>
+                                                </ListBox.ItemTemplate>
+                                            </ListBox>
+                                        </Border>
+                                    </Popup>
                                     <Button Grid.Column="1" Content="Wyślij" Classes="accent"
                                             Command="{Binding SendAgentMessageCommand}"
                                             IsEnabled="{Binding !IsAgentBusy}" />
@@ -468,7 +494,7 @@
                                         <DataTemplate>
                                             <Border Classes.chatUser="{Binding IsUser}" Classes.chatAgent="{Binding !IsUser}"
                                                     Margin="0,0,0,8" MaxWidth="520">
-                                                <md:MarkdownScrollViewer Markdown="{Binding Text}" />
+                                                <md:MarkdownScrollViewer Markdown="{Binding Text}" SelectionEnabled="True" />
                                             </Border>
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>

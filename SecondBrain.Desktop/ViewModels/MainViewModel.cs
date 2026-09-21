@@ -83,6 +83,8 @@ public partial class MainViewModel(
     private async Task LoadTreeAsync()
     {
         var selectedNoteId = SelectedNote?.Id;
+        var expandedKeys = new HashSet<string>();
+        CollectExpandedKeys(Tree, expandedKeys);
         Tree.Clear();
 
         foreach (var folder in await vectorIndex.ListFoldersAsync())
@@ -101,10 +103,63 @@ public partial class MainViewModel(
             Tree.Add(folderNode);
         }
 
+        ApplyExpandedKeys(Tree, expandedKeys);
         HasFolders = Tree.Count > 0;
+        RebuildMentionNames();
 
         if (selectedNoteId is { } id)
             SelectedNote = FindNote(Tree, id);
+    }
+
+    // LoadTreeAsync przebudowuje drzewo od zera (nowe instancje TreeItem) po kazdej akcji
+    // (dodanie/usuniecie notatki, drag&drop, itd.), wiec bez tego uzytkownik traci
+    // rozwiniecie galezi przy kazdym odswiezeniu - klucz po folderze/id notatki przenosi
+    // stan rozwiniecia ze starych wezlow na nowe.
+    private static string TreeKey(TreeItem item) => item.IsFolder ? $"F:{item.OwningFolder}" : $"N:{item.Note?.Id}";
+
+    private static void CollectExpandedKeys(IEnumerable<TreeItem> nodes, HashSet<string> expanded)
+    {
+        foreach (var node in nodes)
+        {
+            if (node.IsExpanded)
+                expanded.Add(TreeKey(node));
+            CollectExpandedKeys(node.Children, expanded);
+        }
+    }
+
+    private static void ApplyExpandedKeys(IEnumerable<TreeItem> nodes, HashSet<string> expanded)
+    {
+        foreach (var node in nodes)
+        {
+            if (expanded.Contains(TreeKey(node)))
+                node.IsExpanded = true;
+            ApplyExpandedKeys(node.Children, expanded);
+        }
+    }
+
+    // Nazwy folderow i notatek do podpowiedzi @-wzmianek w czacie agenta - z juz
+    // zaladowanego drzewa, bez dodatkowego zapytania do noteStore przy kazdym wpisanym znaku.
+    private List<string> _mentionNames = [];
+
+    private void RebuildMentionNames()
+    {
+        var names = new List<string>();
+        foreach (var folder in Tree)
+        {
+            names.Add(folder.DisplayName);
+            CollectNoteNames(folder.Children, names);
+        }
+        _mentionNames = names;
+    }
+
+    private static void CollectNoteNames(IEnumerable<TreeItem> nodes, List<string> names)
+    {
+        foreach (var node in nodes)
+        {
+            if (!node.IsFolder)
+                names.Add(node.DisplayName);
+            CollectNoteNames(node.Children, names);
+        }
     }
 
     private static void BuildNoteTree(ObservableCollection<TreeItem> target, IReadOnlyList<Note> notes, Guid? parentId, string owningFolder)
@@ -139,6 +194,40 @@ public partial class MainViewModel(
 
     private static SearchResultItem ToItem(Note note, string folder) =>
         new(note.Id, note.Title, note.Tags, 0f, note.RawContent, note.FilePath, note.ParentId, note.Pinned, folder);
+
+    // Drag&drop w drzewie: zagniezdzenie jednej notatki pod druga (ten sam folder - drzewo
+    // buduje sie per-folder, wiec przenoszenie miedzy folderami zostaje agentowi/narzedziu).
+    public async Task ReparentNoteAsync(TreeItem dragged, TreeItem target)
+    {
+        if (dragged.Note is null || target.Note is null || dragged == target)
+            return;
+        if (dragged.OwningFolder != target.OwningFolder)
+            return;
+        if (target.Note.Id == dragged.Note.Id || dragged.Note.ParentId == target.Note.Id)
+            return;
+        if (IsDescendant(dragged, target.Note.Id))
+            return;
+
+        var existing = await noteStore.LoadAsync(dragged.Note.FilePath);
+        var note = existing with { ParentId = target.Note.Id, UpdatedAt = DateTimeOffset.UtcNow };
+        var path = await noteStore.SaveAsync(dragged.OwningFolder, note);
+        note = note with { FilePath = path };
+
+        var vector = await embedder.EmbedAsync(note.CompressedContent);
+        await vectorIndex.UpsertAsync(dragged.OwningFolder, note, vector);
+
+        await LoadTreeAsync();
+    }
+
+    private static bool IsDescendant(TreeItem node, Guid noteId)
+    {
+        foreach (var child in node.Children)
+        {
+            if (child.Note?.Id == noteId || IsDescendant(child, noteId))
+                return true;
+        }
+        return false;
+    }
 
     // ---- Foldery ----
 
@@ -227,6 +316,21 @@ public partial class MainViewModel(
 
         foreach (var note in await noteStore.ListAsync(SelectedFolder))
             ParentOptions.Add(ToItem(note, SelectedFolder));
+    }
+
+    // Prawy klik na drzewie: "Dodaj notatke" na folderze ustawia go jako docelowy, na
+    // notatce dodatkowo zagniezdza nowa notatke pod nia (SelectedParentOption).
+    [RelayCommand]
+    private async Task AddNoteHereAsync(TreeItem? item)
+    {
+        if (item is null)
+            return;
+
+        SelectedFolder = item.OwningFolder;
+        await LoadParentOptionsAsync();
+        SelectedParentOption = item.IsFolder ? null : ParentOptions.FirstOrDefault(p => p.Id == item.Note?.Id);
+
+        SelectedTabIndex = TabEditor;
     }
 
     public ObservableCollection<NoteTemplate> Templates { get; } = [];
@@ -775,6 +879,38 @@ public partial class MainViewModel(
 
     [ObservableProperty]
     public partial AgentPendingAction? AgentPending { get; set; }
+
+    // Podpowiedzi @-wzmianek (folderow/notatek) pod polem wpisywania - wolane z code-behind
+    // widoku, ktory sledzi pozycje kursora w TextBox (to szczegol widoku, nie ViewModelu).
+    public ObservableCollection<string> MentionSuggestions { get; } = [];
+
+    [ObservableProperty]
+    public partial bool ShowMentionSuggestions { get; set; }
+
+    [ObservableProperty]
+    public partial int MentionSuggestionIndex { get; set; }
+
+    public void UpdateMentionQuery(string? query)
+    {
+        MentionSuggestions.Clear();
+        if (query is not null)
+        {
+            foreach (var name in _mentionNames
+                         .Where(n => n.Contains(query, StringComparison.OrdinalIgnoreCase))
+                         .Distinct()
+                         .Take(8))
+                MentionSuggestions.Add(name);
+        }
+
+        MentionSuggestionIndex = 0;
+        ShowMentionSuggestions = MentionSuggestions.Count > 0;
+    }
+
+    public void CloseMentionSuggestions()
+    {
+        ShowMentionSuggestions = false;
+        MentionSuggestions.Clear();
+    }
 
     [RelayCommand]
     private async Task SendAgentMessageAsync()

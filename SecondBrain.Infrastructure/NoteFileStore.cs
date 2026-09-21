@@ -51,6 +51,15 @@ public class FileNoteStore(IOptions<StorageOptions> options) : INoteStore
         return notes.OrderByDescending(n => n.Pinned).ThenBy(n => n.Title, StringComparer.OrdinalIgnoreCase).ToList();
     }
 
+    public async Task<string> MoveAsync(string fromFolder, string toFolder, Note note, CancellationToken ct = default)
+    {
+        var newPath = await SaveAsync(toFolder, note, ct);
+        if (!string.IsNullOrEmpty(note.FilePath) && note.FilePath != newPath && File.Exists(note.FilePath))
+            File.Delete(note.FilePath);
+
+        return newPath;
+    }
+
     public Task DeleteFolderAsync(string folder, CancellationToken ct = default)
     {
         var dir = Path.Combine(_root, folder);

@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Linq;
 using System.Text.Json;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
@@ -36,6 +37,8 @@ public partial class MainWindow : Window
         };
 
         Closing += (_, _) => SaveWindowSize();
+
+        MentionPopup.PlacementTarget = AgentInputBox;
     }
 
     // ponytail: tylko Width/Height, bez pozycji/SavedWindowSize (maksymalizacja) - jedno pole
@@ -159,6 +162,147 @@ public partial class MainWindow : Window
         bitmap.Save(stream, new PngBitmapEncoderOptions());
 
         await vm.RunOcrCommand.ExecuteAsync(stream.ToArray());
+    }
+
+    // Drag&drop w drzewie: przeciagniecie jednej notatki na druga zagniezdza ja pod nia
+    // (ReparentNoteAsync w ViewModelu pilnuje tego samego folderu i braku cykli).
+    // In-process format niesie referencje do TreeItem wprost, bez (de)serializacji.
+    private static readonly DataFormat<TreeItem> TreeNoteFormat = DataFormat.CreateInProcessFormat<TreeItem>("SecondBrain.TreeNote");
+
+    private TreeItem? _treeDragCandidate;
+    private PointerPressedEventArgs? _treeDragPressArgs;
+    private Point _treeDragStartPoint;
+
+    private void TreeItem_PointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (sender is Control { DataContext: TreeItem { IsFolder: false } item } &&
+            e.GetCurrentPoint(null).Properties.IsLeftButtonPressed)
+        {
+            _treeDragCandidate = item;
+            _treeDragPressArgs = e;
+            _treeDragStartPoint = e.GetPosition(null);
+        }
+    }
+
+    private async void TreeItem_PointerMoved(object? sender, PointerEventArgs e)
+    {
+        if (_treeDragCandidate is null || _treeDragPressArgs is null ||
+            !e.GetCurrentPoint(null).Properties.IsLeftButtonPressed)
+            return;
+
+        if (Point.Distance(e.GetPosition(null), _treeDragStartPoint) < 6)
+            return;
+
+        var dragged = _treeDragCandidate;
+        var pressArgs = _treeDragPressArgs;
+        _treeDragCandidate = null;
+        _treeDragPressArgs = null;
+
+        var transfer = new DataTransfer();
+        transfer.Add(DataTransferItem.Create(TreeNoteFormat, dragged));
+        await DragDrop.DoDragDropAsync(pressArgs, transfer, DragDropEffects.Move);
+    }
+
+    private void TreeItem_DragOver(object? sender, DragEventArgs e)
+    {
+        var canDrop = sender is Control { DataContext: TreeItem { IsFolder: false } } && e.DataTransfer.Formats.Contains(TreeNoteFormat);
+        e.DragEffects = canDrop ? DragDropEffects.Move : DragDropEffects.None;
+    }
+
+    private async void TreeItem_Drop(object? sender, DragEventArgs e)
+    {
+        if (DataContext is not MainViewModel vm ||
+            sender is not Control { DataContext: TreeItem { IsFolder: false } target } ||
+            e.DataTransfer.Items.FirstOrDefault()?.TryGetRaw(TreeNoteFormat) is not TreeItem dragged)
+            return;
+
+        e.Handled = true;
+        await vm.ReparentNoteAsync(dragged, target);
+    }
+
+    // @-wzmianki w czacie agenta: pozycja kursora w TextBox to stan widoku (Avalonia nie ma
+    // tego w bindowalnej formie), wiec wykrywanie tokenu "@..." przy kursorze i obsluga
+    // strzalek/Enter/Tab/Escape zyje tu, a ViewModel dostaje juz gotowe zapytanie/wybor.
+    private void AgentInput_TextChanged(object? sender, TextChangedEventArgs e)
+    {
+        if (DataContext is not MainViewModel vm || sender is not TextBox box)
+            return;
+
+        vm.UpdateMentionQuery(ExtractMentionQuery(box.Text ?? "", box.CaretIndex));
+    }
+
+    // "@" zaczyna wzmianke tylko na poczatku tekstu lub po bialym znaku (jak w Slacku/Discordzie),
+    // zeby nie lapac np. adresow e-mail wpisanych w tresci wiadomosci.
+    private static string? ExtractMentionQuery(string text, int caret)
+    {
+        caret = Math.Clamp(caret, 0, text.Length);
+
+        var at = text.LastIndexOf('@', Math.Max(0, caret - 1));
+        if (at < 0 || (at > 0 && !char.IsWhiteSpace(text[at - 1])))
+            return null;
+
+        var token = text[(at + 1)..caret];
+        return token.Any(char.IsWhiteSpace) ? null : token;
+    }
+
+    private void AgentInput_KeyDown(object? sender, KeyEventArgs e)
+    {
+        if (DataContext is not MainViewModel vm || sender is not TextBox box)
+            return;
+
+        if (vm.ShowMentionSuggestions)
+        {
+            switch (e.Key)
+            {
+                case Key.Down:
+                    vm.MentionSuggestionIndex = Math.Min(vm.MentionSuggestionIndex + 1, vm.MentionSuggestions.Count - 1);
+                    e.Handled = true;
+                    break;
+                case Key.Up:
+                    vm.MentionSuggestionIndex = Math.Max(vm.MentionSuggestionIndex - 1, 0);
+                    e.Handled = true;
+                    break;
+                case Key.Enter:
+                case Key.Tab:
+                    AcceptMentionSuggestion(box, vm, vm.MentionSuggestions[vm.MentionSuggestionIndex]);
+                    e.Handled = true;
+                    break;
+                case Key.Escape:
+                    vm.CloseMentionSuggestions();
+                    e.Handled = true;
+                    break;
+            }
+            return;
+        }
+
+        if (e.Key == Key.Enter)
+        {
+            e.Handled = true;
+            vm.SendAgentMessageCommand.Execute(null);
+        }
+    }
+
+    private static void AcceptMentionSuggestion(TextBox box, MainViewModel vm, string name)
+    {
+        var text = box.Text ?? "";
+        var caret = Math.Clamp(box.CaretIndex, 0, text.Length);
+        var at = text.LastIndexOf('@', Math.Max(0, caret - 1));
+        if (at < 0)
+            return;
+
+        box.Text = text[..(at + 1)] + name + " " + text[caret..];
+        box.CaretIndex = at + 1 + name.Length + 1;
+        vm.CloseMentionSuggestions();
+    }
+
+    private void MentionList_PointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (DataContext is not MainViewModel vm || (e.Source as Control)?.DataContext is not string name)
+            return;
+
+        AcceptMentionSuggestion(AgentInputBox, vm, name);
+        e.Handled = true;
+        AgentInputBox.Focus();
     }
 
     // Schowek wymaga TopLevel, do ktorego ViewModel nie ma dostepu - stad w code-behind.
