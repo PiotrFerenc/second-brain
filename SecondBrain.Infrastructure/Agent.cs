@@ -169,7 +169,7 @@ public class FabrykaAgent(
             "add_note" => $"Dodac notatke do folderu '{S("folder")}': \"{Truncate(S("text"), 100)}\"?",
             "edit_note" => $"Zedytowac notatke {S("noteId")} w folderze '{S("folder")}' - nowa tresc: \"{Truncate(S("text"), 100)}\"?",
             "set_note_pinned" => $"{(args.GetProperty("pinned").GetBoolean() ? "Przypiac" : "Odpiac")} notatke {S("noteId")}?",
-            "bulk_import" => $"Zaimportowac {args.GetProperty("lines").GetArrayLength()} notatek do folderu '{S("folder")}'?",
+            "bulk_import" => $"Zaimportowac {args.GetProperty("lines").EnumerateArray().Count(e => !string.IsNullOrWhiteSpace(e.GetString()))} notatek do folderu '{S("folder")}'?",
             "merge_tags" => $"Scalic tagi [{string.Join(", ", SArr("fromTags"))}] w tag '{S("toTag")}' we wszystkich notatkach?",
             "trash_note" => $"Przeniesc notatke {S("noteId")} z folderu '{S("folder")}' do kosza?",
             "restore_note" => $"Przywrocic notatke z kosza ({S("trashPath")})?",
@@ -267,6 +267,9 @@ public class FabrykaAgent(
                 var folder = Req("folder");
                 var text = Req("text");
                 var parentId = Opt("parentId") is { } p ? Guid.Parse(p) : (Guid?)null;
+                if (parentId is { } pid && !(await noteStore.ListAsync(folder, ct)).Any(n => n.Id == pid))
+                    return $"Nie znaleziono notatki-rodzica {pid} w folderze '{folder}'.";
+
                 var now = DateTimeOffset.UtcNow;
 
                 var result = await compressor.CompressAsync(text, ct);
