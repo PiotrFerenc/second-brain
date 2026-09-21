@@ -20,6 +20,10 @@ public partial class MainWindow : Window
 
     private record SavedWindowSize(double Width, double Height);
 
+    // X i minimalizacja tylko chowaja okno do tray (App.axaml TrayIcon) zamiast konczyc
+    // program - realne zamkniecie tylko przez CloseFromTray (menu tray "Zamknij").
+    private bool _reallyClosing;
+
     public MainWindow()
     {
         InitializeComponent();
@@ -36,7 +40,13 @@ public partial class MainWindow : Window
             }
         };
 
-        Closing += (_, _) => SaveWindowSize();
+        PropertyChanged += (_, e) =>
+        {
+            if (e.Property == WindowStateProperty && WindowState == WindowState.Minimized)
+                Hide();
+        };
+
+        Closing += OnClosing;
 
         MentionPopup.PlacementTarget = AgentInputBox;
     }
@@ -79,6 +89,24 @@ public partial class MainWindow : Window
         {
             // Zapis stanu okna to najlepszy wysilek - awaria nie moze zablokowac zamkniecia.
         }
+    }
+
+    // Wolane z App.axaml.cs (tray -> "Zamknij") - jedyna droga do prawdziwego wyjscia z programu.
+    public void CloseFromTray()
+    {
+        _reallyClosing = true;
+        Close();
+    }
+
+    private void OnClosing(object? sender, WindowClosingEventArgs e)
+    {
+        SaveWindowSize();
+
+        if (_reallyClosing)
+            return;
+
+        e.Cancel = true;
+        Hide();
     }
 
     private void OnViewModelPropertyChanged(MainViewModel vm, PropertyChangedEventArgs e)

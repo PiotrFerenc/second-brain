@@ -21,4 +21,17 @@
         <FluentTheme />
         <StyleInclude Source="/Styles/AppStyles.axaml" />
     </Application.Styles>
+
+    <TrayIcon.Icons>
+        <TrayIcons>
+            <TrayIcon Icon="/Assets/avalonia-logo.ico" ToolTipText="Second Brain" IsVisible="True" Clicked="TrayIcon_Clicked">
+                <TrayIcon.Menu>
+                    <NativeMenu>
+                        <NativeMenuItem Header="Pokaż" Click="ShowMenuItem_Click" />
+                        <NativeMenuItem Header="Zamknij" Click="ExitMenuItem_Click" />
+                    </NativeMenu>
+                </TrayIcon.Menu>
+            </TrayIcon>
+        </TrayIcons>
+    </TrayIcon.Icons>
 </Application>
