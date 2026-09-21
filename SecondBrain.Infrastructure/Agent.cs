@@ -16,7 +16,10 @@ public class FabrykaAgent(
     IAnswerSynthesizer answerSynthesizer,
     IConflictDetector conflictDetector,
     INoteStore noteStore,
-    GapAutoCloser gapAutoCloser) : IAgent
+    GapAutoCloser gapAutoCloser,
+    ITagCleaner tagCleaner,
+    TagMerger tagMerger,
+    DuplicateScanner duplicateScanner) : IAgent
 {
     private readonly AgentOptions _options = options.Value;
 
@@ -25,7 +28,8 @@ public class FabrykaAgent(
     private static readonly HashSet<string> MutatingTools =
     [
         "create_folder", "add_note", "trash_note", "restore_note",
-        "purge_note", "delete_folder", "resolve_gap", "move_note"
+        "purge_note", "delete_folder", "resolve_gap", "move_note",
+        "edit_note", "set_note_pinned", "merge_tags", "bulk_import"
     ];
 
     private static readonly JsonArray ToolDefinitions = (JsonArray)JsonNode.Parse("""
@@ -37,7 +41,17 @@ public class FabrykaAgent(
           { "type": "function", "function": { "name": "get_note", "description": "Pobierz pelna tresc jednej notatki po id.", "parameters": { "type": "object", "properties": { "folder": { "type": "string" }, "noteId": { "type": "string" } }, "required": ["folder", "noteId"] } } },
           { "type": "function", "function": { "name": "search_notes", "description": "Semantyczne wyszukiwanie notatek pasujacych do zapytania. Bez folderu przeszukuje wszystkie foldery.", "parameters": { "type": "object", "properties": { "query": { "type": "string" }, "folder": { "type": "string" } }, "required": ["query"] } } },
           { "type": "function", "function": { "name": "ask_question", "description": "Zadaj pytanie do bazy notatek (RAG) - zwraca zsyntetyzowana odpowiedz na podstawie znalezionych notatek. Bez folderu przeszukuje wszystkie foldery.", "parameters": { "type": "object", "properties": { "query": { "type": "string" }, "folder": { "type": "string" } }, "required": ["query"] } } },
-          { "type": "function", "function": { "name": "add_note", "description": "Dodaj nowa notatke do folderu - tekst zostanie skompresowany i zindeksowany przez LLM.", "parameters": { "type": "object", "properties": { "folder": { "type": "string" }, "text": { "type": "string" } }, "required": ["folder", "text"] } } },
+          { "type": "function", "function": { "name": "add_note", "description": "Dodaj nowa notatke do folderu - tekst zostanie skompresowany i zindeksowany przez LLM.", "parameters": { "type": "object", "properties": { "folder": { "type": "string" }, "text": { "type": "string" }, "parentId": { "type": "string", "description": "Opcjonalne id notatki-rodzica w tym samym folderze, zeby od razu zagniezdzic nowa notatke." } }, "required": ["folder", "text"] } } },
+          { "type": "function", "function": { "name": "edit_note", "description": "Edytuj tresc istniejacej notatki - nowy tekst zostanie skompresowany na nowo (tytul/tagi tez sie przelicza) i podmieni stara tresc.", "parameters": { "type": "object", "properties": { "folder": { "type": "string" }, "noteId": { "type": "string" }, "text": { "type": "string" } }, "required": ["folder", "noteId", "text"] } } },
+          { "type": "function", "function": { "name": "set_note_pinned", "description": "Przypnij lub odepnij notatke.", "parameters": { "type": "object", "properties": { "folder": { "type": "string" }, "noteId": { "type": "string" }, "pinned": { "type": "boolean" } }, "required": ["folder", "noteId", "pinned"] } } },
+          { "type": "function", "function": { "name": "bulk_import", "description": "Zaimportuj wiele notatek naraz - kazda linia z listy staje sie osobna notatka (kompresja+indeksowanie), bez wykrywania sprzecznosci (za duzo wywolan LLM przy imporcie).", "parameters": { "type": "object", "properties": { "folder": { "type": "string" }, "lines": { "type": "array", "items": { "type": "string" } } }, "required": ["folder", "lines"] } } },
+          { "type": "function", "function": { "name": "list_templates", "description": "Wylistuj szablony notatek (nazwa + tresc) dostepne do wykorzystania przed dodaniem notatki.", "parameters": { "type": "object", "properties": {} } } },
+          { "type": "function", "function": { "name": "fact_history", "description": "Pokaz historie sprzecznych wersji faktu dla danego tematu (wykryte wczesniej przez wykrywacz sprzecznosci).", "parameters": { "type": "object", "properties": { "subject": { "type": "string" } }, "required": ["subject"] } } },
+          { "type": "function", "function": { "name": "list_by_tag", "description": "Wylistuj notatki majace dokladnie podany tag (nie semantyczne - dokladne dopasowanie tagu). Bez folderu przeszukuje wszystkie foldery.", "parameters": { "type": "object", "properties": { "tag": { "type": "string" }, "folder": { "type": "string" } }, "required": ["tag"] } } },
+          { "type": "function", "function": { "name": "get_note_tree", "description": "Pokaz zagniezdzona strukture notatek (rodzic/dzieci) w danym folderze - przydatne przed uzyciem move_note/add_note z parentId.", "parameters": { "type": "object", "properties": { "folder": { "type": "string" } }, "required": ["folder"] } } },
+          { "type": "function", "function": { "name": "find_duplicate_tags", "description": "Znajdz grupy potencjalnie zduplikowanych tagow (liczba pojedyncza/mnoga, literowki, synonimy) w calej bazie - kandydaci do merge_tags.", "parameters": { "type": "object", "properties": {} } } },
+          { "type": "function", "function": { "name": "merge_tags", "description": "Scal liste tagow w jeden kanoniczny tag we wszystkich notatkach (wszystkie foldery).", "parameters": { "type": "object", "properties": { "fromTags": { "type": "array", "items": { "type": "string" } }, "toTag": { "type": "string" } }, "required": ["fromTags", "toTag"] } } },
+          { "type": "function", "function": { "name": "find_duplicate_notes", "description": "Znajdz notatki niemal identyczne (semantycznie) zyjace w dwoch roznych folderach - kandydaci do recznego scalenia.", "parameters": { "type": "object", "properties": { "threshold": { "type": "number", "description": "Prog podobienstwa 0-1, domyslnie 0.92." } } } } },
           { "type": "function", "function": { "name": "trash_note", "description": "Przenies notatke do kosza.", "parameters": { "type": "object", "properties": { "folder": { "type": "string" }, "noteId": { "type": "string" } }, "required": ["folder", "noteId"] } } },
           { "type": "function", "function": { "name": "list_trash", "description": "Wylistuj notatki w koszu.", "parameters": { "type": "object", "properties": {} } } },
           { "type": "function", "function": { "name": "restore_note", "description": "Przywroc notatke z kosza do jej pierwotnego folderu.", "parameters": { "type": "object", "properties": { "trashPath": { "type": "string" } }, "required": ["trashPath"] } } },
@@ -147,11 +161,16 @@ public class FabrykaAgent(
     {
         var args = JsonDocument.Parse(argsJson).RootElement;
         string S(string name) => args.TryGetProperty(name, out var v) ? v.GetString() ?? "" : "";
+        string[] SArr(string name) => args.TryGetProperty(name, out var v) ? v.EnumerateArray().Select(e => e.GetString() ?? "").ToArray() : [];
 
         return toolName switch
         {
             "create_folder" => $"Utworzyc nowy folder '{S("name")}'?",
             "add_note" => $"Dodac notatke do folderu '{S("folder")}': \"{Truncate(S("text"), 100)}\"?",
+            "edit_note" => $"Zedytowac notatke {S("noteId")} w folderze '{S("folder")}' - nowa tresc: \"{Truncate(S("text"), 100)}\"?",
+            "set_note_pinned" => $"{(args.GetProperty("pinned").GetBoolean() ? "Przypiac" : "Odpiac")} notatke {S("noteId")}?",
+            "bulk_import" => $"Zaimportowac {args.GetProperty("lines").GetArrayLength()} notatek do folderu '{S("folder")}'?",
+            "merge_tags" => $"Scalic tagi [{string.Join(", ", SArr("fromTags"))}] w tag '{S("toTag")}' we wszystkich notatkach?",
             "trash_note" => $"Przeniesc notatke {S("noteId")} z folderu '{S("folder")}' do kosza?",
             "restore_note" => $"Przywrocic notatke z kosza ({S("trashPath")})?",
             "purge_note" => $"TRWALE usunac notatke z kosza ({S("trashPath")})? Tej operacji nie mozna cofnac.",
@@ -247,10 +266,11 @@ public class FabrykaAgent(
             {
                 var folder = Req("folder");
                 var text = Req("text");
+                var parentId = Opt("parentId") is { } p ? Guid.Parse(p) : (Guid?)null;
                 var now = DateTimeOffset.UtcNow;
 
                 var result = await compressor.CompressAsync(text, ct);
-                var note = new Note(Guid.NewGuid(), result.Title, text, result.CompressedContent, result.Tags, now, now);
+                var note = new Note(Guid.NewGuid(), result.Title, text, result.CompressedContent, result.Tags, now, now, ParentId: parentId);
                 var path = await noteStore.SaveAsync(folder, note, ct);
                 note = note with { FilePath = path };
 
@@ -392,6 +412,158 @@ public class FabrykaAgent(
                 return movingFolder
                     ? $"Przeniesiono '{updated.Title}' do folderu '{targetFolder}'."
                     : $"Zaktualizowano rodzica notatki '{updated.Title}'.";
+            }
+
+            case "edit_note":
+            {
+                var folder = Req("folder");
+                var noteId = Guid.Parse(Req("noteId"));
+                var text = Req("text");
+
+                var notes = await noteStore.ListAsync(folder, ct);
+                var existing = notes.FirstOrDefault(n => n.Id == noteId);
+                if (existing is null)
+                    return $"Nie znaleziono notatki {noteId} w folderze '{folder}'.";
+
+                var result = await compressor.CompressAsync(text, ct);
+                var note = existing with
+                {
+                    Title = result.Title,
+                    RawContent = text,
+                    CompressedContent = result.CompressedContent,
+                    Tags = result.Tags,
+                    UpdatedAt = DateTimeOffset.UtcNow
+                };
+
+                var path = await noteStore.SaveAsync(folder, note, ct);
+                note = note with { FilePath = path };
+
+                foreach (var def in result.Definitions ?? [])
+                    await noteStore.SaveGlossaryEntryAsync(def.Term, def.Definition, result.Title, ct);
+
+                var vector = await embedder.EmbedAsync(note.CompressedContent, ct);
+                await vectorIndex.UpsertAsync(folder, note, vector, ct);
+
+                return $"Zaktualizowano notatke: {note.Title}";
+            }
+
+            case "set_note_pinned":
+            {
+                var folder = Req("folder");
+                var noteId = Guid.Parse(Req("noteId"));
+                var pinned = args.GetProperty("pinned").GetBoolean();
+
+                var notes = await noteStore.ListAsync(folder, ct);
+                var existing = notes.FirstOrDefault(n => n.Id == noteId);
+                if (existing is null)
+                    return $"Nie znaleziono notatki {noteId} w folderze '{folder}'.";
+
+                var note = existing with { Pinned = pinned, UpdatedAt = DateTimeOffset.UtcNow };
+                var path = await noteStore.SaveAsync(folder, note, ct);
+                note = note with { FilePath = path };
+
+                var vector = await embedder.EmbedAsync(note.CompressedContent, ct);
+                await vectorIndex.UpsertAsync(folder, note, vector, ct);
+
+                return pinned ? $"Przypieto: {note.Title}" : $"Odpieto: {note.Title}";
+            }
+
+            case "bulk_import":
+            {
+                var folder = Req("folder");
+                var lines = args.GetProperty("lines").EnumerateArray()
+                    .Select(e => (e.GetString() ?? "").Trim()).Where(l => l.Length > 0).ToList();
+                if (lines.Count == 0)
+                    return "Brak niepustych linii do zaimportowania.";
+
+                var imported = 0;
+                foreach (var line in lines)
+                {
+                    var now = DateTimeOffset.UtcNow;
+                    var result = await compressor.CompressAsync(line, ct);
+                    var note = new Note(Guid.NewGuid(), result.Title, line, result.CompressedContent, result.Tags, now, now);
+                    var path = await noteStore.SaveAsync(folder, note, ct);
+                    note = note with { FilePath = path };
+
+                    foreach (var def in result.Definitions ?? [])
+                        await noteStore.SaveGlossaryEntryAsync(def.Term, def.Definition, result.Title, ct);
+
+                    var vector = await embedder.EmbedAsync(note.CompressedContent, ct);
+                    await vectorIndex.UpsertAsync(folder, note, vector, ct);
+                    imported++;
+                }
+
+                var closedGaps = await gapAutoCloser.TryCloseMatchingGapsAsync(ct);
+                return closedGaps > 0
+                    ? $"Zaimportowano {imported} notatek do '{folder}'. Zamknieto {closedGaps} luk(i) w wiedzy."
+                    : $"Zaimportowano {imported} notatek do '{folder}'.";
+            }
+
+            case "list_templates":
+                return JsonSerializer.Serialize(await noteStore.ListTemplatesAsync(ct));
+
+            case "fact_history":
+                return JsonSerializer.Serialize(await noteStore.ListFactHistoryAsync(Req("subject"), ct));
+
+            case "list_by_tag":
+            {
+                var tag = Req("tag");
+                var folders = Opt("folder") is { } f ? (IReadOnlyList<string>)[f] : await vectorIndex.ListFoldersAsync(ct);
+
+                var matches = new List<object>();
+                foreach (var folder in folders)
+                {
+                    var notes = await noteStore.ListAsync(folder, ct);
+                    matches.AddRange(notes.Where(n => n.Tags.Any(t => string.Equals(t, tag, StringComparison.OrdinalIgnoreCase)))
+                        .Select(n => new { Folder = folder, n.Id, n.Title, n.Tags }));
+                }
+
+                return JsonSerializer.Serialize(matches);
+            }
+
+            case "get_note_tree":
+            {
+                var notes = await noteStore.ListAsync(Req("folder"), ct);
+
+                object BuildNode(Note n) => new
+                {
+                    n.Id,
+                    n.Title,
+                    Children = notes.Where(c => c.ParentId == n.Id).Select(BuildNode).ToList()
+                };
+
+                return JsonSerializer.Serialize(notes.Where(n => n.ParentId is null).Select(BuildNode).ToList());
+            }
+
+            case "find_duplicate_tags":
+            {
+                var allTags = new List<string>();
+                foreach (var folder in await vectorIndex.ListFoldersAsync(ct))
+                    foreach (var note in await noteStore.ListAsync(folder, ct))
+                        allTags.AddRange(note.Tags);
+
+                var groups = await tagCleaner.FindDuplicateGroupsAsync(allTags.Distinct(StringComparer.OrdinalIgnoreCase).ToList(), ct);
+                return JsonSerializer.Serialize(groups);
+            }
+
+            case "merge_tags":
+            {
+                var fromTags = args.GetProperty("fromTags").EnumerateArray().Select(e => e.GetString() ?? "").ToArray();
+                var toTag = Req("toTag");
+                var count = await tagMerger.MergeAsync(fromTags, toTag, ct);
+                return $"Scalono tagi w '{toTag}' - zaktualizowano {count} notatek.";
+            }
+
+            case "find_duplicate_notes":
+            {
+                var threshold = args.TryGetProperty("threshold", out var t) ? (float)t.GetDouble() : 0.92f;
+                var dups = await duplicateScanner.FindCrossFolderDuplicatesAsync(threshold, ct);
+                return JsonSerializer.Serialize(dups.Select(d => new
+                {
+                    A = new { d.A.Id, d.A.Title },
+                    B = new { d.B.Id, d.B.Title },
+                    d.Similarity
+                }));
             }
 
             default:
