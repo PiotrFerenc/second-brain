@@ -44,7 +44,7 @@ public partial class App : Application
     private void SetupTrayIcon()
     {
         _newNoteFolderMenu = new NativeMenu();
-        _newNoteFolderMenu.Opening += NewNoteFolderMenu_Opening;
+        _newNoteFolderMenu.Opening += (_, _) => RefreshNewNoteFolderMenu();
 
         var newNoteItem = new NativeMenuItem("Nowa notatka") { Menu = _newNoteFolderMenu };
         var showItem = new NativeMenuItem("Pokaż");
@@ -64,21 +64,28 @@ public partial class App : Application
         trayIcon.Clicked += (_, _) => ShowMainWindow();
 
         TrayIcon.SetIcons(this, new TrayIcons { trayIcon });
+
+        // Windows renderuje caly natywny tray-menu z gory (HMENU), wiec "Nowa notatka" wyglada
+        // na wyszarzona/niedostepna dopoki podmenu ma 0 pozycji - samo "Opening" nie zdaza
+        // wypelnic go na czas przy pierwszym otwarciu. Wypelniamy od razu i trzymamy w synchro
+        // z drzewem folderow (Tree.CollectionChanged), Opening zostaje jako dodatkowy refresh.
+        if (_mainWindow?.DataContext is MainViewModel vm)
+            vm.Tree.CollectionChanged += (_, _) => RefreshNewNoteFolderMenu();
+
+        RefreshNewNoteFolderMenu();
     }
 
-    // Podmenu "Nowa notatka" odczytuje foldery z juz zaladowanego drzewa (MainViewModel.Tree)
-    // przy kazdym otwarciu, zeby liste byla zawsze aktualna bez trzymania osobnej subskrypcji.
-    private void NewNoteFolderMenu_Opening(object? sender, EventArgs e)
+    private void RefreshNewNoteFolderMenu()
     {
         if (_newNoteFolderMenu is null)
             return;
 
         _newNoteFolderMenu.Items.Clear();
 
-        if (_mainWindow?.DataContext is not MainViewModel vm)
-            return;
+        var folders = _mainWindow?.DataContext is MainViewModel vm
+            ? vm.Tree.Where(t => t.IsFolder).Select(t => t.DisplayName).ToList()
+            : [];
 
-        var folders = vm.Tree.Where(t => t.IsFolder).Select(t => t.DisplayName).ToList();
         if (folders.Count == 0)
         {
             _newNoteFolderMenu.Items.Add(new NativeMenuItem("(brak folderow)") { IsEnabled = false });
