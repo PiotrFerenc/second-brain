@@ -282,7 +282,7 @@
                                             Command="{Binding DeleteNoteCommand}"
                                             CommandParameter="{Binding SelectedResult}" />
                                 </Grid>
-                                <md:MarkdownScrollViewer Markdown="{Binding SelectedResult.RawContent}" />
+                                <md:MarkdownScrollViewer Markdown="{Binding SelectedResult.RawContent, Converter={x:Static conv:AutoLinkConverter.Instance}}" SelectionEnabled="True" />
                             </DockPanel>
                         </Grid>
                     </DockPanel>
@@ -320,7 +320,7 @@
                             <TextBox Text="{Binding EditNoteText}" Classes="editor" AcceptsReturn="True" TextWrapping="Wrap" />
                         </DockPanel>
 
-                        <md:MarkdownScrollViewer Markdown="{Binding SelectedNote.RawContent}" IsVisible="{Binding !IsEditingNote}" />
+                        <md:MarkdownScrollViewer Markdown="{Binding SelectedNote.RawContent, Converter={x:Static conv:AutoLinkConverter.Instance}}" SelectionEnabled="True" IsVisible="{Binding !IsEditingNote}" />
                     </DockPanel>
                     </DockPanel>
 
@@ -356,7 +356,7 @@
                                             Command="{Binding PurgeFromTrashCommand}"
                                             CommandParameter="{Binding SelectedTrashItem}" />
                                 </StackPanel>
-                                <md:MarkdownScrollViewer Markdown="{Binding SelectedTrashItem.RawContent}" />
+                                <md:MarkdownScrollViewer Markdown="{Binding SelectedTrashItem.RawContent, Converter={x:Static conv:AutoLinkConverter.Instance}}" SelectionEnabled="True" />
                             </DockPanel>
                         </Grid>
                     </DockPanel>
