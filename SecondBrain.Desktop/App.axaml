@@ -22,16 +22,6 @@
         <StyleInclude Source="/Styles/AppStyles.axaml" />
     </Application.Styles>
 
-    <TrayIcon.Icons>
-        <TrayIcons>
-            <TrayIcon Icon="/Assets/avalonia-logo.ico" ToolTipText="Second Brain" IsVisible="True" Clicked="TrayIcon_Clicked">
-                <TrayIcon.Menu>
-                    <NativeMenu>
-                        <NativeMenuItem Header="Pokaż" Click="ShowMenuItem_Click" />
-                        <NativeMenuItem Header="Zamknij" Click="ExitMenuItem_Click" />
-                    </NativeMenu>
-                </TrayIcon.Menu>
-            </TrayIcon>
-        </TrayIcons>
-    </TrayIcon.Icons>
+    <!-- Tray ikona budowana w code-behind (App.axaml.cs) - podmenu "Nowa notatka" jest
+         dynamiczne (lista folderow), a x:Name nie dziala na obiektach pod Application. -->
 </Application>
