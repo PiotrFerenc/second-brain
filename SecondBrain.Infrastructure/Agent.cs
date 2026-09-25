@@ -33,7 +33,8 @@ public class FabrykaAgent(
         "edit_note", "set_note_pinned", "merge_tags", "bulk_import",
         "bulk_trash", "bulk_move", "bulk_tag", "bulk_pin", "purge_trash_all",
         "bulk_create_folders", "bulk_delete_folders", "bulk_restore",
-        "bulk_purge", "bulk_resolve_gaps", "add_glossary_entry", "delete_glossary_entry"
+        "bulk_purge", "bulk_resolve_gaps", "add_glossary_entry", "delete_glossary_entry",
+        "bulk_note_create"
     ];
 
     private static readonly JsonArray ToolDefinitions = (JsonArray)JsonNode.Parse("""
@@ -76,7 +77,8 @@ public class FabrykaAgent(
           { "type": "function", "function": { "name": "bulk_purge", "description": "Trwale usun z kosza wybrana liste notatek naraz (w przeciwienstwie do purge_trash_all, ktore czysci caly kosz). Nieodwracalne.", "parameters": { "type": "object", "properties": { "trashPaths": { "type": "array", "items": { "type": "string" } } }, "required": ["trashPaths"] } } },
           { "type": "function", "function": { "name": "bulk_resolve_gaps", "description": "Odrzuc/zamknij wiele luk w wiedzy naraz bez odpowiadania na nie.", "parameters": { "type": "object", "properties": { "paths": { "type": "array", "items": { "type": "string" } } }, "required": ["paths"] } } },
           { "type": "function", "function": { "name": "add_glossary_entry", "description": "Dodaj recznie wpis do slownika pojec (albo nadpisz istniejacy o tym samym terminie).", "parameters": { "type": "object", "properties": { "term": { "type": "string" }, "definition": { "type": "string" } }, "required": ["term", "definition"] } } },
-          { "type": "function", "function": { "name": "delete_glossary_entry", "description": "Usun wpis ze slownika pojec po terminie.", "parameters": { "type": "object", "properties": { "term": { "type": "string" } }, "required": ["term"] } } }
+          { "type": "function", "function": { "name": "delete_glossary_entry", "description": "Usun wpis ze slownika pojec po terminie.", "parameters": { "type": "object", "properties": { "term": { "type": "string" } }, "required": ["term"] } } },
+          { "type": "function", "function": { "name": "bulk_note_create", "description": "Dodaj wiele notatek naraz do jednego folderu - notatki podane jako jeden string, oddzielone przecinkami (kazda staje sie osobna notatka, kompresja+indeksowanie). Prostsza alternatywa dla bulk_import gdy user podaje notatki po przecinku w tekscie.", "parameters": { "type": "object", "properties": { "folder": { "type": "string" }, "notes": { "type": "string", "description": "Notatki oddzielone przecinkami, np. 'Kup mleko, Zadzwon do Jana, Zaplac czynsz'." } }, "required": ["folder", "notes"] } } }
         ]
         """)!;
 
@@ -212,6 +214,7 @@ public class FabrykaAgent(
             "bulk_resolve_gaps" => $"Odrzucic {SArr("paths").Length} luk w wiedzy?",
             "add_glossary_entry" => $"Dodac do slownika: '{S("term")}' = \"{Truncate(S("definition"), 100)}\"?",
             "delete_glossary_entry" => $"Usunac ze slownika termin '{S("term")}'?",
+            "bulk_note_create" => $"Dodac {S("notes").Split(',').Count(s => !string.IsNullOrWhiteSpace(s))} notatek do folderu '{S("folder")}'?",
             _ => $"Wykonac akcje '{toolName}' z argumentami {argsJson}?"
         };
     }
@@ -631,33 +634,15 @@ public class FabrykaAgent(
 
             case "bulk_import":
             {
-                var folder = Req("folder");
                 var lines = args.GetProperty("lines").EnumerateArray()
                     .Select(e => (e.GetString() ?? "").Trim()).Where(l => l.Length > 0).ToList();
-                if (lines.Count == 0)
-                    return "Brak niepustych linii do zaimportowania.";
+                return await BulkCreateNotesAsync(Req("folder"), lines, ct);
+            }
 
-                var imported = 0;
-                foreach (var line in lines)
-                {
-                    var now = DateTimeOffset.UtcNow;
-                    var result = await compressor.CompressAsync(line, ct);
-                    var note = new Note(Guid.NewGuid(), result.Title, line, result.CompressedContent, result.Tags, now, now);
-                    var path = await noteStore.SaveAsync(folder, note, ct);
-                    note = note with { FilePath = path };
-
-                    foreach (var def in result.Definitions ?? [])
-                        await noteStore.SaveGlossaryEntryAsync(def.Term, def.Definition, result.Title, ct);
-
-                    var vector = await embedder.EmbedAsync(note.CompressedContent, ct);
-                    await vectorIndex.UpsertAsync(folder, note, vector, ct);
-                    imported++;
-                }
-
-                var closedGaps = await gapAutoCloser.TryCloseMatchingGapsAsync(ct);
-                return closedGaps > 0
-                    ? $"Zaimportowano {imported} notatek do '{folder}'. Zamknieto {closedGaps} luk(i) w wiedzy."
-                    : $"Zaimportowano {imported} notatek do '{folder}'.";
+            case "bulk_note_create":
+            {
+                var lines = Req("notes").Split(',').Select(s => s.Trim()).Where(s => s.Length > 0).ToList();
+                return await BulkCreateNotesAsync(Req("folder"), lines, ct);
             }
 
             case "list_templates":
@@ -742,6 +727,34 @@ public class FabrykaAgent(
         var folderById = candidates.ToDictionary(c => c.Scored.Note.Id, c => c.Folder);
         var reranked = await reranker.RerankAsync(query, candidates.Select(c => c.Scored).ToList(), ct);
         return reranked.Select(r => (folderById.GetValueOrDefault(r.Note.Id, folder ?? ""), r)).ToList();
+    }
+
+    private async Task<string> BulkCreateNotesAsync(string folder, List<string> lines, CancellationToken ct)
+    {
+        if (lines.Count == 0)
+            return "Brak niepustych notatek do zaimportowania.";
+
+        var imported = 0;
+        foreach (var line in lines)
+        {
+            var now = DateTimeOffset.UtcNow;
+            var result = await compressor.CompressAsync(line, ct);
+            var note = new Note(Guid.NewGuid(), result.Title, line, result.CompressedContent, result.Tags, now, now);
+            var path = await noteStore.SaveAsync(folder, note, ct);
+            note = note with { FilePath = path };
+
+            foreach (var def in result.Definitions ?? [])
+                await noteStore.SaveGlossaryEntryAsync(def.Term, def.Definition, result.Title, ct);
+
+            var vector = await embedder.EmbedAsync(note.CompressedContent, ct);
+            await vectorIndex.UpsertAsync(folder, note, vector, ct);
+            imported++;
+        }
+
+        var closedGaps = await gapAutoCloser.TryCloseMatchingGapsAsync(ct);
+        return closedGaps > 0
+            ? $"Zaimportowano {imported} notatek do '{folder}'. Zamknieto {closedGaps} luk(i) w wiedzy."
+            : $"Zaimportowano {imported} notatek do '{folder}'.";
     }
 
     private async Task<string> MoveNoteCoreAsync(string folder, Guid noteId, string? targetFolder, string? newParentIdRaw, CancellationToken ct)
