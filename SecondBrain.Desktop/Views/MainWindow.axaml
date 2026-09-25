@@ -317,7 +317,16 @@
                                 <Button Content="Anuluj" Classes="subtleAction" Command="{Binding CancelEditNoteCommand}" />
                                 <TextBlock Text="{Binding NoteEditStatus}" Classes="subtle" VerticalAlignment="Center" TextWrapping="Wrap" />
                             </StackPanel>
-                            <TextBox Text="{Binding EditNoteText}" Classes="editor" AcceptsReturn="True" TextWrapping="Wrap" />
+                            <Grid ColumnDefinitions="*,Auto,*">
+                                <TextBox Grid.Column="0"
+                                         Text="{Binding EditNoteText}"
+                                         Classes="editor"
+                                         AcceptsReturn="True" TextWrapping="Wrap" />
+
+                                <Border Grid.Column="1" Width="1" Background="{DynamicResource CtpSurface2}" Margin="16,0" />
+
+                                <md:MarkdownScrollViewer Grid.Column="2" Markdown="{Binding EditNoteText}" SelectionEnabled="True" />
+                            </Grid>
                         </DockPanel>
 
                         <md:MarkdownScrollViewer Markdown="{Binding SelectedNote.RawContent, Converter={x:Static conv:AutoLinkConverter.Instance}}" SelectionEnabled="True" IsVisible="{Binding !IsEditingNote}" />
