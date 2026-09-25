@@ -27,6 +27,7 @@ public partial class MainViewModel(
     public const int TabGlossary = 5;
     public const int TabAgent = 6;
     public const int TabTimeline = 7;
+    public const int TabHistory = 8;
 
     // ---- Drzewo (foldery + notatki, w tym zagniezdzone podstrony) ----
 
@@ -938,6 +939,43 @@ public partial class MainViewModel(
         HasGlossary = GlossaryEntries.Count > 0;
     }
 
+    // ---- Historia (cale repo notatek z gita - lista commitow + diff, jak SourceTree) ----
+
+    public ObservableCollection<CommitEntry> Commits { get; } = [];
+
+    [ObservableProperty]
+    public partial CommitEntry? SelectedCommit { get; set; }
+
+    [ObservableProperty]
+    public partial bool HasCommits { get; set; }
+
+    public ObservableCollection<DiffFile> CommitDiffFiles { get; } = [];
+
+    [ObservableProperty]
+    public partial bool HasCommitDiff { get; set; }
+
+    [RelayCommand]
+    private async Task LoadCommitsAsync()
+    {
+        Commits.Clear();
+        foreach (var c in await noteStore.ListCommitsAsync())
+            Commits.Add(c);
+
+        HasCommits = Commits.Count > 0;
+    }
+
+    partial void OnSelectedCommitChanged(CommitEntry? value) => _ = LoadCommitDiffAsync();
+
+    private async Task LoadCommitDiffAsync()
+    {
+        CommitDiffFiles.Clear();
+        if (SelectedCommit is not null)
+            foreach (var file in await noteStore.GetCommitDiffAsync(SelectedCommit.Hash))
+                CommitDiffFiles.Add(file);
+
+        HasCommitDiff = CommitDiffFiles.Count > 0;
+    }
+
     // ---- Agent (czat z dostepem do calego programu przez narzedzia) ----
     // Globalny, nie ograniczony do aktualnie wybranego folderu - agent sam decyduje ktorych
     // narzedzi/folderow uzyc. Kazda rozmowa to osobna sesja zapisywana na dysk (IAgentSessionStore)
@@ -1183,6 +1221,9 @@ public partial class MainViewModel(
     [ObservableProperty]
     public partial bool IsTimelineTabActive { get; set; }
 
+    [ObservableProperty]
+    public partial bool IsHistoryTabActive { get; set; }
+
     // Naglowek "Notatka / +" w prawym panelu ma sens tylko dla tych dwoch widokow -
     // Szukaj, Kosz, Luki i Slownik maja wlasna zawartosc od samej gory.
     [ObservableProperty]
@@ -1198,6 +1239,7 @@ public partial class MainViewModel(
         IsGlossaryTabActive = value == TabGlossary;
         IsAgentTabActive = value == TabAgent;
         IsTimelineTabActive = value == TabTimeline;
+        IsHistoryTabActive = value == TabHistory;
         IsContentHeaderVisible = value is TabEditor or TabNote;
     }
 
@@ -1224,6 +1266,13 @@ public partial class MainViewModel(
 
     [RelayCommand]
     private void ShowTimelineTab() => SelectedTabIndex = TabTimeline;
+
+    [RelayCommand]
+    private async Task ShowHistoryTabAsync()
+    {
+        SelectedTabIndex = TabHistory;
+        await LoadCommitsAsync();
+    }
 
     // ---- Start ----
 

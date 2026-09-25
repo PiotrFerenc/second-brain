@@ -79,6 +79,97 @@ public class GitBackedNoteStore(INoteStore inner, IOptions<StorageOptions> optio
     public Task<IReadOnlyList<FactVersion>> ListFactHistoryAsync(string subject, CancellationToken ct = default) =>
         inner.ListFactHistoryAsync(subject, ct);
 
+    // Zakladka "Historia" (jak SourceTree/GitKraken): cale repo notatek, bez filtru po pliku.
+    public async Task<IReadOnlyList<CommitEntry>> ListCommitsAsync(int limit = 200, CancellationToken ct = default)
+    {
+        var result = await Cli.Wrap("git")
+            .WithArguments(["log", $"-n{limit}", "--format=%H|||%h|||%aI|||%s"])
+            .WithWorkingDirectory(_root)
+            .WithValidation(CommandResultValidation.None)
+            .ExecuteBufferedAsync(ct);
+
+        if (result.ExitCode != 0)
+            return [];
+
+        return result.StandardOutput
+            .Split('\n', StringSplitOptions.RemoveEmptyEntries)
+            .Select(line => line.Split("|||", 4))
+            .Where(parts => parts.Length == 4)
+            .Select(parts => new CommitEntry(parts[0], parts[1], DateTimeOffset.Parse(parts[2]), parts[3]))
+            .ToList();
+    }
+
+    // "git show" na pierwszym commicie (bez rodzica) dziala tak samo jak na kazdym innym -
+    // pokazuje cala tresc jako same dodane linie, wiec nie trzeba specjalnego przypadku.
+    public async Task<IReadOnlyList<DiffFile>> GetCommitDiffAsync(string hash, CancellationToken ct = default)
+    {
+        var result = await Cli.Wrap("git")
+            .WithArguments(["show", "--format=", "--no-color", hash])
+            .WithWorkingDirectory(_root)
+            .WithValidation(CommandResultValidation.None)
+            .ExecuteBufferedAsync(ct);
+
+        if (result.ExitCode != 0)
+            return [];
+
+        return ParseDiff(result.StandardOutput);
+    }
+
+    private static IReadOnlyList<DiffFile> ParseDiff(string diffOutput)
+    {
+        var files = new List<DiffFile>();
+        string? currentPath = null;
+        List<DiffLine>? currentLines = null;
+
+        void FlushCurrent()
+        {
+            if (currentPath is not null && currentLines is not null)
+                files.Add(new DiffFile(currentPath, currentLines));
+        }
+
+        foreach (var line in diffOutput.Split('\n'))
+        {
+            if (line.StartsWith("diff --git ", StringComparison.Ordinal))
+            {
+                FlushCurrent();
+                // "diff --git a/<path> b/<path>" - bierzemy sciezke "b/" (po zmianie), dziala
+                // tez dla nowych/usunietych plikow bo git zawsze podaje oba warianty tutaj.
+                var bIndex = line.LastIndexOf(" b/", StringComparison.Ordinal);
+                currentPath = bIndex >= 0 ? line[(bIndex + 3)..] : line["diff --git ".Length..];
+                currentLines = [];
+            }
+            else if (currentLines is null)
+            {
+                continue; // preambula przed pierwszym "diff --git" (nie powinno wystapic dla --format=)
+            }
+            else if (line.StartsWith("@@", StringComparison.Ordinal))
+            {
+                currentLines.Add(new DiffLine(DiffLineKind.Hunk, line));
+            }
+            else if (line.StartsWith("+++", StringComparison.Ordinal) || line.StartsWith("---", StringComparison.Ordinal) ||
+                     line.StartsWith("index ", StringComparison.Ordinal) || line.StartsWith("new file mode", StringComparison.Ordinal) ||
+                     line.StartsWith("deleted file mode", StringComparison.Ordinal))
+            {
+                // metadane naglowka diffa - pomijamy, sciezka juz mamy z "diff --git"
+            }
+            else if (line.StartsWith('+'))
+            {
+                currentLines.Add(new DiffLine(DiffLineKind.Added, line[1..]));
+            }
+            else if (line.StartsWith('-'))
+            {
+                currentLines.Add(new DiffLine(DiffLineKind.Removed, line[1..]));
+            }
+            else if (line.StartsWith(' '))
+            {
+                currentLines.Add(new DiffLine(DiffLineKind.Context, line[1..]));
+            }
+        }
+
+        FlushCurrent();
+        return files;
+    }
+
     private async Task WithCommitAsync(Func<Task> action, string message)
     {
         await action();

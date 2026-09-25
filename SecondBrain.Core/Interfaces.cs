@@ -41,6 +41,21 @@ public record FolderedNote(string Folder, Note Note);
 // ostrzezenie w statusie, ktore latwo przewinac/przegapic).
 public record FactVersion(DateTimeOffset RecordedAt, string SourceTitle, string Statement);
 
+// Historia calego repo notatek (widok "Historia" - jak SourceTree/GitKraken).
+public record CommitEntry(string Hash, string ShortHash, DateTimeOffset When, string Message);
+
+public enum DiffLineKind { Context, Added, Removed, Hunk }
+
+public record DiffLine(DiffLineKind Kind, string Text)
+{
+    public bool IsAdded => Kind == DiffLineKind.Added;
+    public bool IsRemoved => Kind == DiffLineKind.Removed;
+    public bool IsHunk => Kind == DiffLineKind.Hunk;
+    public string Marker => Kind switch { DiffLineKind.Added => "+", DiffLineKind.Removed => "-", _ => "" };
+}
+
+public record DiffFile(string Path, IReadOnlyList<DiffLine> Lines);
+
 public interface ICompressor
 {
     Task<CompressionResult> CompressAsync(string rawText, CancellationToken ct = default);
@@ -120,6 +135,14 @@ public interface INoteStore
     // Wersjonowanie faktow (patrz FactVersion) - append-only historia per temat.
     Task RecordFactVersionAsync(string subject, string statement, string sourceTitle, CancellationToken ct = default);
     Task<IReadOnlyList<FactVersion>> ListFactHistoryAsync(string subject, CancellationToken ct = default);
+
+    // Historia calego repo (zakladka "Historia") i diff pojedynczego commita.
+    // Domyslnie puste, realna implementacja tylko w GitBackedNoteStore.
+    Task<IReadOnlyList<CommitEntry>> ListCommitsAsync(int limit = 200, CancellationToken ct = default) =>
+        Task.FromResult<IReadOnlyList<CommitEntry>>([]);
+
+    Task<IReadOnlyList<DiffFile>> GetCommitDiffAsync(string hash, CancellationToken ct = default) =>
+        Task.FromResult<IReadOnlyList<DiffFile>>([]);
 }
 
 // Folder = jeden plik w lokalnym indeksie wektorowym. Jedna implementacja (FileVectorIndex) na razie,

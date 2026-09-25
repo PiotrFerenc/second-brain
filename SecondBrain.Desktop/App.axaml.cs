@@ -2,7 +2,9 @@ using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Input;
 using Avalonia.Markup.Xaml;
+using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 using Microsoft.Extensions.DependencyInjection;
 using SecondBrain.Desktop.ViewModels;
@@ -94,9 +96,21 @@ public partial class App : Application
 
         foreach (var folder in folders)
         {
-            var item = new NativeMenuItem(folder);
-            item.Click += (_, _) => StartNewNoteInFolder(folder);
-            _newNoteFolderMenu.Items.Add(item);
+            var folderMenu = new NativeMenu();
+
+            var typeItem = new NativeMenuItem("Wpisz...");
+            typeItem.Click += (_, _) => StartNewNoteInFolder(folder);
+            folderMenu.Items.Add(typeItem);
+
+            var clipboardItem = new NativeMenuItem("Ze schowka");
+            clipboardItem.Click += async (_, _) => await NewNoteFromClipboardTextAsync(folder);
+            folderMenu.Items.Add(clipboardItem);
+
+            var imageItem = new NativeMenuItem("Obrazek ze schowka (OCR)");
+            imageItem.Click += async (_, _) => await NewNoteFromClipboardImageAsync(folder);
+            folderMenu.Items.Add(imageItem);
+
+            _newNoteFolderMenu.Items.Add(new NativeMenuItem(folder) { Menu = folderMenu });
         }
     }
 
@@ -108,6 +122,43 @@ public partial class App : Application
         ShowMainWindow();
         vm.SelectedFolder = folder;
         vm.SelectedTabIndex = MainViewModel.TabEditor;
+    }
+
+    // Tekst ze schowka (nie obrazek) trafia od razu do pola notatki, tak samo jak OCR ponizej -
+    // user wciaz musi kliknac Zapisz, zeby dac szanse na poprawki przed kompresja/zapisem.
+    private async Task NewNoteFromClipboardTextAsync(string folder)
+    {
+        if (_mainWindow?.DataContext is not MainViewModel vm)
+            return;
+
+        var clipboard = TopLevel.GetTopLevel(_mainWindow)?.Clipboard;
+        var data = clipboard is null ? null : await clipboard.TryGetDataAsync();
+        var textItem = data?.Items.FirstOrDefault(i => i.Formats.Contains(DataFormat.Text));
+        if (textItem is null || await textItem.TryGetRawAsync(DataFormat.Text) is not string text || string.IsNullOrWhiteSpace(text))
+            return;
+
+        StartNewNoteInFolder(folder);
+        vm.NoteText = text;
+    }
+
+    // Ten sam schowek->OCR co przycisk "Wklej obrazek ze schowka" w edytorze (patrz
+    // MainWindow.axaml.cs PasteImage_Click), tylko wywolany z tray zamiast z okna.
+    private async Task NewNoteFromClipboardImageAsync(string folder)
+    {
+        if (_mainWindow?.DataContext is not MainViewModel vm)
+            return;
+
+        var clipboard = TopLevel.GetTopLevel(_mainWindow)?.Clipboard;
+        var data = clipboard is null ? null : await clipboard.TryGetDataAsync();
+        var bitmapItem = data?.Items.FirstOrDefault(i => i.Formats.Contains(DataFormat.Bitmap));
+        if (bitmapItem is null || await bitmapItem.TryGetRawAsync(DataFormat.Bitmap) is not Bitmap bitmap)
+            return;
+
+        using var stream = new MemoryStream();
+        bitmap.Save(stream, new PngBitmapEncoderOptions());
+
+        StartNewNoteInFolder(folder);
+        await vm.RunOcrCommand.ExecuteAsync(stream.ToArray());
     }
 
     private void ShowMainWindow()

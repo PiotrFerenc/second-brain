@@ -39,6 +39,11 @@
             <SolidColorBrush x:Key="CtpBase" Color="#1e1e2e" />
             <SolidColorBrush x:Key="CtpMantle" Color="#181825" />
             <SolidColorBrush x:Key="CtpCrust" Color="#11111b" />
+
+            <!-- Tlo wierszy diffa w zakladce Historia (dodane/usuniete) - podbarwienie CtpGreen/
+                 CtpRed pod alfa, nie pelny kolor, zeby tekst zostal czytelny jak zwykla tresc. -->
+            <SolidColorBrush x:Key="CtpDiffAddBg" Color="#33a6e3a1" />
+            <SolidColorBrush x:Key="CtpDiffRemoveBg" Color="#33f38ba8" />
         </ResourceDictionary>
 
         <ResourceDictionary x:Key="Light">
@@ -71,6 +76,9 @@
             <SolidColorBrush x:Key="CtpBase" Color="#eff1f5" />
             <SolidColorBrush x:Key="CtpMantle" Color="#e6e9ef" />
             <SolidColorBrush x:Key="CtpCrust" Color="#dce0e8" />
+
+            <SolidColorBrush x:Key="CtpDiffAddBg" Color="#2440a02b" />
+            <SolidColorBrush x:Key="CtpDiffRemoveBg" Color="#24d20f39" />
         </ResourceDictionary>
 
     </ResourceDictionary.ThemeDictionaries>

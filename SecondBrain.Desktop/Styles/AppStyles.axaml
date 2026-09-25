@@ -196,4 +196,32 @@
         <Setter Property="Background" Value="{DynamicResource CtpMauve}" />
     </Style>
 
+    <!-- Wiersze diffa w zakladce Historia - tlo zamiast bordera (konwencja GitHub/SourceTree),
+         marker (+/-) w pelnym kolorze, reszta linii zwyklym tekstem. -->
+    <Style Selector="Border.diffAdd">
+        <Setter Property="Background" Value="{DynamicResource CtpDiffAddBg}" />
+    </Style>
+    <Style Selector="Border.diffRemove">
+        <Setter Property="Background" Value="{DynamicResource CtpDiffRemoveBg}" />
+    </Style>
+    <Style Selector="Border.diffHunk">
+        <Setter Property="Background" Value="{DynamicResource CtpSurface0}" />
+    </Style>
+    <Style Selector="TextBlock.diffMono">
+        <Setter Property="FontFamily" Value="Cascadia Code,Consolas,Menlo,monospace" />
+        <Setter Property="FontSize" Value="12.5" />
+    </Style>
+    <Style Selector="TextBlock.diffMarker">
+        <Setter Property="FontFamily" Value="Cascadia Code,Consolas,Menlo,monospace" />
+        <Setter Property="FontSize" Value="12.5" />
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="Width" Value="16" />
+    </Style>
+    <Style Selector="TextBlock.diffMarker.add">
+        <Setter Property="Foreground" Value="{DynamicResource CtpGreen}" />
+    </Style>
+    <Style Selector="TextBlock.diffMarker.remove">
+        <Setter Property="Foreground" Value="{DynamicResource CtpRed}" />
+    </Style>
+
 </Styles>
