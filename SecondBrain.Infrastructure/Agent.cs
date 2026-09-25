@@ -34,7 +34,7 @@ public class FabrykaAgent(
         "bulk_trash", "bulk_move", "bulk_tag", "bulk_pin", "purge_trash_all",
         "bulk_create_folders", "bulk_delete_folders", "bulk_restore",
         "bulk_purge", "bulk_resolve_gaps", "add_glossary_entry", "delete_glossary_entry",
-        "bulk_note_create"
+        "bulk_note_create", "bulk_note_update"
     ];
 
     private static readonly JsonArray ToolDefinitions = (JsonArray)JsonNode.Parse("""
@@ -78,7 +78,8 @@ public class FabrykaAgent(
           { "type": "function", "function": { "name": "bulk_resolve_gaps", "description": "Odrzuc/zamknij wiele luk w wiedzy naraz bez odpowiadania na nie.", "parameters": { "type": "object", "properties": { "paths": { "type": "array", "items": { "type": "string" } } }, "required": ["paths"] } } },
           { "type": "function", "function": { "name": "add_glossary_entry", "description": "Dodaj recznie wpis do slownika pojec (albo nadpisz istniejacy o tym samym terminie).", "parameters": { "type": "object", "properties": { "term": { "type": "string" }, "definition": { "type": "string" } }, "required": ["term", "definition"] } } },
           { "type": "function", "function": { "name": "delete_glossary_entry", "description": "Usun wpis ze slownika pojec po terminie.", "parameters": { "type": "object", "properties": { "term": { "type": "string" } }, "required": ["term"] } } },
-          { "type": "function", "function": { "name": "bulk_note_create", "description": "Dodaj wiele notatek naraz do jednego folderu - notatki podane jako jeden string, oddzielone przecinkami (kazda staje sie osobna notatka, kompresja+indeksowanie). Prostsza alternatywa dla bulk_import gdy user podaje notatki po przecinku w tekscie.", "parameters": { "type": "object", "properties": { "folder": { "type": "string" }, "notes": { "type": "string", "description": "Notatki oddzielone przecinkami, np. 'Kup mleko, Zadzwon do Jana, Zaplac czynsz'." } }, "required": ["folder", "notes"] } } }
+          { "type": "function", "function": { "name": "bulk_note_create", "description": "Dodaj wiele notatek naraz do jednego folderu - notatki podane jako jeden string, oddzielone przecinkami (kazda staje sie osobna notatka, kompresja+indeksowanie). Prostsza alternatywa dla bulk_import gdy user podaje notatki po przecinku w tekscie.", "parameters": { "type": "object", "properties": { "folder": { "type": "string" }, "notes": { "type": "string", "description": "Notatki oddzielone przecinkami, np. 'Kup mleko, Zadzwon do Jana, Zaplac czynsz'." } }, "required": ["folder", "notes"] } } },
+          { "type": "function", "function": { "name": "bulk_note_update", "description": "Zaktualizuj wiele notatek naraz w jednym folderze - wpisy podane jako jeden string, oddzielone przecinkami, kazdy w formacie 'noteId: nowa tresc'. Ustal id notatek najpierw przez list_notes/search_notes.", "parameters": { "type": "object", "properties": { "folder": { "type": "string" }, "updates": { "type": "string", "description": "Wpisy oddzielone przecinkami, np. '3fa8...: Nowa tresc, 9c12...: Inna tresc'." } }, "required": ["folder", "updates"] } } }
         ]
         """)!;
 
@@ -215,6 +216,7 @@ public class FabrykaAgent(
             "add_glossary_entry" => $"Dodac do slownika: '{S("term")}' = \"{Truncate(S("definition"), 100)}\"?",
             "delete_glossary_entry" => $"Usunac ze slownika termin '{S("term")}'?",
             "bulk_note_create" => $"Dodac {S("notes").Split(',').Count(s => !string.IsNullOrWhiteSpace(s))} notatek do folderu '{S("folder")}'?",
+            "bulk_note_update" => $"Zaktualizowac {S("updates").Split(',').Count(s => !string.IsNullOrWhiteSpace(s))} notatek w folderze '{S("folder")}'?",
             _ => $"Wykonac akcje '{toolName}' z argumentami {argsJson}?"
         };
     }
@@ -581,34 +583,28 @@ public class FabrykaAgent(
             case "edit_note":
             {
                 var folder = Req("folder");
-                var noteId = Guid.Parse(Req("noteId"));
-                var text = Req("text");
-
                 var notes = await noteStore.ListAsync(folder, ct);
-                var existing = notes.FirstOrDefault(n => n.Id == noteId);
-                if (existing is null)
-                    return $"Nie znaleziono notatki {noteId} w folderze '{folder}'.";
+                return await EditNoteCoreAsync(folder, notes, Guid.Parse(Req("noteId")), Req("text"), ct);
+            }
 
-                var result = await compressor.CompressAsync(text, ct);
-                var note = existing with
+            case "bulk_note_update":
+            {
+                var folder = Req("folder");
+                var notes = await noteStore.ListAsync(folder, ct);
+
+                var results = new List<string>();
+                foreach (var entry in Req("updates").Split(',').Select(s => s.Trim()).Where(s => s.Length > 0))
                 {
-                    Title = result.Title,
-                    RawContent = text,
-                    CompressedContent = result.CompressedContent,
-                    Tags = result.Tags,
-                    UpdatedAt = DateTimeOffset.UtcNow
-                };
+                    var sep = entry.IndexOf(':');
+                    if (sep < 0) { results.Add($"Zly format wpisu: '{entry}' (oczekiwano 'noteId: tekst')."); continue; }
 
-                var path = await noteStore.SaveAsync(folder, note, ct);
-                note = note with { FilePath = path };
+                    var idPart = entry[..sep].Trim();
+                    var text = entry[(sep + 1)..].Trim();
+                    if (!Guid.TryParse(idPart, out var noteId)) { results.Add($"Niepoprawne id: '{idPart}'."); continue; }
 
-                foreach (var def in result.Definitions ?? [])
-                    await noteStore.SaveGlossaryEntryAsync(def.Term, def.Definition, result.Title, ct);
-
-                var vector = await embedder.EmbedAsync(note.CompressedContent, ct);
-                await vectorIndex.UpsertAsync(folder, note, vector, ct);
-
-                return $"Zaktualizowano notatke: {note.Title}";
+                    results.Add(await EditNoteCoreAsync(folder, notes, noteId, text, ct));
+                }
+                return string.Join("\n", results);
             }
 
             case "set_note_pinned":
@@ -727,6 +723,34 @@ public class FabrykaAgent(
         var folderById = candidates.ToDictionary(c => c.Scored.Note.Id, c => c.Folder);
         var reranked = await reranker.RerankAsync(query, candidates.Select(c => c.Scored).ToList(), ct);
         return reranked.Select(r => (folderById.GetValueOrDefault(r.Note.Id, folder ?? ""), r)).ToList();
+    }
+
+    private async Task<string> EditNoteCoreAsync(string folder, IReadOnlyList<Note> notes, Guid noteId, string text, CancellationToken ct)
+    {
+        var existing = notes.FirstOrDefault(n => n.Id == noteId);
+        if (existing is null)
+            return $"Nie znaleziono notatki {noteId} w folderze '{folder}'.";
+
+        var result = await compressor.CompressAsync(text, ct);
+        var note = existing with
+        {
+            Title = result.Title,
+            RawContent = text,
+            CompressedContent = result.CompressedContent,
+            Tags = result.Tags,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+
+        var path = await noteStore.SaveAsync(folder, note, ct);
+        note = note with { FilePath = path };
+
+        foreach (var def in result.Definitions ?? [])
+            await noteStore.SaveGlossaryEntryAsync(def.Term, def.Definition, result.Title, ct);
+
+        var vector = await embedder.EmbedAsync(note.CompressedContent, ct);
+        await vectorIndex.UpsertAsync(folder, note, vector, ct);
+
+        return $"Zaktualizowano notatke: {note.Title}";
     }
 
     private async Task<string> BulkCreateNotesAsync(string folder, List<string> lines, CancellationToken ct)
