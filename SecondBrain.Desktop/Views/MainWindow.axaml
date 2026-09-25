@@ -43,6 +43,7 @@
                 <Button Content="{Binding Gaps.Count, StringFormat='Luki ({0})'}"
                         Classes="subtleAction" Command="{Binding ShowGapsTabCommand}" />
                 <Button Content="Słownik" Classes="subtleAction" Command="{Binding ShowGlossaryTabCommand}" />
+                <Button Content="Oś czasu" Classes="subtleAction" Command="{Binding ShowTimelineTabCommand}" />
                 <Button Content="Agent" Classes="subtleAction" Command="{Binding ShowAgentTabCommand}" />
             </WrapPanel>
 
@@ -227,6 +228,8 @@
                                       IsChecked="{Binding SearchCurrentFolderOnly}"
                                       IsEnabled="{Binding SelectedFolder, Converter={x:Static acnv:ObjectConverters.IsNotNull}}"
                                       VerticalAlignment="Center" />
+                            <Button Content="Szukaj po obrazku" Classes="subtleAction" Click="PasteImageSearch_Click"
+                                    ToolTip.Tip="OCR obrazka ze schowka jako zapytanie" />
                         </StackPanel>
 
                         <Border DockPanel.Dock="Top"
@@ -437,6 +440,40 @@
                                 <TextBlock Text="{Binding SelectedGlossaryEntry.Definition}" TextWrapping="Wrap" FontSize="15" LineHeight="22" />
                             </DockPanel>
                         </Grid>
+                    </DockPanel>
+
+                    <DockPanel Margin="0,20,0,0" IsVisible="{Binding IsTimelineTabActive}">
+                        <TextBlock DockPanel.Dock="Top" Text="Brak notatek jeszcze."
+                                   Classes="subtle" TextWrapping="Wrap"
+                                   IsVisible="{Binding !HasTimeline}" />
+
+                        <ScrollViewer IsVisible="{Binding HasTimeline}">
+                            <ItemsControl ItemsSource="{Binding TimelineGroups}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:TimelineGroup">
+                                        <StackPanel Margin="0,0,0,20" Spacing="8">
+                                            <TextBlock Text="{Binding Label}" Classes="label" />
+                                            <ItemsControl ItemsSource="{Binding Items}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate x:DataType="vm:SearchResultItem">
+                                                        <Button Classes="subtleAction"
+                                                                HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                                                Margin="0,0,0,4"
+                                                                Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).OpenTimelineNoteCommand}"
+                                                                CommandParameter="{Binding}">
+                                                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                                                <TextBlock Text="{Binding Title}" TextWrapping="Wrap" />
+                                                                <TextBlock Text="{Binding Folder}" Classes="subtle" FontSize="11.5" />
+                                                            </StackPanel>
+                                                        </Button>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
                     </DockPanel>
 
                     <Grid ColumnDefinitions="220,*" Margin="0,20,0,0" IsVisible="{Binding IsAgentTabActive}">

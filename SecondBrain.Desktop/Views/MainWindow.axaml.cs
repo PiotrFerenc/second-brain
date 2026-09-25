@@ -192,6 +192,25 @@ public partial class MainWindow : Window
         await vm.RunOcrCommand.ExecuteAsync(stream.ToArray());
     }
 
+    // Wyszukiwanie po obrazie: ten sam schowek->OCR co przy edytorze, ale wynik leci do
+    // SearchByImageCommand (OCR -> SearchQuery -> SearchAsync) zamiast do pola notatki.
+    private async void PasteImageSearch_Click(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainViewModel vm)
+            return;
+
+        var clipboard = GetTopLevel(this)?.Clipboard;
+        var data = clipboard is null ? null : await clipboard.TryGetDataAsync();
+        var bitmapItem = data?.Items.FirstOrDefault(i => i.Formats.Contains(DataFormat.Bitmap));
+        if (bitmapItem is null || await bitmapItem.TryGetRawAsync(DataFormat.Bitmap) is not Bitmap bitmap)
+            return;
+
+        using var stream = new MemoryStream();
+        bitmap.Save(stream, new PngBitmapEncoderOptions());
+
+        await vm.SearchByImageCommand.ExecuteAsync(stream.ToArray());
+    }
+
     // Drag&drop w drzewie: przeciagniecie jednej notatki na druga zagniezdza ja pod nia
     // (ReparentNoteAsync w ViewModelu pilnuje tego samego folderu i braku cykli).
     // In-process format niesie referencje do TreeItem wprost, bez (de)serializacji.

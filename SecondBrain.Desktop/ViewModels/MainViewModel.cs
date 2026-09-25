@@ -26,6 +26,7 @@ public partial class MainViewModel(
     public const int TabGaps = 4;
     public const int TabGlossary = 5;
     public const int TabAgent = 6;
+    public const int TabTimeline = 7;
 
     // ---- Drzewo (foldery + notatki, w tym zagniezdzone podstrony) ----
 
@@ -106,9 +107,58 @@ public partial class MainViewModel(
         ApplyExpandedKeys(Tree, expandedKeys);
         HasFolders = Tree.Count > 0;
         RebuildMentionNames();
+        BuildTimeline();
 
         if (selectedNoteId is { } id)
             SelectedNote = FindNote(Tree, id);
+    }
+
+    // Oś czasu: pochodna drzewa juz zaladowanego wyzej (bez dodatkowego odczytu z dysku) -
+    // splaszcz wszystkie notatki ze wszystkich folderow, pogrupuj po dacie utworzenia.
+    public ObservableCollection<TimelineGroup> TimelineGroups { get; } = [];
+
+    [ObservableProperty]
+    public partial bool HasTimeline { get; set; }
+
+    [ObservableProperty]
+    public partial SearchResultItem? SelectedTimelineNote { get; set; }
+
+    private void BuildTimeline()
+    {
+        TimelineGroups.Clear();
+
+        var allNotes = new List<SearchResultItem>();
+        CollectNotes(Tree, allNotes);
+
+        foreach (var group in allNotes
+                     .OrderByDescending(n => n.CreatedAt)
+                     .GroupBy(n => n.CreatedAt.Date))
+        {
+            var label = group.Key.ToString("d MMMM yyyy", new System.Globalization.CultureInfo("pl-PL"));
+            TimelineGroups.Add(new TimelineGroup(label, group.ToList()));
+        }
+
+        HasTimeline = TimelineGroups.Count > 0;
+    }
+
+    private static void CollectNotes(IEnumerable<TreeItem> nodes, List<SearchResultItem> notes)
+    {
+        foreach (var node in nodes)
+        {
+            if (node.Note is not null)
+                notes.Add(node.Note);
+            CollectNotes(node.Children, notes);
+        }
+    }
+
+    [RelayCommand]
+    private void OpenTimelineNote(SearchResultItem? item)
+    {
+        if (item is null)
+            return;
+
+        SelectedNote = item;
+        SelectedTabIndex = TabNote;
     }
 
     // LoadTreeAsync przebudowuje drzewo od zera (nowe instancje TreeItem) po kazdej akcji
@@ -193,7 +243,7 @@ public partial class MainViewModel(
     }
 
     private static SearchResultItem ToItem(Note note, string folder) =>
-        new(note.Id, note.Title, note.Tags, 0f, note.RawContent, note.FilePath, note.ParentId, note.Pinned, folder);
+        new(note.Id, note.Title, note.Tags, 0f, note.RawContent, note.FilePath, note.ParentId, note.Pinned, folder, note.CreatedAt);
 
     // Drag&drop w drzewie: zagniezdzenie jednej notatki pod druga (ten sam folder - drzewo
     // buduje sie per-folder, wiec przenoszenie miedzy folderami zostaje agentowi/narzedziu).
@@ -366,8 +416,19 @@ public partial class MainViewModel(
             var now = DateTimeOffset.UtcNow;
             var result = await compressor.CompressAsync(NoteText);
 
+            // "Auto-linkowanie": zamiast prosic LLM o zgadywanie tytulow (ryzyko halucynacji),
+            // uzywamy juz policzonego wektora notatki do wyszukania faktycznie podobnych. Notatka
+            // jeszcze nie jest w indeksie, wiec wynik nie trzeba filtrowac po jej wlasnym Id.
+            EditorStatus = "Licze embedding...";
+            var vector = await embedder.EmbedAsync(result.CompressedContent);
+            var related = await vectorIndex.SearchAsync(SelectedFolder, vector, limit: 4);
+            var relatedNotes = related.Take(3).Select(r => r.Note).ToList();
+            var relatedTitles = relatedNotes.Select(n => n.Title).ToList();
+
+            // Auto-tagowanie: gdy user nie wpisal tagow recznie, dolóż do propozycji LLM
+            // najczestsze tagi z podobnych notatek, ktorych jeszcze nie ma.
             var tags = string.IsNullOrWhiteSpace(NoteTagsInput)
-                ? result.Tags
+                ? SuggestTags(result.Tags, relatedNotes)
                 : NoteTagsInput.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
             var note = new Note(Guid.NewGuid(), result.Title, NoteText, result.CompressedContent, tags,
@@ -380,15 +441,7 @@ public partial class MainViewModel(
             foreach (var def in result.Definitions ?? [])
                 await noteStore.SaveGlossaryEntryAsync(def.Term, def.Definition, result.Title);
 
-            EditorStatus = "Licze embedding...";
-            var vector = await embedder.EmbedAsync(note.CompressedContent);
             await vectorIndex.UpsertAsync(SelectedFolder, note, vector);
-
-            // "Auto-linkowanie": zamiast prosic LLM o zgadywanie tytulow (ryzyko halucynacji),
-            // uzywamy juz policzonego wektora notatki do wyszukania faktycznie podobnych.
-            var related = await vectorIndex.SearchAsync(SelectedFolder, vector, limit: 4);
-            var relatedNotes = related.Where(r => r.Note.Id != note.Id).Take(3).Select(r => r.Note).ToList();
-            var relatedTitles = relatedNotes.Select(n => n.Title).ToList();
 
             var statusLines = new List<string> { $"Zapisano: {result.Title}" };
             if (relatedTitles.Count > 0)
@@ -430,6 +483,21 @@ public partial class MainViewModel(
         {
             IsBusy = false;
         }
+    }
+
+    // ponytail: tagi sasiadow liczone czestosciowo (bez wag/podobienstwa), max 2 dolozone -
+    // podmienic na cos madrzejszego gdy prosta czestosc zacznie realnie zawadzac.
+    private static string[] SuggestTags(string[] baseTags, IReadOnlyList<Note> neighbors)
+    {
+        var extra = neighbors
+            .SelectMany(n => n.Tags)
+            .Where(t => !baseTags.Contains(t, StringComparer.OrdinalIgnoreCase))
+            .GroupBy(t => t, StringComparer.OrdinalIgnoreCase)
+            .OrderByDescending(g => g.Count())
+            .Select(g => g.Key)
+            .Take(2);
+
+        return [.. baseTags, .. extra];
     }
 
     // Import zbiorczy: kazda niepusta linia pliku przechodzi przez ten sam pipeline
@@ -510,6 +578,20 @@ public partial class MainViewModel(
         {
             IsBusy = false;
         }
+    }
+
+    // Wyszukiwanie po obrazie: ten sam OCR co w edytorze, ale wyciagniety tekst leci wprost
+    // jako zapytanie do istniejacego SearchAsync zamiast do pola notatki.
+    [RelayCommand]
+    private async Task SearchByImageAsync(byte[] imageBytes)
+    {
+        var text = await ocrExtractor.ExtractTextAsync(imageBytes, "image/png");
+        if (string.IsNullOrWhiteSpace(text))
+            return;
+
+        SearchQuery = text;
+        SelectedTabIndex = TabSearch;
+        await SearchAsync();
     }
 
     // ---- Notatka (podglad wybranej w drzewie) ----
@@ -706,7 +788,7 @@ public partial class MainViewModel(
                     note = await noteStore.LoadAsync(r.Note.FilePath);
 
                 var folder = folderById.GetValueOrDefault(r.Note.Id, "");
-                SearchResults.Add(new SearchResultItem(note.Id, note.Title, note.Tags, r.Score, note.RawContent, note.FilePath, note.ParentId, note.Pinned, folder));
+                SearchResults.Add(new SearchResultItem(note.Id, note.Title, note.Tags, r.Score, note.RawContent, note.FilePath, note.ParentId, note.Pinned, folder, note.CreatedAt));
 
                 if (notesForAnswer.Count < 5)
                     notesForAnswer.Add(note);
@@ -1098,6 +1180,9 @@ public partial class MainViewModel(
     [ObservableProperty]
     public partial bool IsAgentTabActive { get; set; }
 
+    [ObservableProperty]
+    public partial bool IsTimelineTabActive { get; set; }
+
     // Naglowek "Notatka / +" w prawym panelu ma sens tylko dla tych dwoch widokow -
     // Szukaj, Kosz, Luki i Slownik maja wlasna zawartosc od samej gory.
     [ObservableProperty]
@@ -1112,6 +1197,7 @@ public partial class MainViewModel(
         IsGapsTabActive = value == TabGaps;
         IsGlossaryTabActive = value == TabGlossary;
         IsAgentTabActive = value == TabAgent;
+        IsTimelineTabActive = value == TabTimeline;
         IsContentHeaderVisible = value is TabEditor or TabNote;
     }
 
@@ -1135,6 +1221,9 @@ public partial class MainViewModel(
 
     [RelayCommand]
     private void ShowAgentTab() => SelectedTabIndex = TabAgent;
+
+    [RelayCommand]
+    private void ShowTimelineTab() => SelectedTabIndex = TabTimeline;
 
     // ---- Start ----
 

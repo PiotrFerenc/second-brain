@@ -1,6 +1,6 @@
 namespace SecondBrain.Desktop.ViewModels;
 
-public class SearchResultItem(Guid id, string title, string[] tagList, float score, string rawContent, string filePath, Guid? parentId, bool pinned, string folder)
+public class SearchResultItem(Guid id, string title, string[] tagList, float score, string rawContent, string filePath, Guid? parentId, bool pinned, string folder, DateTimeOffset createdAt = default)
 {
     public Guid Id { get; } = id;
     public string Title { get; } = title;
@@ -12,4 +12,5 @@ public class SearchResultItem(Guid id, string title, string[] tagList, float sco
     public Guid? ParentId { get; } = parentId;
     public bool Pinned { get; } = pinned;
     public string Folder { get; } = folder;
+    public DateTimeOffset CreatedAt { get; } = createdAt;
 }
