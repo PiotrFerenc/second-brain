@@ -31,7 +31,9 @@ public class FabrykaAgent(
         "create_folder", "add_note", "trash_note", "restore_note",
         "purge_note", "delete_folder", "resolve_gap", "move_note",
         "edit_note", "set_note_pinned", "merge_tags", "bulk_import",
-        "bulk_trash", "bulk_move", "bulk_tag", "bulk_pin", "purge_trash_all"
+        "bulk_trash", "bulk_move", "bulk_tag", "bulk_pin", "purge_trash_all",
+        "bulk_create_folders", "bulk_delete_folders", "bulk_restore",
+        "bulk_purge", "bulk_resolve_gaps", "add_glossary_entry", "delete_glossary_entry"
     ];
 
     private static readonly JsonArray ToolDefinitions = (JsonArray)JsonNode.Parse("""
@@ -67,7 +69,14 @@ public class FabrykaAgent(
           { "type": "function", "function": { "name": "bulk_tag", "description": "Dodaj i/lub usun tagi na wielu notatkach naraz.", "parameters": { "type": "object", "properties": { "folder": { "type": "string" }, "noteIds": { "type": "array", "items": { "type": "string" } }, "addTags": { "type": "array", "items": { "type": "string" } }, "removeTags": { "type": "array", "items": { "type": "string" } } }, "required": ["folder", "noteIds"] } } },
           { "type": "function", "function": { "name": "bulk_pin", "description": "Przypnij lub odepnij wiele notatek naraz.", "parameters": { "type": "object", "properties": { "folder": { "type": "string" }, "noteIds": { "type": "array", "items": { "type": "string" } }, "pinned": { "type": "boolean" } }, "required": ["folder", "noteIds", "pinned"] } } },
           { "type": "function", "function": { "name": "purge_trash_all", "description": "Trwale usun WSZYSTKIE notatki z kosza naraz. Nieodwracalne.", "parameters": { "type": "object", "properties": {} } } },
-          { "type": "function", "function": { "name": "export_folder", "description": "Wyeksportuj caly folder jako jeden tekst markdown (wszystkie notatki polaczone) - do skopiowania/backupu.", "parameters": { "type": "object", "properties": { "folder": { "type": "string" } }, "required": ["folder"] } } }
+          { "type": "function", "function": { "name": "export_folder", "description": "Wyeksportuj caly folder jako jeden tekst markdown (wszystkie notatki polaczone) - do skopiowania/backupu.", "parameters": { "type": "object", "properties": { "folder": { "type": "string" } }, "required": ["folder"] } } },
+          { "type": "function", "function": { "name": "bulk_create_folders", "description": "Utworz wiele nowych, pustych folderow naraz.", "parameters": { "type": "object", "properties": { "names": { "type": "array", "items": { "type": "string" } } }, "required": ["names"] } } },
+          { "type": "function", "function": { "name": "bulk_delete_folders", "description": "Usun wiele folderow naraz wraz z ich notatkami. Nieodwracalne.", "parameters": { "type": "object", "properties": { "folders": { "type": "array", "items": { "type": "string" } } }, "required": ["folders"] } } },
+          { "type": "function", "function": { "name": "bulk_restore", "description": "Przywroc wiele notatek z kosza naraz do ich pierwotnych folderow.", "parameters": { "type": "object", "properties": { "trashPaths": { "type": "array", "items": { "type": "string" } } }, "required": ["trashPaths"] } } },
+          { "type": "function", "function": { "name": "bulk_purge", "description": "Trwale usun z kosza wybrana liste notatek naraz (w przeciwienstwie do purge_trash_all, ktore czysci caly kosz). Nieodwracalne.", "parameters": { "type": "object", "properties": { "trashPaths": { "type": "array", "items": { "type": "string" } } }, "required": ["trashPaths"] } } },
+          { "type": "function", "function": { "name": "bulk_resolve_gaps", "description": "Odrzuc/zamknij wiele luk w wiedzy naraz bez odpowiadania na nie.", "parameters": { "type": "object", "properties": { "paths": { "type": "array", "items": { "type": "string" } } }, "required": ["paths"] } } },
+          { "type": "function", "function": { "name": "add_glossary_entry", "description": "Dodaj recznie wpis do slownika pojec (albo nadpisz istniejacy o tym samym terminie).", "parameters": { "type": "object", "properties": { "term": { "type": "string" }, "definition": { "type": "string" } }, "required": ["term", "definition"] } } },
+          { "type": "function", "function": { "name": "delete_glossary_entry", "description": "Usun wpis ze slownika pojec po terminie.", "parameters": { "type": "object", "properties": { "term": { "type": "string" } }, "required": ["term"] } } }
         ]
         """)!;
 
@@ -196,6 +205,13 @@ public class FabrykaAgent(
             "bulk_tag" => $"Zmienic tagi na {SArr("noteIds").Length} notatkach (dodaj: [{string.Join(", ", SArr("addTags"))}], usun: [{string.Join(", ", SArr("removeTags"))}])?",
             "bulk_pin" => $"{(args.GetProperty("pinned").GetBoolean() ? "Przypiac" : "Odpiac")} {SArr("noteIds").Length} notatek?",
             "purge_trash_all" => "TRWALE usunac WSZYSTKIE notatki z kosza? Tej operacji nie mozna cofnac.",
+            "bulk_create_folders" => $"Utworzyc {SArr("names").Length} nowych folderow: [{string.Join(", ", SArr("names"))}]?",
+            "bulk_delete_folders" => $"TRWALE usunac {SArr("folders").Length} folderow wraz z notatkami: [{string.Join(", ", SArr("folders"))}]? Tej operacji nie mozna cofnac.",
+            "bulk_restore" => $"Przywrocic {SArr("trashPaths").Length} notatek z kosza?",
+            "bulk_purge" => $"TRWALE usunac {SArr("trashPaths").Length} notatek z kosza? Tej operacji nie mozna cofnac.",
+            "bulk_resolve_gaps" => $"Odrzucic {SArr("paths").Length} luk w wiedzy?",
+            "add_glossary_entry" => $"Dodac do slownika: '{S("term")}' = \"{Truncate(S("definition"), 100)}\"?",
+            "delete_glossary_entry" => $"Usunac ze slownika termin '{S("term")}'?",
             _ => $"Wykonac akcje '{toolName}' z argumentami {argsJson}?"
         };
     }
@@ -473,6 +489,70 @@ public class FabrykaAgent(
                 foreach (var t in trashed)
                     await noteStore.PurgeTrashAsync(t.TrashPath, ct);
                 return $"Trwale usunieto {trashed.Count} notatek z kosza.";
+            }
+
+            case "bulk_create_folders":
+            {
+                var results = new List<string>();
+                foreach (var name in ReqArr("names"))
+                {
+                    var created = await vectorIndex.CreateFolderAsync(name, ct);
+                    results.Add(created ? $"Utworzono folder '{name}'." : $"Folder '{name}' juz istnieje.");
+                }
+                return string.Join("\n", results);
+            }
+
+            case "bulk_delete_folders":
+            {
+                var results = new List<string>();
+                foreach (var folder in ReqArr("folders"))
+                {
+                    await vectorIndex.DeleteFolderAsync(folder, ct);
+                    await noteStore.DeleteFolderAsync(folder, ct);
+                    results.Add($"Usunieto folder '{folder}' trwale.");
+                }
+                return string.Join("\n", results);
+            }
+
+            case "bulk_restore":
+            {
+                var results = new List<string>();
+                foreach (var trashPath in ReqArr("trashPaths"))
+                {
+                    var restored = await noteStore.RestoreFromTrashAsync(trashPath, ct);
+                    var vector = await embedder.EmbedAsync(restored.Note.CompressedContent, ct);
+                    await vectorIndex.UpsertAsync(restored.OriginalFolder, restored.Note, vector, ct);
+                    results.Add($"Przywrocono '{restored.Note.Title}' do folderu '{restored.OriginalFolder}'.");
+                }
+                return string.Join("\n", results);
+            }
+
+            case "bulk_purge":
+            {
+                foreach (var trashPath in ReqArr("trashPaths"))
+                    await noteStore.PurgeTrashAsync(trashPath, ct);
+                return $"Trwale usunieto {ReqArr("trashPaths").Length} notatek z kosza.";
+            }
+
+            case "bulk_resolve_gaps":
+            {
+                foreach (var path in ReqArr("paths"))
+                    await noteStore.ResolveGapAsync(path, ct);
+                return $"Odrzucono {ReqArr("paths").Length} luk w wiedzy.";
+            }
+
+            case "add_glossary_entry":
+            {
+                var term = Req("term");
+                await noteStore.SaveGlossaryEntryAsync(term, Req("definition"), "Reczny wpis", ct);
+                return $"Dodano do slownika: {term}";
+            }
+
+            case "delete_glossary_entry":
+            {
+                var term = Req("term");
+                var deleted = await noteStore.DeleteGlossaryEntryAsync(term, ct);
+                return deleted ? $"Usunieto ze slownika: {term}" : $"Nie znaleziono terminu '{term}' w slowniku.";
             }
 
             case "export_folder":

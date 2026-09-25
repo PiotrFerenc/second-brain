@@ -225,6 +225,16 @@ public class FileNoteStore(IOptions<StorageOptions> options) : INoteStore
         return entries.OrderBy(e => e.Term, StringComparer.OrdinalIgnoreCase).ToList();
     }
 
+    public Task<bool> DeleteGlossaryEntryAsync(string term, CancellationToken ct = default)
+    {
+        var path = Path.Combine(_root, ".glossary", $"{Slugify(term)}.md");
+        if (!File.Exists(path))
+            return Task.FromResult(false);
+
+        File.Delete(path);
+        return Task.FromResult(true);
+    }
+
     public async Task<IReadOnlyList<FolderedNote>> MergeTagsAsync(string[] fromTags, string toTag, CancellationToken ct = default)
     {
         var fromSet = new HashSet<string>(fromTags, StringComparer.OrdinalIgnoreCase);

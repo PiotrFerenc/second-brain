@@ -110,6 +110,7 @@ public interface INoteStore
     // Ten sam termin nadpisuje poprzedni wpis (najnowsza definicja wygrywa).
     Task SaveGlossaryEntryAsync(string term, string definition, string sourceTitle, CancellationToken ct = default);
     Task<IReadOnlyList<GlossaryEntry>> ListGlossaryAsync(CancellationToken ct = default);
+    Task<bool> DeleteGlossaryEntryAsync(string term, CancellationToken ct = default);
 
     // Czyszczenie tagow: podmienia kazdy tag z fromTags na toTag we wszystkich notatkach
     // (wszystkie foldery), przepisujac pliki na dysku. Zwraca zaktualizowane notatki wraz

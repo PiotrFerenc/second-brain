@@ -67,6 +67,9 @@ public class GitBackedNoteStore(INoteStore inner, IOptions<StorageOptions> optio
     public Task<IReadOnlyList<GlossaryEntry>> ListGlossaryAsync(CancellationToken ct = default) =>
         inner.ListGlossaryAsync(ct);
 
+    public Task<bool> DeleteGlossaryEntryAsync(string term, CancellationToken ct = default) =>
+        WithCommitAsync(() => inner.DeleteGlossaryEntryAsync(term, ct), $"Usunieto z slownika: {term}");
+
     public Task<IReadOnlyList<FolderedNote>> MergeTagsAsync(string[] fromTags, string toTag, CancellationToken ct = default) =>
         WithCommitAsync(() => inner.MergeTagsAsync(fromTags, toTag, ct), $"Scalono tagi: {string.Join(", ", fromTags)} -> {toTag}");
 
