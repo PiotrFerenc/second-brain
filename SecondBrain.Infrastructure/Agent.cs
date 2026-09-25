@@ -1,4 +1,5 @@
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.Extensions.Options;
@@ -29,7 +30,8 @@ public class FabrykaAgent(
     [
         "create_folder", "add_note", "trash_note", "restore_note",
         "purge_note", "delete_folder", "resolve_gap", "move_note",
-        "edit_note", "set_note_pinned", "merge_tags", "bulk_import"
+        "edit_note", "set_note_pinned", "merge_tags", "bulk_import",
+        "bulk_trash", "bulk_move", "bulk_tag", "bulk_pin", "purge_trash_all"
     ];
 
     private static readonly JsonArray ToolDefinitions = (JsonArray)JsonNode.Parse("""
@@ -59,7 +61,13 @@ public class FabrykaAgent(
           { "type": "function", "function": { "name": "list_gaps", "description": "Wylistuj luki w wiedzy - pytania, na ktore baza notatek nie miala jeszcze odpowiedzi.", "parameters": { "type": "object", "properties": {} } } },
           { "type": "function", "function": { "name": "resolve_gap", "description": "Odrzuc / zamknij luke w wiedzy bez odpowiadania na nia.", "parameters": { "type": "object", "properties": { "path": { "type": "string" } }, "required": ["path"] } } },
           { "type": "function", "function": { "name": "list_glossary", "description": "Wylistuj slownik pojec zbudowany automatycznie z notatek.", "parameters": { "type": "object", "properties": {} } } },
-          { "type": "function", "function": { "name": "move_note", "description": "Przenies notatke do innego folderu i/lub zagniezdz ja pod inna notatka. Podaj przynajmniej jedno z: targetFolder, newParentId. newParentId='root' odpina notatke na najwyzszy poziom folderu. Notatki z wlasnymi podnotatkami nie mozna przeniesc miedzy folderami.", "parameters": { "type": "object", "properties": { "folder": { "type": "string", "description": "Aktualny folder notatki." }, "noteId": { "type": "string" }, "targetFolder": { "type": "string", "description": "Nowy folder notatki." }, "newParentId": { "type": "string", "description": "Id notatki-rodzica (w folderze docelowym) albo 'root'." } }, "required": ["folder", "noteId"] } } }
+          { "type": "function", "function": { "name": "move_note", "description": "Przenies notatke do innego folderu i/lub zagniezdz ja pod inna notatka. Podaj przynajmniej jedno z: targetFolder, newParentId. newParentId='root' odpina notatke na najwyzszy poziom folderu. Notatki z wlasnymi podnotatkami nie mozna przeniesc miedzy folderami.", "parameters": { "type": "object", "properties": { "folder": { "type": "string", "description": "Aktualny folder notatki." }, "noteId": { "type": "string" }, "targetFolder": { "type": "string", "description": "Nowy folder notatki." }, "newParentId": { "type": "string", "description": "Id notatki-rodzica (w folderze docelowym) albo 'root'." } }, "required": ["folder", "noteId"] } } },
+          { "type": "function", "function": { "name": "bulk_trash", "description": "Przenies wiele notatek naraz do kosza (po liscie id, wszystkie w jednym folderze).", "parameters": { "type": "object", "properties": { "folder": { "type": "string" }, "noteIds": { "type": "array", "items": { "type": "string" } } }, "required": ["folder", "noteIds"] } } },
+          { "type": "function", "function": { "name": "bulk_move", "description": "Przenies wiele notatek naraz do innego folderu i/lub pod innego rodzica. Podaj przynajmniej jedno z: targetFolder, newParentId.", "parameters": { "type": "object", "properties": { "folder": { "type": "string" }, "noteIds": { "type": "array", "items": { "type": "string" } }, "targetFolder": { "type": "string" }, "newParentId": { "type": "string" } }, "required": ["folder", "noteIds"] } } },
+          { "type": "function", "function": { "name": "bulk_tag", "description": "Dodaj i/lub usun tagi na wielu notatkach naraz.", "parameters": { "type": "object", "properties": { "folder": { "type": "string" }, "noteIds": { "type": "array", "items": { "type": "string" } }, "addTags": { "type": "array", "items": { "type": "string" } }, "removeTags": { "type": "array", "items": { "type": "string" } } }, "required": ["folder", "noteIds"] } } },
+          { "type": "function", "function": { "name": "bulk_pin", "description": "Przypnij lub odepnij wiele notatek naraz.", "parameters": { "type": "object", "properties": { "folder": { "type": "string" }, "noteIds": { "type": "array", "items": { "type": "string" } }, "pinned": { "type": "boolean" } }, "required": ["folder", "noteIds", "pinned"] } } },
+          { "type": "function", "function": { "name": "purge_trash_all", "description": "Trwale usun WSZYSTKIE notatki z kosza naraz. Nieodwracalne.", "parameters": { "type": "object", "properties": {} } } },
+          { "type": "function", "function": { "name": "export_folder", "description": "Wyeksportuj caly folder jako jeden tekst markdown (wszystkie notatki polaczone) - do skopiowania/backupu.", "parameters": { "type": "object", "properties": { "folder": { "type": "string" } }, "required": ["folder"] } } }
         ]
         """)!;
 
@@ -180,6 +188,14 @@ public class FabrykaAgent(
                 + (string.IsNullOrEmpty(S("targetFolder")) ? "" : $" do folderu '{S("targetFolder")}'")
                 + (string.IsNullOrEmpty(S("newParentId")) ? "" : $", nowy rodzic: {S("newParentId")}")
                 + "?",
+            "bulk_trash" => $"Przeniesc {SArr("noteIds").Length} notatek z folderu '{S("folder")}' do kosza?",
+            "bulk_move" => $"Przeniesc {SArr("noteIds").Length} notatek"
+                + (string.IsNullOrEmpty(S("targetFolder")) ? "" : $" do folderu '{S("targetFolder")}'")
+                + (string.IsNullOrEmpty(S("newParentId")) ? "" : $", nowy rodzic: {S("newParentId")}")
+                + "?",
+            "bulk_tag" => $"Zmienic tagi na {SArr("noteIds").Length} notatkach (dodaj: [{string.Join(", ", SArr("addTags"))}], usun: [{string.Join(", ", SArr("removeTags"))}])?",
+            "bulk_pin" => $"{(args.GetProperty("pinned").GetBoolean() ? "Przypiac" : "Odpiac")} {SArr("noteIds").Length} notatek?",
+            "purge_trash_all" => "TRWALE usunac WSZYSTKIE notatki z kosza? Tej operacji nie mozna cofnac.",
             _ => $"Wykonac akcje '{toolName}' z argumentami {argsJson}?"
         };
     }
@@ -189,6 +205,8 @@ public class FabrykaAgent(
         var args = JsonDocument.Parse(argsJson).RootElement;
         string Req(string name) => args.GetProperty(name).GetString()!;
         string? Opt(string name) => args.TryGetProperty(name, out var v) ? v.GetString() : null;
+        string[] ReqArr(string name) => args.GetProperty(name).EnumerateArray().Select(e => e.GetString() ?? "").ToArray();
+        string[] OptArr(string name) => args.TryGetProperty(name, out var v) ? v.EnumerateArray().Select(e => e.GetString() ?? "").ToArray() : [];
 
         switch (toolName)
         {
@@ -362,59 +380,119 @@ public class FabrykaAgent(
                 if (string.IsNullOrEmpty(targetFolder) && string.IsNullOrEmpty(newParentIdRaw))
                     return "Podaj targetFolder i/lub newParentId - nie ma czego zmieniac.";
 
+                return await MoveNoteCoreAsync(folder, noteId, targetFolder, newParentIdRaw, ct);
+            }
+
+            case "bulk_trash":
+            {
+                var folder = Req("folder");
                 var notes = await noteStore.ListAsync(folder, ct);
-                var note = notes.FirstOrDefault(n => n.Id == noteId);
-                if (note is null)
-                    return $"Nie znaleziono notatki {noteId} w folderze '{folder}'.";
-
-                var movingFolder = !string.IsNullOrEmpty(targetFolder) && targetFolder != folder;
-                if (movingFolder && notes.Any(n => n.ParentId == noteId))
-                    return "Ta notatka ma podnotatki - przenoszenie miedzy folderami z podnotatkami nie jest wspierane. Najpierw odepnij/przenies dzieci.";
-
-                var newParentId = note.ParentId;
-                if (newParentIdRaw is not null)
+                var results = new List<string>();
+                foreach (var noteId in ReqArr("noteIds").Select(Guid.Parse))
                 {
-                    if (newParentIdRaw == "root")
-                    {
-                        newParentId = null;
-                    }
-                    else
-                    {
-                        var parentId = Guid.Parse(newParentIdRaw);
-                        if (parentId == noteId)
-                            return "Notatka nie moze byc wlasnym rodzicem.";
+                    var note = notes.FirstOrDefault(n => n.Id == noteId);
+                    if (note is null) { results.Add($"Nie znaleziono notatki {noteId}."); continue; }
 
-                        var parentScopeNotes = movingFolder ? await noteStore.ListAsync(targetFolder!, ct) : notes;
-                        if (parentScopeNotes.All(n => n.Id != parentId))
-                            return $"Nie znaleziono notatki-rodzica {parentId} w folderze docelowym.";
-                        if (!movingFolder && IsDescendant(notes, noteId, parentId))
-                            return "Nie mozna zagniezdzic notatki pod jej wlasnym potomkiem.";
-
-                        newParentId = parentId;
-                    }
-                }
-
-                var effectiveFolder = movingFolder ? targetFolder! : folder;
-                var updated = note with { ParentId = newParentId, UpdatedAt = DateTimeOffset.UtcNow };
-
-                if (movingFolder)
-                {
-                    var newPath = await noteStore.MoveAsync(folder, targetFolder!, updated, ct);
-                    updated = updated with { FilePath = newPath };
                     await vectorIndex.DeleteNoteAsync(folder, noteId, ct);
+                    await noteStore.MoveToTrashAsync(folder, note.FilePath, ct);
+                    results.Add($"Do kosza: {note.Title}");
                 }
-                else
+                return string.Join("\n", results);
+            }
+
+            case "bulk_move":
+            {
+                var folder = Req("folder");
+                var targetFolder = Opt("targetFolder");
+                var newParentIdRaw = Opt("newParentId");
+                if (string.IsNullOrEmpty(targetFolder) && string.IsNullOrEmpty(newParentIdRaw))
+                    return "Podaj targetFolder i/lub newParentId - nie ma czego zmieniac.";
+
+                var results = new List<string>();
+                foreach (var noteId in ReqArr("noteIds").Select(Guid.Parse))
+                    results.Add(await MoveNoteCoreAsync(folder, noteId, targetFolder, newParentIdRaw, ct));
+                return string.Join("\n", results);
+            }
+
+            case "bulk_tag":
+            {
+                var folder = Req("folder");
+                var addTags = OptArr("addTags");
+                var removeTags = OptArr("removeTags");
+                var notes = await noteStore.ListAsync(folder, ct);
+
+                var results = new List<string>();
+                foreach (var noteId in ReqArr("noteIds").Select(Guid.Parse))
                 {
-                    var path = await noteStore.SaveAsync(folder, updated, ct);
-                    updated = updated with { FilePath = path };
+                    var existing = notes.FirstOrDefault(n => n.Id == noteId);
+                    if (existing is null) { results.Add($"Nie znaleziono notatki {noteId}."); continue; }
+
+                    var newTags = existing.Tags
+                        .Where(t => !removeTags.Contains(t, StringComparer.OrdinalIgnoreCase))
+                        .Concat(addTags)
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .ToArray();
+
+                    var note = existing with { Tags = newTags, UpdatedAt = DateTimeOffset.UtcNow };
+                    var path = await noteStore.SaveAsync(folder, note, ct);
+                    note = note with { FilePath = path };
+
+                    var vector = await embedder.EmbedAsync(note.CompressedContent, ct);
+                    await vectorIndex.UpsertAsync(folder, note, vector, ct);
+                    results.Add($"Zaktualizowano tagi: {note.Title}");
                 }
+                return string.Join("\n", results);
+            }
 
-                var vector = await embedder.EmbedAsync(updated.CompressedContent, ct);
-                await vectorIndex.UpsertAsync(effectiveFolder, updated, vector, ct);
+            case "bulk_pin":
+            {
+                var folder = Req("folder");
+                var pinned = args.GetProperty("pinned").GetBoolean();
+                var notes = await noteStore.ListAsync(folder, ct);
 
-                return movingFolder
-                    ? $"Przeniesiono '{updated.Title}' do folderu '{targetFolder}'."
-                    : $"Zaktualizowano rodzica notatki '{updated.Title}'.";
+                var results = new List<string>();
+                foreach (var noteId in ReqArr("noteIds").Select(Guid.Parse))
+                {
+                    var existing = notes.FirstOrDefault(n => n.Id == noteId);
+                    if (existing is null) { results.Add($"Nie znaleziono notatki {noteId}."); continue; }
+
+                    var note = existing with { Pinned = pinned, UpdatedAt = DateTimeOffset.UtcNow };
+                    var path = await noteStore.SaveAsync(folder, note, ct);
+                    note = note with { FilePath = path };
+
+                    var vector = await embedder.EmbedAsync(note.CompressedContent, ct);
+                    await vectorIndex.UpsertAsync(folder, note, vector, ct);
+                    results.Add(pinned ? $"Przypieto: {note.Title}" : $"Odpieto: {note.Title}");
+                }
+                return string.Join("\n", results);
+            }
+
+            case "purge_trash_all":
+            {
+                var trashed = await noteStore.ListTrashAsync(ct);
+                foreach (var t in trashed)
+                    await noteStore.PurgeTrashAsync(t.TrashPath, ct);
+                return $"Trwale usunieto {trashed.Count} notatek z kosza.";
+            }
+
+            case "export_folder":
+            {
+                var folder = Req("folder");
+                var notes = await noteStore.ListAsync(folder, ct);
+                if (notes.Count == 0)
+                    return $"Folder '{folder}' jest pusty.";
+
+                var sb = new StringBuilder();
+                foreach (var note in notes.OrderBy(n => n.Title))
+                {
+                    sb.AppendLine($"# {note.Title}");
+                    sb.AppendLine();
+                    sb.AppendLine(note.RawContent);
+                    sb.AppendLine();
+                    sb.AppendLine("---");
+                    sb.AppendLine();
+                }
+                return sb.ToString();
             }
 
             case "edit_note":
@@ -584,6 +662,63 @@ public class FabrykaAgent(
         var folderById = candidates.ToDictionary(c => c.Scored.Note.Id, c => c.Folder);
         var reranked = await reranker.RerankAsync(query, candidates.Select(c => c.Scored).ToList(), ct);
         return reranked.Select(r => (folderById.GetValueOrDefault(r.Note.Id, folder ?? ""), r)).ToList();
+    }
+
+    private async Task<string> MoveNoteCoreAsync(string folder, Guid noteId, string? targetFolder, string? newParentIdRaw, CancellationToken ct)
+    {
+        var notes = await noteStore.ListAsync(folder, ct);
+        var note = notes.FirstOrDefault(n => n.Id == noteId);
+        if (note is null)
+            return $"Nie znaleziono notatki {noteId} w folderze '{folder}'.";
+
+        var movingFolder = !string.IsNullOrEmpty(targetFolder) && targetFolder != folder;
+        if (movingFolder && notes.Any(n => n.ParentId == noteId))
+            return "Ta notatka ma podnotatki - przenoszenie miedzy folderami z podnotatkami nie jest wspierane. Najpierw odepnij/przenies dzieci.";
+
+        var newParentId = note.ParentId;
+        if (newParentIdRaw is not null)
+        {
+            if (newParentIdRaw == "root")
+            {
+                newParentId = null;
+            }
+            else
+            {
+                var parentId = Guid.Parse(newParentIdRaw);
+                if (parentId == noteId)
+                    return "Notatka nie moze byc wlasnym rodzicem.";
+
+                var parentScopeNotes = movingFolder ? await noteStore.ListAsync(targetFolder!, ct) : notes;
+                if (parentScopeNotes.All(n => n.Id != parentId))
+                    return $"Nie znaleziono notatki-rodzica {parentId} w folderze docelowym.";
+                if (!movingFolder && IsDescendant(notes, noteId, parentId))
+                    return "Nie mozna zagniezdzic notatki pod jej wlasnym potomkiem.";
+
+                newParentId = parentId;
+            }
+        }
+
+        var effectiveFolder = movingFolder ? targetFolder! : folder;
+        var updated = note with { ParentId = newParentId, UpdatedAt = DateTimeOffset.UtcNow };
+
+        if (movingFolder)
+        {
+            var newPath = await noteStore.MoveAsync(folder, targetFolder!, updated, ct);
+            updated = updated with { FilePath = newPath };
+            await vectorIndex.DeleteNoteAsync(folder, noteId, ct);
+        }
+        else
+        {
+            var path = await noteStore.SaveAsync(folder, updated, ct);
+            updated = updated with { FilePath = path };
+        }
+
+        var vector = await embedder.EmbedAsync(updated.CompressedContent, ct);
+        await vectorIndex.UpsertAsync(effectiveFolder, updated, vector, ct);
+
+        return movingFolder
+            ? $"Przeniesiono '{updated.Title}' do folderu '{targetFolder}'."
+            : $"Zaktualizowano rodzica notatki '{updated.Title}'.";
     }
 
     private static string Truncate(string s, int n) => s.Length <= n ? s : s[..n] + "...";
