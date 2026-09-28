@@ -214,7 +214,7 @@
 
                             <Border Grid.Column="1" Width="1" Background="{DynamicResource CtpSurface2}" Margin="16,0" />
 
-                            <md:MarkdownScrollViewer Grid.Column="2" Markdown="{Binding NoteText}" />
+                            <md:MarkdownScrollViewer Grid.Column="2" Markdown="{Binding NoteText, Converter={x:Static conv:AutoLinkConverter.Instance}}" />
                         </Grid>
                     </DockPanel>
 
@@ -330,7 +330,7 @@
 
                                     <Border Grid.Column="1" Width="1" Background="{DynamicResource CtpSurface2}" Margin="16,0" />
 
-                                    <md:MarkdownScrollViewer Grid.Column="2" Markdown="{Binding EditNoteText}" SelectionEnabled="True" />
+                                    <md:MarkdownScrollViewer Grid.Column="2" Markdown="{Binding EditNoteText, Converter={x:Static conv:AutoLinkConverter.Instance}}" SelectionEnabled="True" />
                                 </Grid>
                             </DockPanel>
 
