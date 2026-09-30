@@ -26,7 +26,6 @@ public partial class MainViewModel(
     public const int TabNote = 2;
     public const int TabTrash = 3;
     public const int TabGaps = 4;
-    public const int TabGlossary = 5;
     public const int TabAgent = 6;
     public const int TabTimeline = 7;
     public const int TabHistory = 8;
@@ -438,7 +437,6 @@ public partial class MainViewModel(
 
             await LoadTreeAsync();
             await LoadParentOptionsAsync();
-            await LoadGlossaryAsync();
             await LoadGapsAsync();
         }
         finally
@@ -492,7 +490,6 @@ public partial class MainViewModel(
 
             await LoadTreeAsync();
             await LoadParentOptionsAsync();
-            await LoadGlossaryAsync();
             await LoadGapsAsync();
         }
         finally
@@ -626,7 +623,6 @@ public partial class MainViewModel(
 
             await LoadTreeAsync();
             await LoadBacklinksAsync();
-            await LoadGlossaryAsync();
         }
         finally
         {
@@ -846,26 +842,6 @@ public partial class MainViewModel(
         await SearchAsync();
     }
 
-    // ---- Auto-slownik ----
-
-    public ObservableCollection<GlossaryEntry> GlossaryEntries { get; } = [];
-
-    [ObservableProperty]
-    public partial GlossaryEntry? SelectedGlossaryEntry { get; set; }
-
-    [ObservableProperty]
-    public partial bool HasGlossary { get; set; }
-
-    [RelayCommand]
-    private async Task LoadGlossaryAsync()
-    {
-        GlossaryEntries.Clear();
-        foreach (var e in await noteStore.ListGlossaryAsync())
-            GlossaryEntries.Add(e);
-
-        HasGlossary = GlossaryEntries.Count > 0;
-    }
-
     // ---- Historia (cale repo notatek z gita - lista commitow + diff, jak SourceTree) ----
 
     public ObservableCollection<CommitEntry> Commits { get; } = [];
@@ -1009,7 +985,6 @@ public partial class MainViewModel(
                 await LoadTreeAsync();
                 await LoadTrashAsync();
                 await LoadGapsAsync();
-                await LoadGlossaryAsync();
             }
         }
         finally
@@ -1140,9 +1115,6 @@ public partial class MainViewModel(
     public partial bool IsGapsTabActive { get; set; }
 
     [ObservableProperty]
-    public partial bool IsGlossaryTabActive { get; set; }
-
-    [ObservableProperty]
     public partial bool IsAgentTabActive { get; set; }
 
     [ObservableProperty]
@@ -1152,7 +1124,7 @@ public partial class MainViewModel(
     public partial bool IsHistoryTabActive { get; set; }
 
     // Naglowek "Notatka / +" w prawym panelu ma sens tylko dla tych dwoch widokow -
-    // Szukaj, Kosz, Luki i Slownik maja wlasna zawartosc od samej gory.
+    // Szukaj, Kosz i Luki maja wlasna zawartosc od samej gory.
     [ObservableProperty]
     public partial bool IsContentHeaderVisible { get; set; } = true;
 
@@ -1199,7 +1171,6 @@ public partial class MainViewModel(
         IsNoteTabActive = value == TabNote;
         IsTrashTabActive = value == TabTrash;
         IsGapsTabActive = value == TabGaps;
-        IsGlossaryTabActive = value == TabGlossary;
         IsAgentTabActive = value == TabAgent;
         IsTimelineTabActive = value == TabTimeline;
         IsHistoryTabActive = value == TabHistory;
@@ -1214,9 +1185,6 @@ public partial class MainViewModel(
 
     [RelayCommand]
     private void ShowNoteTab() => SelectedTabIndex = TabNote;
-
-    [RelayCommand]
-    private void ShowGlossaryTab() => SelectedTabIndex = TabGlossary;
 
     [RelayCommand]
     private void ShowTrashTab() => SelectedTabIndex = TabTrash;
@@ -1246,7 +1214,6 @@ public partial class MainViewModel(
         await LoadTrashAsync();
         await LoadTemplatesAsync();
         await LoadGapsAsync();
-        await LoadGlossaryAsync();
         await LoadAgentSessionsAsync();
     }
 }

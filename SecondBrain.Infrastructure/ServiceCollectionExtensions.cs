@@ -76,8 +76,6 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<NotePipeline>();
 
         // Reakcje na zdarzenia - kolejnosc rejestracji = kolejnosc wykonania.
-        services.AddSingleton<IEventHandler<NoteAdded>, GlossaryOnNoteAdded>();
-        services.AddSingleton<IEventHandler<NoteEdited>, GlossaryOnNoteAdded>();
         services.AddSingleton<IEventHandler<NoteAdded>, ConflictOnNoteAdded>();
         services.AddSingleton<IEventHandler<NoteAdded>, GapAutoCloseOnNoteAdded>();
         services.AddSingleton<IEventHandler<ImportCompleted>, GapAutoCloseOnNoteAdded>();
