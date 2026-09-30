@@ -26,12 +26,21 @@ public interface ISearchTab
     NoteItem? SelectedResult { get; }
 }
 
-// Stan edytora nowej notatki.
-public interface IEditorContext
+// Stan edytora nowej notatki. INotifyPropertyChanged, bo okno szybkiej notatki (plugin)
+// binduje sie do niego wprost - host przekazuje zmiany z wlasnego VM.
+public interface IEditorContext : System.ComponentModel.INotifyPropertyChanged
 {
     string? Folder { get; }
+    void SetFolder(string folder);              // wybor folderu docelowego (jak klik w drzewie)
     string Text { get; set; }
-    string Status { set; }
+    string Status { get; set; }
     bool IsBusy { get; set; }
-    Task OpenQuickNoteAsync(string folder);
+    Task SaveAsync();                           // ten sam zapis co przycisk "Zapisz" w edytorze
+    Task OpenQuickNoteAsync(string folder);     // deleguje do IQuickNoteHost; no-op gdy plugin quicknote wylaczony
+}
+
+// Okno szybkiej notatki - dostarcza plugin quicknote; host tylko deleguje OpenQuickNoteAsync.
+public interface IQuickNoteHost
+{
+    Task OpenAsync(string folder);
 }

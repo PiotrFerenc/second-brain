@@ -2,7 +2,6 @@ using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
-using Avalonia.Input;
 using Avalonia.Markup.Xaml;
 using Avalonia.Platform;
 using Microsoft.Extensions.DependencyInjection;
@@ -98,60 +97,12 @@ public partial class App : Application
         {
             var folderMenu = new NativeMenu();
 
-            var typeItem = new NativeMenuItem("Wpisz...");
-            typeItem.Click += (_, _) => OpenQuickNote(folder);
-            folderMenu.Items.Add(typeItem);
-
-            var clipboardItem = new NativeMenuItem("Ze schowka");
-            clipboardItem.Click += async (_, _) => await NewNoteFromClipboardTextAsync(folder);
-            folderMenu.Items.Add(clipboardItem);
-
-
-            // Pozycje z pluginow (ITrayNewNoteContribution, np. OCR) - po wbudowanych dwoch.
+            // Pozycje z pluginow (ITrayNewNoteContribution: quicknote, OCR, ...).
             foreach (var contribution in Services.GetServices<ITrayNewNoteContribution>())
                 folderMenu.Items.Add(contribution.Build(folder));
 
             _newNoteFolderMenu.Items.Add(new NativeMenuItem(folder) { Menu = folderMenu });
         }
-    }
-
-    // Male okno "szybka notatka" (jak OneNote) zamiast calego glownego okna - wystarczy
-    // wpisac tekst i Zapisz, bez przelaczania sie na edytor w duzym oknie.
-    private QuickNoteWindow? _quickNoteWindow;
-
-    public void OpenQuickNote(string folder)
-    {
-        if (_mainWindow?.DataContext is not MainViewModel vm)
-            return;
-
-        vm.SelectedFolder = folder;
-
-        if (_quickNoteWindow is null)
-        {
-            _quickNoteWindow = new QuickNoteWindow { DataContext = vm };
-            _quickNoteWindow.Closed += (_, _) => _quickNoteWindow = null;
-            _quickNoteWindow.Show();
-        }
-
-        _quickNoteWindow.WindowState = WindowState.Normal;
-        _quickNoteWindow.Activate();
-    }
-
-    // Tekst ze schowka (nie obrazek) trafia od razu do pola notatki -
-    // user wciaz musi kliknac Zapisz, zeby dac szanse na poprawki przed kompresja/zapisem.
-    private async Task NewNoteFromClipboardTextAsync(string folder)
-    {
-        if (_mainWindow?.DataContext is not MainViewModel vm)
-            return;
-
-        var clipboard = TopLevel.GetTopLevel(_mainWindow)?.Clipboard;
-        var data = clipboard is null ? null : await clipboard.TryGetDataAsync();
-        var textItem = data?.Items.FirstOrDefault(i => i.Formats.Contains(DataFormat.Text));
-        if (textItem is null || await textItem.TryGetRawAsync(DataFormat.Text) is not string text || string.IsNullOrWhiteSpace(text))
-            return;
-
-        OpenQuickNote(folder);
-        vm.NoteText = text;
     }
 
     private void ShowMainWindow()

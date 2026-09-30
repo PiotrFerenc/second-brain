@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using SecondBrain.Core;
 using SecondBrain.Desktop.ViewModels;
+using Microsoft.Extensions.DependencyInjection;
 using SecondBrain.Plugins.Sdk;
 using Serilog;
 
@@ -64,30 +65,63 @@ public sealed class ShellAdapter(MainViewModel vm, IEnumerable<ITabContribution>
     }
 }
 
-public sealed class EditorContextAdapter(MainViewModel vm) : IEditorContext
+public sealed class EditorContextAdapter : IEditorContext
 {
-    public string? Folder => vm.SelectedFolder;
+    private readonly MainViewModel _vm;
+    private readonly IServiceProvider _services;
+
+    public EditorContextAdapter(MainViewModel vm, IServiceProvider services)
+    {
+        _vm = vm;
+        _services = services;
+        // Zmiany z VM przekazywane pod nazwami IEditorContext - okno szybkiej notatki binduje sie do adaptera.
+        vm.PropertyChanged += (_, e) =>
+        {
+            var name = e.PropertyName switch
+            {
+                nameof(MainViewModel.NoteText) => nameof(Text),
+                nameof(MainViewModel.EditorStatus) => nameof(Status),
+                nameof(MainViewModel.IsBusy) => nameof(IsBusy),
+                nameof(MainViewModel.SelectedFolder) => nameof(Folder),
+                _ => null
+            };
+            if (name is not null)
+                PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(name));
+        };
+    }
+
+    public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
+
+    public string? Folder => _vm.SelectedFolder;
+    public void SetFolder(string folder) => _vm.SelectedFolder = folder;
 
     public string Text
     {
-        get => vm.NoteText;
-        set => vm.NoteText = value;
+        get => _vm.NoteText;
+        set => _vm.NoteText = value;
     }
 
     public string Status
     {
-        set => vm.EditorStatus = value;
+        get => _vm.EditorStatus;
+        set => _vm.EditorStatus = value;
     }
 
     public bool IsBusy
     {
-        get => vm.IsBusy;
-        set => vm.IsBusy = value;
+        get => _vm.IsBusy;
+        set => _vm.IsBusy = value;
     }
 
+    public Task SaveAsync() => _vm.SaveNoteCommand.ExecuteAsync(null);
+
+    // GetService, nie konstruktor: plugin quicknote sam zalezy od IEditorContext (cykl).
     public Task OpenQuickNoteAsync(string folder)
     {
-        ((App)Application.Current!).OpenQuickNote(folder);
+        if (_services.GetService<IQuickNoteHost>() is { } host)
+            return host.OpenAsync(folder);
+
+        Log.Warning("OpenQuickNote: brak IQuickNoteHost (plugin quicknote wylaczony?)");
         return Task.CompletedTask;
     }
 }

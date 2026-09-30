@@ -1,12 +1,11 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:vm="using:SecondBrain.Desktop.ViewModels"
         xmlns:sdk="using:SecondBrain.Plugins.Sdk"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d" d:DesignWidth="420" d:DesignHeight="320"
-        x:Class="SecondBrain.Desktop.Views.QuickNoteWindow"
-        x:DataType="vm:MainViewModel"
+        x:Class="SecondBrain.Plugins.QuickNote.QuickNoteWindow"
+        x:DataType="sdk:IEditorContext"
         Width="420" Height="320"
         CanResize="True"
         ShowInTaskbar="False"
@@ -16,11 +15,11 @@
 
     <DockPanel Margin="12">
         <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,8,0,0">
-            <TextBlock Text="{Binding EditorStatus}" Classes="subtle" VerticalAlignment="Center" TextWrapping="Wrap" MaxWidth="240" />
+            <TextBlock Text="{Binding Status}" Classes="subtle" VerticalAlignment="Center" TextWrapping="Wrap" MaxWidth="240" />
             <Button Content="Zapisz" Click="Save_Click" IsEnabled="{Binding !IsBusy}" Classes="accent" />
         </StackPanel>
         <sdk:SlotHost DockPanel.Dock="Top" SlotId="Editor.Footer" Orientation="Vertical" Margin="0,0,0,8" />
-        <TextBox x:Name="NoteTextBox" Text="{Binding NoteText}" AcceptsReturn="True" TextWrapping="Wrap"
+        <TextBox x:Name="NoteTextBox" Text="{Binding Text}" AcceptsReturn="True" TextWrapping="Wrap"
                  PlaceholderText="Wpisz notatkę... (Ctrl+Enter zapisuje)" VerticalContentAlignment="Top" />
     </DockPanel>
 </Window>
