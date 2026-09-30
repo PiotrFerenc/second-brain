@@ -26,5 +26,14 @@ public sealed class TrashPlugin : IPlugin
 
         services.AddSingleton<ISlotContribution, DeleteNoteAction>();
         services.AddSingleton<ISlotContribution, DeleteSearchResultAction>();
+
+        services.AddSingleton<IAgentTool, TrashNoteTool>();
+        services.AddSingleton<IAgentTool, ListTrashTool>();
+        services.AddSingleton<IAgentTool, RestoreNoteTool>();
+        services.AddSingleton<IAgentTool, PurgeNoteTool>();
+        services.AddSingleton<IAgentTool, PurgeTrashAllTool>();
+        services.AddSingleton<IAgentTool, BulkRestoreTool>();
+        services.AddSingleton<IAgentTool, BulkPurgeTool>();
+        services.AddSingleton<IAgentTool, BulkTrashTool>();
     }
 }

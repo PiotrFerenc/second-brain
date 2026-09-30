@@ -63,31 +63,6 @@ public sealed class BulkNoteUpdateTool(NotePipeline pipeline, INoteStore noteSto
     }
 }
 
-public sealed class BulkTrashTool(NotePipeline pipeline, INoteStore noteStore) : AgentTool
-{
-    public override string Name => "bulk_trash";
-    public override string Description => "Przenies wiele notatek naraz do kosza (po liscie id, wszystkie w jednym folderze).";
-    protected override string Parameters => """{"type":"object","properties":{"folder":{"type":"string"},"noteIds":{"type":"array","items":{"type":"string"}}},"required":["folder","noteIds"]}""";
-    public override bool IsMutating => true;
-    public override string Describe(JsonElement args) => $"Przeniesc {SArr(args, "noteIds").Length} notatek z folderu '{S(args, "folder")}' do kosza?";
-
-    public override async Task<string> ExecuteAsync(JsonElement args, CancellationToken ct = default)
-    {
-        var folder = args.Req("folder");
-        var notes = await noteStore.ListAsync(folder, ct);
-        var results = new List<string>();
-        foreach (var noteId in args.ReqArr("noteIds").Select(Guid.Parse))
-        {
-            var note = notes.FirstOrDefault(n => n.Id == noteId);
-            if (note is null) { results.Add($"Nie znaleziono notatki {noteId}."); continue; }
-
-            await pipeline.TrashAsync(folder, note, ct);
-            results.Add($"Do kosza: {note.Title}");
-        }
-        return string.Join("\n", results);
-    }
-}
-
 public sealed class BulkMoveTool(NotePipeline pipeline, INoteStore noteStore) : AgentTool
 {
     public override string Name => "bulk_move";
