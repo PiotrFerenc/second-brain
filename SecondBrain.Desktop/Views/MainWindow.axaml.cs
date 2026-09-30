@@ -244,25 +244,6 @@ public partial class MainWindow : Window
         await vm.RunOcrCommand.ExecuteAsync(stream.ToArray());
     }
 
-    // Wyszukiwanie po obrazie: ten sam schowek->OCR co przy edytorze, ale wynik leci do
-    // SearchByImageCommand (OCR -> SearchQuery -> SearchAsync) zamiast do pola notatki.
-    private async void PasteImageSearch_Click(object? sender, RoutedEventArgs e)
-    {
-        if (DataContext is not MainViewModel vm)
-            return;
-
-        var clipboard = GetTopLevel(this)?.Clipboard;
-        var data = clipboard is null ? null : await clipboard.TryGetDataAsync();
-        var bitmapItem = data?.Items.FirstOrDefault(i => i.Formats.Contains(DataFormat.Bitmap));
-        if (bitmapItem is null || await bitmapItem.TryGetRawAsync(DataFormat.Bitmap) is not Bitmap bitmap)
-            return;
-
-        using var stream = new MemoryStream();
-        bitmap.Save(stream, new PngBitmapEncoderOptions());
-
-        await vm.SearchByImageCommand.ExecuteAsync(stream.ToArray());
-    }
-
     // Drag&drop w drzewie: przeciagniecie jednej notatki na druga zagniezdza ja pod nia
     // (ReparentNoteAsync w ViewModelu pilnuje tego samego folderu i braku cykli).
     // In-process format niesie referencje do TreeItem wprost, bez (de)serializacji.
@@ -405,51 +386,9 @@ public partial class MainWindow : Window
     }
 
     // Schowek wymaga TopLevel, do ktorego ViewModel nie ma dostepu - stad w code-behind.
-    private async void CopyAnswer_Click(object? sender, RoutedEventArgs e)
-    {
-        if (DataContext is MainViewModel vm)
-            await CopyToClipboardAsync(vm.SynthesizedAnswer);
-    }
-
-    private async void CopySearchResult_Click(object? sender, RoutedEventArgs e)
-    {
-        if (DataContext is MainViewModel { SelectedResult: { } item })
-            await CopyToClipboardAsync(item.RawContent);
-    }
-
     private async void CopyNote_Click(object? sender, RoutedEventArgs e)
     {
         if (DataContext is MainViewModel { SelectedNote: { } item })
-            await CopyToClipboardAsync(item.RawContent);
-    }
-
-    private async Task CopyToClipboardAsync(string? text)
-    {
-        if (string.IsNullOrEmpty(text))
-            return;
-
-        var clipboard = GetTopLevel(this)?.Clipboard;
-        if (clipboard is null)
-            return;
-
-        using var transfer = new TextDataTransfer(text);
-        await clipboard.SetDataAsync(transfer);
-    }
-
-    // SyncToAsyncDataTransfer (klasa Avalonii do tego samego) jest internal,
-    // wiec wlasny minimalny wrapper tekstu pod IAsyncDataTransfer.
-    private sealed class TextDataTransfer(string text) : IAsyncDataTransfer
-    {
-        public IReadOnlyList<DataFormat> Formats { get; } = [DataFormat.Text];
-        public IReadOnlyList<IAsyncDataTransferItem> Items { get; } = [new TextDataTransferItem(text)];
-        public void Dispose() { }
-    }
-
-    private sealed class TextDataTransferItem(string text) : IAsyncDataTransferItem
-    {
-        public IReadOnlyList<DataFormat> Formats { get; } = [DataFormat.Text];
-
-        public Task<object?> TryGetRawAsync(DataFormat format) =>
-            Task.FromResult(format == DataFormat.Text ? (object?)text : null);
+            await ClipboardText.SetAsync(this, item.RawContent);
     }
 }

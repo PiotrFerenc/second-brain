@@ -14,7 +14,9 @@ public sealed class ShellAdapter(MainViewModel vm, IEnumerable<ITabContribution>
 {
     public string? SelectedFolder => vm.SelectedFolder;
     public NoteItem? SelectedNote => vm.SelectedNote;
-    public NoteItem? SelectedSearchResult => vm.SelectedResult;
+    public NoteItem? SelectedSearchResult => SearchTab?.SelectedResult;
+
+    private ISearchTab? SearchTab => tabs.FirstOrDefault(t => t.Id == "search") as ISearchTab;
     public IReadOnlyList<string> Folders => vm.Tree.Where(t => t.IsFolder).Select(t => t.DisplayName).ToList();
 
     public Func<Note, bool>? TreeFilter
@@ -45,9 +47,13 @@ public sealed class ShellAdapter(MainViewModel vm, IEnumerable<ITabContribution>
 
     public void Search(string query)
     {
-        vm.SearchQuery = query;
-        vm.SelectedTabIndex = MainViewModel.TabSearch;
-        _ = vm.SearchCommand.ExecuteAsync(null);
+        if (SearchTab is not { } search)
+        {
+            Log.Warning("Search: brak zakladki 'search' (plugin wylaczony?)");
+            return;
+        }
+        ShowTab("search");
+        search.Search(query);
     }
 
     public Task RefreshTreeAsync() => vm.LoadTreeCommand.ExecuteAsync(null);

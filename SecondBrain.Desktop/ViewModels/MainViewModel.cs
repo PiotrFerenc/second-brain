@@ -10,18 +10,14 @@ namespace SecondBrain.Desktop.ViewModels;
 
 public partial class MainViewModel(
     IVectorIndex vectorIndex,
-    IAnswerSynthesizer answerSynthesizer,
     INoteStore noteStore,
     NotePipeline pipeline,
-    NoteSearch noteSearch,
-    IEventBus events,
     IAgent agent,
     IAgentSessionStore agentSessionStore,
     IOcrExtractor ocrExtractor,
     INoteRewriter noteRewriter) : ViewModelBase
 {
     public const int TabEditor = 0;
-    public const int TabSearch = 1;
     public const int TabNote = 2;
     public const int TabAgent = 6;
 
@@ -488,20 +484,6 @@ public partial class MainViewModel(
         }
     }
 
-    // Wyszukiwanie po obrazie: ten sam OCR co w edytorze, ale wyciagniety tekst leci wprost
-    // jako zapytanie do istniejacego SearchAsync zamiast do pola notatki.
-    [RelayCommand]
-    private async Task SearchByImageAsync(byte[] imageBytes)
-    {
-        var text = await ocrExtractor.ExtractTextAsync(imageBytes, "image/png");
-        if (string.IsNullOrWhiteSpace(text))
-            return;
-
-        SearchQuery = text;
-        SelectedTabIndex = TabSearch;
-        await SearchAsync();
-    }
-
     // ---- Notatka (podglad wybranej w drzewie) ----
 
     [RelayCommand]
@@ -588,81 +570,6 @@ public partial class MainViewModel(
             .ToList();
 
         BacklinksText = referencing.Count > 0 ? string.Join(", ", referencing) : "Brak.";
-    }
-
-    // ---- Wyszukiwanie (globalne, po wszystkich folderach) ----
-
-    [ObservableProperty]
-    public partial string SearchQuery { get; set; } = "";
-
-    [ObservableProperty]
-    public partial SearchResultItem? SelectedResult { get; set; }
-
-    [ObservableProperty]
-    public partial string SynthesizedAnswer { get; set; } = "";
-
-    [ObservableProperty]
-    public partial bool HasAnswer { get; set; }
-
-    [ObservableProperty]
-    public partial bool HasSearched { get; set; }
-
-    [ObservableProperty]
-    public partial bool HasResults { get; set; }
-
-    public ObservableCollection<SearchResultItem> SearchResults { get; } = [];
-
-    // Domyslnie globalnie (wszystkie foldery) - zaznaczenie zawezia do aktualnie
-    // wybranego w drzewie folderu.
-    [ObservableProperty]
-    public partial bool SearchCurrentFolderOnly { get; set; }
-
-    [RelayCommand]
-    private async Task SearchAsync()
-    {
-        SearchResults.Clear();
-        SelectedResult = null;
-        HasSearched = true;
-        SynthesizedAnswer = "";
-        HasAnswer = false;
-
-        if (string.IsNullOrWhiteSpace(SearchQuery))
-            return;
-
-        IsBusy = true;
-        try
-        {
-            IReadOnlyList<string>? foldersToSearch = SearchCurrentFolderOnly && SelectedFolder is not null ? [SelectedFolder] : null;
-            var hits = await noteSearch.SearchAsync(SearchQuery, foldersToSearch, vectorLimit: 20);
-
-            var notesForAnswer = new List<Note>();
-
-            foreach (var (folder, note, score) in hits.Take(10))
-            {
-                SearchResults.Add(new SearchResultItem(note.Id, note.Title, note.Tags, score, note.RawContent, note.FilePath, note.ParentId, note.Pinned, folder, note.CreatedAt));
-
-                if (notesForAnswer.Count < 5)
-                    notesForAnswer.Add(note);
-            }
-
-            SelectedResult = SearchResults.FirstOrDefault();
-            HasResults = SearchResults.Count > 0;
-
-            if (notesForAnswer.Count > 0)
-            {
-                var answer = await answerSynthesizer.SynthesizeAsync(SearchQuery, notesForAnswer);
-                SynthesizedAnswer = answer.Answer;
-                HasAnswer = !string.IsNullOrWhiteSpace(SynthesizedAnswer);
-
-                // "Luka w wiedzy": RAG jawnie mowi ze notatki nie zawieraja odpowiedzi -
-                // handler GapLogOnSearch zapisuje pytanie, zeby nie zginelo i user mial co dopisac.
-                await events.PublishAsync(new SearchCompleted(SearchQuery, answer.Answered));
-            }
-        }
-        finally
-        {
-            IsBusy = false;
-        }
     }
 
     // Klikniecie w tag: zawezia DRZEWO folderow do notatek z tym tagiem (ze wszystkich
@@ -889,8 +796,7 @@ public partial class MainViewModel(
     }
 
     // ---- Zakladki / skroty klawiszowe ----
-    // Szukaj jest dostepne tylko z paska narzedzi (nie ma wlasnego naglowka
-    // w prawym panelu) - stad wlasne flagi widoczności zamiast TabControl.SelectedIndex.
+    // Wlasne flagi widocznosci zamiast TabControl.SelectedIndex (panele rdzenia + widok pluginu).
 
     [ObservableProperty]
     public partial int SelectedTabIndex { get; set; } = TabEditor;
@@ -899,16 +805,13 @@ public partial class MainViewModel(
     public partial bool IsEditorTabActive { get; set; } = true;
 
     [ObservableProperty]
-    public partial bool IsSearchTabActive { get; set; }
-
-    [ObservableProperty]
     public partial bool IsNoteTabActive { get; set; }
 
     [ObservableProperty]
     public partial bool IsAgentTabActive { get; set; }
 
     // Naglowek "Notatka / +" w prawym panelu ma sens tylko dla tych dwoch widokow -
-    // Szukaj, Kosz i Luki maja wlasna zawartosc od samej gory.
+    // zakladki pluginow maja wlasna zawartosc od samej gory.
     [ObservableProperty]
     public partial bool IsContentHeaderVisible { get; set; } = true;
 
@@ -951,7 +854,6 @@ public partial class MainViewModel(
     {
         IsPluginTabActive = value == TabPlugin;
         IsEditorTabActive = value == TabEditor;
-        IsSearchTabActive = value == TabSearch;
         IsNoteTabActive = value == TabNote;
         IsAgentTabActive = value == TabAgent;
         IsContentHeaderVisible = value is TabEditor or TabNote;
@@ -959,9 +861,6 @@ public partial class MainViewModel(
 
     [RelayCommand]
     private void ShowEditorTab() => SelectedTabIndex = TabEditor;
-
-    [RelayCommand]
-    private void ShowSearchTab() => SelectedTabIndex = TabSearch;
 
     [RelayCommand]
     private void ShowNoteTab() => SelectedTabIndex = TabNote;
