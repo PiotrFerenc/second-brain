@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using SecondBrain.Core;
 using SecondBrain.Plugins.Sdk;
 
 namespace SecondBrain.Plugins.Search;
@@ -17,5 +18,7 @@ public sealed class SearchPlugin : IPlugin
     {
         services.AddSingleton<SearchTab>();
         services.AddSingleton<ITabContribution>(sp => sp.GetRequiredService<SearchTab>());
+        services.AddSingleton<IAgentTool, SearchNotesTool>();
+        services.AddSingleton<IAgentTool, AskQuestionTool>();
     }
 }
