@@ -31,71 +31,51 @@ dziennik, kosz, skróty klawiszowe, renderowanie Markdown. Solucja: `SecondBrain
 ```
 SecondBrain.slnx
   SecondBrain.Core/            interfejsy domenowe + modele, bez zaleznosci zewnetrznych
-    Note.cs                    record Note (Id, Title, RawContent, CompressedContent, Tags,
-                                CreatedAt, UpdatedAt, FilePath, ParentId, Pinned) + ScoredNote
-    Interfaces.cs               ICompressor (zwraca CompressionResult: Title+CompressedContent
-                                 +Tags, wszystko ustala LLM jednym wywolaniem), IEmbedder,
-                                 IReranker, IAnswerSynthesizer (RAG: odpowiedz na pytanie na
-                                 podstawie znalezionych notatek), INoteStore (ListAsync +
-                                 kosz: MoveToTrashAsync/ListTrashAsync/RestoreFromTrashAsync/
-                                 PurgeTrashAsync, TrashedNote), IVectorIndex (+ DeleteFolderAsync,
-                                 DeleteNoteAsync)
+    Note.cs, Interfaces.cs      Note/ScoredNote; ICompressor, IEmbedder, IReranker, IAnswerSynthesizer,
+                                INoteStore (notatki, kosz, szablony, skille, luki, slownik, fakty,
+                                scalanie tagow - metody funkcji zostaja tu, dopoki uzywa ich agent),
+                                IVectorIndex, IAgent, IAgentSessionStore, IOcrExtractor
+    Events.cs                   zdarzenia (NoteCompressed, NoteAdded, NoteEdited, NoteReindexed,
+                                NoteTrashed/Restored/Purged, FolderCreated/Deleted, ImportCompleted,
+                                NotesChanged, SearchCompleted, StorageChanged), IEventBus, IEventHandler<T>
 
-  SecondBrain.Infrastructure/  implementacje, referencja do Core
-    Options.cs                  HttpClientOptions (BaseAddress, TimeoutSeconds, ApiKey, Headers)
-                                 + OpenAiOptions, RerankerOptions, QdrantOptions (+ApiKey/UseHttps),
-                                 StorageOptions
-    HttpClientHeaders.cs        wspolne nakladanie naglowkow (w tym {ApiKey}) na nazwany HttpClient
-    Embedding.cs                OpenAiEmbedder (realny) + MockEmbedder (aktywny, patrz nizej)
-    Compression.cs              OpenAiCompressor (chat/completions, response_format json_object,
-                                 zwraca tytul+tresc+tagi jednym wywolaniem) — dziala
-    AnswerSynthesis.cs           OpenAiAnswerSynthesizer (chat/completions, json_object,
-                                 zwraca AnswerResult{Answered,Answer} - jawny sygnal
-                                 "nie wiem" zamiast parsowania wolnego tekstu) — dziala
-    Reranking.cs                MockReranker (aktywny) + CohereReranker (v2/rerank, gotowy,
-                                 nieprzetestowany — provider dostepny tylko na 2. maszynie)
-    NoteFileStore.cs             FileNoteStore — front matter (+parent/pinned), ListAsync
-                                 (posortowane: przypiete pierwsze, potem data), kosz jako
-                                 <root>/.trash/<folder>___<id>.md (folder zakodowany w nazwie)
-    QdrantVectorIndex.cs         implementacja IVectorIndex na Qdrant.Client (+DeleteCollectionAsync,
-                                 DeleteAsync po Guid)
-    ServiceCollectionExtensions.cs  AddSecondBrainInfrastructure(config) — jedna rejestracja
-                                 DI uzywana przez PipelineTest i Desktop
+  SecondBrain.Infrastructure/  serwisy hosta, referencja do Core
+    NotePipeline.cs             JEDYNE miejsce cyklu zycia notatki (kompresja -> zapis -> embedding ->
+                                upsert -> zdarzenia; kosz, przenoszenie, foldery); zwraca Notices
+    NoteSearch.cs               wyszukiwanie hybrydowe + reranker (uzywa: plugin search, gaps, agent)
+    EventBus.cs                 handlery z DI, sekwencyjnie, wyjatek handlera logowany, nie przerywa
+    NotesRoot.cs                jedna klasa liczy katalog notatek
+    Options.cs, HttpClientHeaders.cs, Embedding.cs, Compression.cs, AnswerSynthesis.cs, Reranking.cs,
+    TagCleaning.cs, DuplicateScanner.cs   providerzy i serwisy uzywane przez rdzen/agenta
+    NoteFileStore.cs, FileVectorIndex.cs, AgentSessionStore.cs, Agent.cs
+    ServiceCollectionExtensions.cs  AddSecondBrainInfrastructure(config)
 
-  SecondBrain.Desktop/         Avalonia + CommunityToolkit.Mvvm, referencja do Core+Infrastructure
-    Program.cs                  buduje ServiceProvider PRZED startem Avalonii, wystawia App.Services
-    App.axaml.cs                 rozwiazuje MainViewModel z App.Services zamiast `new MainViewModel()`
-    ViewModels/MainViewModel.cs  jeden ViewModel na cale okno — spory (drzewo, edytor,
-                                 wyszukiwanie, notatka, dziennik, kosz), ale nadal jeden plik
-                                 bo commandy sie nie duplikuja, tylko rosna liczbowo
-    ViewModels/SearchResultItem.cs  DTO notatki do bindowania (Id, Title, Tags, Score,
-                                 RawContent, FilePath, ParentId, Pinned)
-    ViewModels/TreeItem.cs       wezel drzewa sidebaru (folder lub notatka, z OwningFolder)
-    ViewModels/TrashItem.cs      DTO wpisu w koszu
-    Converters/FolderAccentConverter.cs  string -> kolorowa kropka folderu (Catppuccin)
-    Converters/PinLabelConverter.cs  bool Pinned -> "Przypnij"/"Odepnij"
-    Styles/Catppuccin.axaml      paleta Mocha/Latte jako ThemeDictionaries (Light/Dark),
-                                 nadpisuje tez SystemAccentColor (mauve) dla FluentTheme
-    Styles/AppStyles.axaml       Style dla Window/Button(+.accent/.danger/.subtleAction)/
-                                 TextBox(+.editor)/ListBox(Item)/TabItem - FluentTheme baza
-    Views/MainWindow.axaml       Grid: sidebar = TreeView (foldery jako korzenie z kolorowa
-                                 kropka, notatki jako dzieci, zagniezdzone podstrony jako
-                                 dzieci notatek) | "kartka" tresci z TabControl 5 zakladek:
-                                 Nowa notatka (szablony, tagi, wybor notatki nadrzednej),
-                                 Szukaj (+ karta odpowiedzi LLM, Markdown w wyniku), Notatka
-                                 (podglad wybranej w drzewie: pin/kopiuj/usun/backlinki,
-                                 Markdown), Kosz (przywroc/usun na zawsze).
-                                 Wybor folderu w drzewie czysci pola edytora/wyszukiwania;
-                                 wybor notatki przelacza automatycznie na zakladke "Notatka".
-                                 Skroty: Ctrl+N/F/D/S.
-    Views/MainWindow.axaml.cs    start (InitializeCommand), kopiowanie do schowka (wlasny
-                                 IAsyncDataTransfer - Avalonia 12 usunela SetTextAsync)
+  SecondBrain.Plugins.Sdk/     kontrakty pluginow (refs: Core, Avalonia, CommunityToolkit.Mvvm)
+    IPlugin.cs                  Id/Name/Description, ConfigureServices, StartAsync
+    Contributions.cs            ITabContribution (+TabArea), ISlotContribution, ITrayNewNoteContribution
+    IShell.cs                   IShell (stan powloki, nawigacja, TreeFilter, SelectedNoteChanged),
+                                IEditorContext, ISearchTab, IQuickNoteHost
+    PluginManager.cs            odkrywanie refleksja, ~/SecondBrain/plugins.json ({"disabled":[...]}),
+                                ConfigureServices tylko wlaczonych, StartAsync
+    SlotHost.cs, PluginRuntime.cs, NoteItem.cs, ClipboardText.cs, NullShell.cs, Converters/
 
-  SecondBrain.PipelineTest/    cienki CLI nad Core+Infrastructure, do szybkich testow bez UI
-    Program.cs                  komendy: list, create, delete-folder, seed, add, notes,
-                                 delete-note (do kosza), list-trash, restore, purge, search
-                                 (drukuje tez syntezowana odpowiedz LLM pod wynikami)
-    SampleNotes.cs               3 przykladowe notatki do `seed`
+  SecondBrain.Plugins/         jeden projekt, folder na plugin (refs: Sdk, Infrastructure)
+    Backlinks/ Conflicts/ Gaps/ Glossary/ History/ Import/ Ocr/ QuickNote/ Rewrite/
+    Search/ Tags/ Templates/ Timeline/ Trash/     - patrz PLAN-PLUGINS.md 1.2
+
+  SecondBrain.Desktop/         host: powloka + rdzen UI (refs: Plugins)
+    Program.cs                  config -> AddSecondBrainInfrastructure -> AddSecondBrainShell ->
+                                PluginManager.Discover(...).ConfigureServices -> Build -> PluginRuntime
+    Plugins/                    ShellAdapter (IShell/IEditorContext nad MainViewModel), ShellServices,
+                                PluginsTab/PluginsView (zakladka "Wtyczki")
+    ViewModels/MainViewModel.cs rdzen: drzewo, foldery, edytor, widok notatki, zakladki, agent, sesje
+    Views/MainWindow.axaml      sidebar (pasek = ItemsControl z ITabContribution, drzewo, foldery) |
+                                panele rdzenia (edytor, notatka, agent) + ContentControl dla zakladek
+                                pluginow; SlotHost: Sidebar.AboveTree, Editor.Templates, Editor.Toolbar,
+                                Editor.Footer, Note.Header, Note.Actions, Note.Footer
+    Skills/                     wbudowane skille agenta
+
+  SecondBrain.PipelineTest/    CLI nad Core+Infrastructure+backend pluginow (NullShell zamiast okna)
 ```
 
 Pakiet zewnętrzny: `Markdown.Avalonia.Tight` (12.0.0-a3, alpha, ale jedyny kompatybilny
@@ -254,6 +234,14 @@ Te ustalenia są wiążące — nie zmieniaj ich bez wyraźnej prośby użytkown
 | **Rozciągana belka boczna: natywny `GridSplitter` Avalonia**, `MinWidth=200`/`MaxWidth=500` na kolumnie sidebaru, szerokość NIE jest zapamiętywana między uruchomieniami | Wprost zażądane (długie tytuły notatek się nie mieściły w stałych 270px). Standardowa kontrolka zamiast własnej implementacji przeciągania. Brak trwałego zapisu szerokości to świadome cięcie zakresu (osobne zadanie od zapisu rozmiaru całego okna, budowane równolegle) — dodanie tu dublowałoby mechanizm zapisu stanu |
 | **5+2 funkcje w tej turze budowane przez agenty w równoległych `git worktree`**, `Agent(isolation:"worktree")` nie działa w tym środowisku (sesja w tle, brak `WorktreeCreate` hooka) — worktree zakładane ręcznie (`git worktree add`) | Wprost zażądane przez użytkownika, powtórzone jako wzorzec pracy. Każdy fork dostaje instrukcję pracy wyłącznie w swoim katalogu, kopiowania gitignorowanego `appsettings.json` (worktree nie kopiuje plików niewersjonowanych) i unikalnego prefiksu folderu testowego (Qdrant + `~/SecondBrain/notes` to współdzielona żywa infrastruktura między wszystkimi równoległymi forkami) |
 
+| **System pluginów: `SecondBrain.Plugins.Sdk` (kontrakty) + `SecondBrain.Plugins` (folder na plugin), odkrywanie refleksją, bez ładowania DLL z dysku** | Pełna analiza i decyzje w `PLAN-PLUGINS.md`. Jeden użytkownik z repo: „plugin kompilowany" to nowa klasa `IPlugin`, izolacja asemblerowa nic nie daje |
+| **Wyłączony plugin = brak `ConfigureServices`; zmiana działa po restarcie; `~/SecondBrain/plugins.json` trzyma listę wyłączonych** | Kontener DI jest niezmienny; nigdzie w hoście nie ma `if (plugin włączony)`. Nowy plugin domyślnie widoczny |
+| **Zdarzenia (`IEventBus`) zamiast wywołań między funkcjami; handlery sekwencyjne, błąd handlera nie przerywa operacji; `Notices` jako kolektor komunikatów** | Jedyny sposób, żeby wyłączenie np. `glossary` nie wymagało zmian w `NotePipeline`; edytor/agent/CLI pokazują komunikaty po swojemu |
+| **Handler zdarzenia nigdy nie czeka na wątek UI (`Dispatcher.UIThread.InvokeAsync`)** | CLI nie ma pętli Avalonii — `add` w CLI wisiał w nieskończoność (złapane przy migracji słownika). Zakładka ładuje dane przy aktywacji albo przez `Dispatcher.UIThread.Post` |
+| **CLI rejestruje `NullShell`/`NullEditorContext`** | Zakładki pluginów bywają handlerami zdarzeń i wstrzykują `IShell`; bez tego `EventBus` nie mógł ich utworzyć w CLI |
+| **Metody luk/słownika/faktów/szablonów/scalania tagów zostają w `INoteStore`; `DuplicateScanner`, `ITagCleaner`, `TagMerger` zostają w Infrastructure** | Używa ich `FabrykaAgent` (Infrastructure nie może referencować pluginów). Przenoszą się razem z narzędziami agenta (`PLAN-AGENT-PLUGINS.md` P2); plugin `duplicates` odłożony z tego samego powodu |
+| **Okna/kontrolki pluginów: bezparametrowy konstruktor, zależności przez `DataContext`; kontrybucja slotu to fabryka (`CreateControl` per `SlotHost`)** | Loader XAML ostrzega przy konstruktorze z parametrem; jeden slot (`Editor.Footer`) żyje w dwóch oknach (główne + szybka notatka) |
+
 ## 4. Co dalej
 
 Rdzeń działa end-to-end (na mockach embeddingu/rerankera). To, co zostało, to odblokowanie
@@ -361,6 +349,13 @@ Nie zaczynaj żadnej z tych ścieżek bez wyraźnej prośby i decyzji, która op
   trwałe (patrz decyzja w sekcji 3, powód: koszt klonowania kolekcji Qdrant).
 - Nie zaczynaj klikalnych `[[linków]]` (Zadanie 10) ani filtrowania po tagach (Zadanie 9)
   bez wyraźnej prośby — to świadome cięcia zakresu, nie zapomniane elementy.
+
+- Nie dodawaj funkcji do `MainViewModel`/`MainWindow.axaml` — nowa funkcja to folder w
+  `SecondBrain.Plugins` (patrz `PLAN-PLUGINS.md`, README „Wtyczki"). Host dotyka się tylko
+  dla nowego slotu (jedna linia `SlotHost`).
+- Nie ładuj pluginów z dysku, nie rób przełączania na żywo, nie dodawaj grafu zależności
+  między pluginami, nie używaj `IChatClient`/`Microsoft.Extensions.AI` do własnych wywołań LLM.
+- Nie czekaj na wątek UI w handlerach zdarzeń (patrz decyzje).
 
 ## 6. Środowisko
 

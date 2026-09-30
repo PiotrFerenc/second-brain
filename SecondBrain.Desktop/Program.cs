@@ -3,7 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using SecondBrain.Desktop.Plugins;
 using SecondBrain.Infrastructure;
-using SecondBrain.Plugins.Hello;
+using SecondBrain.Plugins.Search;
 using SecondBrain.Plugins.Sdk;
 using Serilog;
 using System;
@@ -33,7 +33,7 @@ sealed class Program
             var services = new ServiceCollection();
             services.AddSecondBrainInfrastructure(config);
             services.AddSecondBrainShell();
-            PluginManager.Discover(typeof(HelloPlugin).Assembly).ConfigureServices(services, config);
+            PluginManager.Discover(typeof(SearchPlugin).Assembly).ConfigureServices(services, config);
             App.Services = services.BuildServiceProvider();
             PluginRuntime.Services = App.Services;
 

@@ -10,6 +10,45 @@ w istniejących widokach, pozycje w menu tray). Istniejące funkcje przepisujemy
 w pierwszej kolejności; nowe funkcje powstają wyłącznie jako pluginy. Menedżer pluginów
 pozwala włączyć/wyłączyć każdy z nich.
 
+## Stan realizacji (2026-09-30)
+
+Fazy 0 i 1 wykonane i scalone na `master`; faza 2 częściowo (sprzątanie zależne od agenta odłożone).
+
+- Faza 0: `NotePipeline`, `NoteSearch`, `NotesRoot`, szyna zdarzeń, SDK, `PluginManager`,
+  powłoka ze slotami, zakładka „Wtyczki" — bez zmiany zachowania.
+- Faza 1: 14 pluginów (`search`, `trash`, `gaps`, `glossary`, `conflicts`, `timeline`,
+  `history`, `ocr`, `import`, `rewrite`, `templates`, `tags`, `backlinks`, `quicknote`).
+  Każdy sprawdzony: build 0/0, Desktop bez wyjątków z pluginem i bez, CLI tam, gdzie
+  funkcja ma backend. Test „wszystkie wyłączone": aplikacja startuje bez wyjątków.
+- `MainViewModel.cs` 1320 → 710 linii, `MainWindow.axaml` 641 → 360, `App.axaml.cs` 185 → 117.
+
+Odstępstwa od planu (świadome):
+
+1. **`duplicates` nie jest pluginem**, a `ITagCleaner`/`TagMerger`/`DuplicateScanner`
+   zostają w Infrastructure — wstrzykuje je `FabrykaAgent`, a Infrastructure nie może
+   referencować `SecondBrain.Plugins`. Przenoszą się razem z narzędziami agenta
+   (`PLAN-AGENT-PLUGINS.md` P2).
+2. **`INoteStore` nie schudł** (luki, słownik, fakty, szablony, scalanie tagów zostają) —
+   ten sam powód: agent i CLI wołają te metody. Magazyny pluginów (`GapStore` itd.)
+   powstaną przy P2; do tego czasu pluginy używają `INoteStore`.
+3. `PluginManager` żyje w Sdk (CLI nie może referencować WinExe); `TabPlacement` →
+   `TabArea` (kolizja z `Avalonia.Controls.TabPlacement`).
+4. Dodane do kontraktu w trakcie migracji: `IShell.Search`, `IShell.SelectedSearchResult`,
+   `IShell.SelectedNoteChanged`, `ISearchTab`, `IQuickNoteHost`, `IEditorContext :
+   INotifyPropertyChanged` + `SaveAsync`/`SetFolder`, `NoteCompressed.TagsFromUser`,
+   `NullShell`/`NullEditorContext` w CLI.
+5. Kolejność przycisków w pasku i pozycji tray = `Order` kontrybucji / kolejność Id
+   pluginów; `ITrayNewNoteContribution` nie ma `Order`.
+6. Komunikaty sprzeczności/luk ujednolicone do wersji bez diakrytyków (jedno źródło
+   w `Notices`); status importu to jeden „Importuje..." zamiast per linia.
+
+Reguły odkryte w trakcie (obowiązują dla nowych pluginów): handler zdarzenia nigdy nie
+czeka na wątek UI; okna/kontrolki pluginu z bezparametrowym konstruktorem; `CreateControl`
+to fabryka; komendy CLI w testach agentów z `timeout`.
+
+Pozostało z fazy 2: `README` „Wtyczki" ✅, `PLAN.md` ✅, `hello` usunięty ✅; odchudzenie
+`INoteStore` i `duplicates` → po P2 agenta.
+
 ## 0. W skrócie
 
 - Plugin = klasa `IPlugin` + folder w projekcie `SecondBrain.Plugins`. Kompilowany razem

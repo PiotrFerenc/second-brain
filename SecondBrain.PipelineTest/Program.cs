@@ -3,7 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using SecondBrain.Core;
 using SecondBrain.Infrastructure;
 using SecondBrain.PipelineTest;
-using SecondBrain.Plugins.Hello;
+using SecondBrain.Plugins.Search;
 using SecondBrain.Plugins.Sdk;
 
 var config = new ConfigurationBuilder()
@@ -18,7 +18,7 @@ services.AddSecondBrainInfrastructure(config);
 services.AddSingleton<IShell, NullShell>();
 services.AddSingleton<IEditorContext, NullEditorContext>();
 // Backend pluginow tez w CLI - zeby `add` robil to samo co w Desktopie (patrz PLAN-PLUGINS.md 2.4).
-PluginManager.Discover(typeof(HelloPlugin).Assembly).ConfigureServices(services, config);
+PluginManager.Discover(typeof(SearchPlugin).Assembly).ConfigureServices(services, config);
 
 await using var provider = services.BuildServiceProvider();
 PluginRuntime.Services = provider;
