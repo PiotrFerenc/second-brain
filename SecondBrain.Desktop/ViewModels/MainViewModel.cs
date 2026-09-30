@@ -17,7 +17,8 @@ public partial class MainViewModel(
     IAgent agent,
     IAgentSessionStore agentSessionStore,
     GapAutoCloser gapAutoCloser,
-    IOcrExtractor ocrExtractor) : ViewModelBase
+    IOcrExtractor ocrExtractor,
+    INoteRewriter noteRewriter) : ViewModelBase
 {
     public const int TabEditor = 0;
     public const int TabSearch = 1;
@@ -337,6 +338,9 @@ public partial class MainViewModel(
     public partial string NoteTagsInput { get; set; } = "";
 
     [ObservableProperty]
+    public partial string RewriteInstruction { get; set; } = "";
+
+    [ObservableProperty]
     public partial string EditorStatus { get; set; } = "";
 
     [ObservableProperty]
@@ -574,6 +578,33 @@ public partial class MainViewModel(
             var text = await ocrExtractor.ExtractTextAsync(imageBytes, "image/png");
             NoteText = text;
             EditorStatus = "Tekst z obrazka wczytany - sprawdz i zapisz.";
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    // Instrukcja idzie jako system prompt, tresc notatki jako user - odpowiedz zastepuje NoteText.
+    [RelayCommand]
+    private async Task RewriteNoteAsync()
+    {
+        if (string.IsNullOrWhiteSpace(RewriteInstruction) || string.IsNullOrWhiteSpace(NoteText))
+        {
+            EditorStatus = "Wpisz instrukcje i tresc notatki.";
+            return;
+        }
+
+        IsBusy = true;
+        try
+        {
+            EditorStatus = "Przetwarzam wg instrukcji...";
+            NoteText = await noteRewriter.RewriteAsync(RewriteInstruction, NoteText);
+            EditorStatus = "Tresc zastapiona odpowiedzia - sprawdz i zapisz.";
+        }
+        catch (Exception ex)
+        {
+            EditorStatus = $"Blad: {ex.Message}";
         }
         finally
         {

@@ -94,6 +94,13 @@ public interface ITagCleaner
     Task<IReadOnlyList<TagGroup>> FindDuplicateGroupsAsync(IReadOnlyList<string> allTags, CancellationToken ct = default);
 }
 
+// Przepisuje surowy tekst notatki wg krotkiej instrukcji wpisanej przez usera w edytorze
+// (instrukcja = system prompt, tekst notatki = wiadomosc usera). Zwraca czysty tekst.
+public interface INoteRewriter
+{
+    Task<string> RewriteAsync(string instruction, string noteText, CancellationToken ct = default);
+}
+
 public interface INoteStore
 {
     Task<string> SaveAsync(string folder, Note note, CancellationToken ct = default);

@@ -194,6 +194,12 @@
                                 <Button Grid.Column="3" Content="Importuj z folderu..." Classes="subtleAction" Click="ImportFolder_Click" />
                             </Grid>
                             <TextBox Text="{Binding NoteTagsInput}" PlaceholderText="tagi po przecinku (puste = LLM zaproponuje)" />
+                            <Grid ColumnDefinitions="*,Auto">
+                                <TextBox Grid.Column="0" Text="{Binding RewriteInstruction}"
+                                         PlaceholderText="Instrukcja dla LLM (np. popraw styl, przetłumacz na angielski)" />
+                                <Button Grid.Column="1" Content="Wyślij" Margin="8,0,0,0"
+                                        Command="{Binding RewriteNoteCommand}" IsEnabled="{Binding !IsBusy}" />
+                            </Grid>
                             <ComboBox ItemsSource="{Binding ParentOptions}"
                                       SelectedItem="{Binding SelectedParentOption}"
                                       PlaceholderText="Notatka nadrzędna (opcjonalnie)"

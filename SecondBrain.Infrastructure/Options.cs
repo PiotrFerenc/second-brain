@@ -115,6 +115,12 @@ public class OcrOptions : HttpClientOptions
         "Przepisz caly tekst widoczny na tym obrazku, doslownie, bez komentarzy. Sformatuj wynik jako czytelny markdown (naglowki, listy, pogrubienia, akapity zgodnie ze struktura tekstu na obrazku), zachowujac oryginalna tresc bez zmian.";
 }
 
+// System prompt podaje user w edytorze (pole instrukcji), wiec tu tylko model - bez SystemPrompt.
+public class NoteRewriteOptions : HttpClientOptions
+{
+    public string Model { get; set; } = "gpt-3.5-turbo";
+}
+
 public class VectorIndexOptions
 {
     // Rozmiar wektora embeddingu - musi zgadzac sie z modelem w EmbeddingOptions.

@@ -99,7 +99,7 @@ public partial class App : Application
             var folderMenu = new NativeMenu();
 
             var typeItem = new NativeMenuItem("Wpisz...");
-            typeItem.Click += (_, _) => StartNewNoteInFolder(folder);
+            typeItem.Click += (_, _) => OpenQuickNote(folder);
             folderMenu.Items.Add(typeItem);
 
             var clipboardItem = new NativeMenuItem("Ze schowka");
@@ -114,14 +114,26 @@ public partial class App : Application
         }
     }
 
-    private void StartNewNoteInFolder(string folder)
+    // Male okno "szybka notatka" (jak OneNote) zamiast calego glownego okna - wystarczy
+    // wpisac tekst i Zapisz, bez przelaczania sie na edytor w duzym oknie.
+    private QuickNoteWindow? _quickNoteWindow;
+
+    private void OpenQuickNote(string folder)
     {
         if (_mainWindow?.DataContext is not MainViewModel vm)
             return;
 
-        ShowMainWindow();
         vm.SelectedFolder = folder;
-        vm.SelectedTabIndex = MainViewModel.TabEditor;
+
+        if (_quickNoteWindow is null)
+        {
+            _quickNoteWindow = new QuickNoteWindow { DataContext = vm };
+            _quickNoteWindow.Closed += (_, _) => _quickNoteWindow = null;
+            _quickNoteWindow.Show();
+        }
+
+        _quickNoteWindow.WindowState = WindowState.Normal;
+        _quickNoteWindow.Activate();
     }
 
     // Tekst ze schowka (nie obrazek) trafia od razu do pola notatki, tak samo jak OCR ponizej -
@@ -137,7 +149,7 @@ public partial class App : Application
         if (textItem is null || await textItem.TryGetRawAsync(DataFormat.Text) is not string text || string.IsNullOrWhiteSpace(text))
             return;
 
-        StartNewNoteInFolder(folder);
+        OpenQuickNote(folder);
         vm.NoteText = text;
     }
 
@@ -157,7 +169,7 @@ public partial class App : Application
         using var stream = new MemoryStream();
         bitmap.Save(stream, new PngBitmapEncoderOptions());
 
-        StartNewNoteInFolder(folder);
+        OpenQuickNote(folder);
         await vm.RunOcrCommand.ExecuteAsync(stream.ToArray());
     }
 
