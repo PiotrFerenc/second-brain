@@ -63,7 +63,6 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IAnswerSynthesizer, FabrykaAnswerSynthesizer>();
         services.AddSingleton<IConflictDetector, FabrykaConflictDetector>();
         services.AddSingleton<IAgent, FabrykaAgent>();
-        services.AddSingleton<GapAutoCloser>();
         services.AddSingleton<ITagCleaner, FabrykaTagCleaner>();
         services.AddSingleton<TagMerger>();
         services.AddSingleton<IOcrExtractor, LightOnOcrExtractor>();
@@ -79,9 +78,6 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IEventHandler<NoteAdded>, GlossaryOnNoteAdded>();
         services.AddSingleton<IEventHandler<NoteEdited>, GlossaryOnNoteAdded>();
         services.AddSingleton<IEventHandler<NoteAdded>, ConflictOnNoteAdded>();
-        services.AddSingleton<IEventHandler<NoteAdded>, GapAutoCloseOnNoteAdded>();
-        services.AddSingleton<IEventHandler<ImportCompleted>, GapAutoCloseOnNoteAdded>();
-        services.AddSingleton<IEventHandler<SearchCompleted>, GapLogOnSearch>();
         services.AddSingleton<IEventHandler<StorageChanged>, GitCommitOnChange>();
         services.AddSingleton<IVectorIndex, FileVectorIndex>();
         services.AddSingleton<DuplicateScanner>();
