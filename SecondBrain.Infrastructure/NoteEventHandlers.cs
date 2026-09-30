@@ -43,23 +43,3 @@ public sealed class ConflictOnNoteAdded(IConflictDetector conflictDetector, INot
     }
 }
 
-// Po pojedynczym dodaniu i raz po calym imporcie (nie per linia).
-public sealed class GapAutoCloseOnNoteAdded(GapAutoCloser gapAutoCloser) : IEventHandler<NoteAdded>, IEventHandler<ImportCompleted>
-{
-    public Task HandleAsync(NoteAdded e, CancellationToken ct = default) => e.FromImport ? Task.CompletedTask : CloseAsync(e.Notices, ct);
-    public Task HandleAsync(ImportCompleted e, CancellationToken ct = default) => CloseAsync(e.Notices, ct);
-
-    private async Task CloseAsync(ICollection<string> notices, CancellationToken ct)
-    {
-        var closed = await gapAutoCloser.TryCloseMatchingGapsAsync(ct);
-        if (closed > 0)
-            notices.Add($"Zamknieto {closed} luk(i) w wiedzy.");
-    }
-}
-
-// RAG jawnie powiedzial "notatki tego nie zawieraja" - pytanie zostaje jako luka w wiedzy.
-public sealed class GapLogOnSearch(INoteStore noteStore) : IEventHandler<SearchCompleted>
-{
-    public Task HandleAsync(SearchCompleted e, CancellationToken ct = default) =>
-        e.Answered ? Task.CompletedTask : noteStore.LogGapAsync(e.Query, ct);
-}

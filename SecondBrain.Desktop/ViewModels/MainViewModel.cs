@@ -24,7 +24,6 @@ public partial class MainViewModel(
     public const int TabSearch = 1;
     public const int TabNote = 2;
     public const int TabTrash = 3;
-    public const int TabGaps = 4;
     public const int TabGlossary = 5;
     public const int TabAgent = 6;
     public const int TabTimeline = 7;
@@ -437,7 +436,6 @@ public partial class MainViewModel(
             await LoadTreeAsync();
             await LoadParentOptionsAsync();
             await LoadGlossaryAsync();
-            await LoadGapsAsync();
         }
         finally
         {
@@ -491,7 +489,6 @@ public partial class MainViewModel(
             await LoadTreeAsync();
             await LoadParentOptionsAsync();
             await LoadGlossaryAsync();
-            await LoadGapsAsync();
         }
         finally
         {
@@ -800,50 +797,6 @@ public partial class MainViewModel(
         await LoadTrashAsync();
     }
 
-    // ---- Luki w wiedzy ----
-
-    public ObservableCollection<GapItem> Gaps { get; } = [];
-
-    [ObservableProperty]
-    public partial GapItem? SelectedGap { get; set; }
-
-    [ObservableProperty]
-    public partial bool HasGaps { get; set; }
-
-    [RelayCommand]
-    private async Task LoadGapsAsync()
-    {
-        Gaps.Clear();
-        foreach (var g in await noteStore.ListGapsAsync())
-            Gaps.Add(new GapItem(g.Query, g.AskedAt, g.Path));
-
-        HasGaps = Gaps.Count > 0;
-    }
-
-    [RelayCommand]
-    private async Task ResolveGapAsync(GapItem? item)
-    {
-        item ??= SelectedGap;
-        if (item is null)
-            return;
-
-        await noteStore.ResolveGapAsync(item.Path);
-        SelectedGap = null;
-        await LoadGapsAsync();
-    }
-
-    [RelayCommand]
-    private async Task RetryGapSearchAsync(GapItem? item)
-    {
-        item ??= SelectedGap;
-        if (item is null)
-            return;
-
-        SearchQuery = item.Query;
-        SelectedTabIndex = TabSearch;
-        await SearchAsync();
-    }
-
     // ---- Auto-slownik ----
 
     public ObservableCollection<GlossaryEntry> GlossaryEntries { get; } = [];
@@ -969,7 +922,6 @@ public partial class MainViewModel(
             {
                 await LoadTreeAsync();
                 await LoadTrashAsync();
-                await LoadGapsAsync();
                 await LoadGlossaryAsync();
             }
         }
@@ -1098,9 +1050,6 @@ public partial class MainViewModel(
     public partial bool IsTrashTabActive { get; set; }
 
     [ObservableProperty]
-    public partial bool IsGapsTabActive { get; set; }
-
-    [ObservableProperty]
     public partial bool IsGlossaryTabActive { get; set; }
 
     [ObservableProperty]
@@ -1156,7 +1105,6 @@ public partial class MainViewModel(
         IsSearchTabActive = value == TabSearch;
         IsNoteTabActive = value == TabNote;
         IsTrashTabActive = value == TabTrash;
-        IsGapsTabActive = value == TabGaps;
         IsGlossaryTabActive = value == TabGlossary;
         IsAgentTabActive = value == TabAgent;
         IsTimelineTabActive = value == TabTimeline;
@@ -1179,9 +1127,6 @@ public partial class MainViewModel(
     private void ShowTrashTab() => SelectedTabIndex = TabTrash;
 
     [RelayCommand]
-    private void ShowGapsTab() => SelectedTabIndex = TabGaps;
-
-    [RelayCommand]
     private void ShowAgentTab() => SelectedTabIndex = TabAgent;
 
     [RelayCommand]
@@ -1195,7 +1140,6 @@ public partial class MainViewModel(
         await LoadTreeAsync();
         await LoadTrashAsync();
         await LoadTemplatesAsync();
-        await LoadGapsAsync();
         await LoadGlossaryAsync();
         await LoadAgentSessionsAsync();
     }

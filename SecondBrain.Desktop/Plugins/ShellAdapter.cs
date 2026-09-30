@@ -42,6 +42,13 @@ public sealed class ShellAdapter(MainViewModel vm, IEnumerable<ITabContribution>
         vm.SelectedTabIndex = MainViewModel.TabNote;
     }
 
+    public void Search(string query)
+    {
+        vm.SearchQuery = query;
+        vm.SelectedTabIndex = MainViewModel.TabSearch;
+        _ = vm.SearchCommand.ExecuteAsync(null);
+    }
+
     public Task RefreshTreeAsync() => vm.LoadTreeCommand.ExecuteAsync(null);
 }
 
