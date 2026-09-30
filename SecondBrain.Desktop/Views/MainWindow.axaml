@@ -40,7 +40,6 @@
                  kolejnej linii zamiast wypadac poza widoczny obszar. -->
             <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,20" ItemSpacing="8" LineSpacing="8">
                 <Button Content="Szukaj" Classes="subtleAction" Command="{Binding ShowSearchTabCommand}" />
-                <Button Content="Słownik" Classes="subtleAction" Command="{Binding ShowGlossaryTabCommand}" />
                 <Button Content="Agent" Classes="subtleAction" Command="{Binding ShowAgentTabCommand}" />
                 <!-- Zakladki z pluginow (ITabContribution, Placement=SidebarToolbar) -->
                 <ItemsControl ItemsSource="{Binding ToolbarTabs}">
@@ -377,37 +376,6 @@
                             <md:MarkdownScrollViewer Markdown="{Binding SelectedNote.RawContent, Converter={x:Static conv:AutoLinkConverter.Instance}}" SelectionEnabled="True" IsVisible="{Binding !IsEditingNote}" />
                         </Panel>
                     </DockPanel>
-                    </DockPanel>
-
-                    <DockPanel Margin="0,20,0,0" IsVisible="{Binding IsGlossaryTabActive}">
-                        <Grid ColumnDefinitions="280,*">
-
-                            <Panel Grid.Column="0">
-                                <TextBlock Text="Słownik jest jeszcze pusty - pojęcia wyłapane przy zapisie notatek pojawią się tutaj."
-                                           Classes="subtle" TextWrapping="Wrap"
-                                           IsVisible="{Binding !HasGlossary}" />
-
-                                <ListBox ItemsSource="{Binding GlossaryEntries}"
-                                         SelectedItem="{Binding SelectedGlossaryEntry}"
-                                         IsVisible="{Binding HasGlossary}">
-                                    <ListBox.ItemTemplate>
-                                        <DataTemplate>
-                                            <TextBlock Text="{Binding Term}" FontWeight="Medium" TextWrapping="Wrap" />
-                                        </DataTemplate>
-                                    </ListBox.ItemTemplate>
-                                </ListBox>
-                            </Panel>
-
-                            <DockPanel Grid.Column="1" Margin="20,0,0,0"
-                                       IsVisible="{Binding SelectedGlossaryEntry, Converter={x:Static acnv:ObjectConverters.IsNotNull}}">
-                                <TextBlock DockPanel.Dock="Top" Text="{Binding SelectedGlossaryEntry.Term}"
-                                           FontSize="19" FontWeight="Bold" TextWrapping="Wrap" Margin="0,0,0,4" />
-                                <TextBlock DockPanel.Dock="Top" Classes="subtle" FontSize="12" Margin="0,0,0,14">
-                                    <Run Text="Źródło: " /><Run Text="{Binding SelectedGlossaryEntry.SourceTitle}" />
-                                </TextBlock>
-                                <TextBlock Text="{Binding SelectedGlossaryEntry.Definition}" TextWrapping="Wrap" FontSize="15" LineHeight="22" />
-                            </DockPanel>
-                        </Grid>
                     </DockPanel>
 
 

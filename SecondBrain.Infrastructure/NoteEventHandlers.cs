@@ -3,20 +3,7 @@ using SecondBrain.Core;
 namespace SecondBrain.Infrastructure;
 
 // Reakcje na cykl zycia notatki, wczesniej wplecione w kazda kopie pipeline'u. Kolejnosc
-// rejestracji w DI = kolejnosc wykonania: slownik -> sprzecznosc -> domykanie luk.
-
-// Definicje ("X to Y") zlapane przy kompresji trafiaja do slownika - globalnie, nie per folder.
-public sealed class GlossaryOnNoteAdded(INoteStore noteStore) : IEventHandler<NoteAdded>, IEventHandler<NoteEdited>
-{
-    public Task HandleAsync(NoteAdded e, CancellationToken ct = default) => SaveAsync(e.Result, ct);
-    public Task HandleAsync(NoteEdited e, CancellationToken ct = default) => SaveAsync(e.Result, ct);
-
-    private async Task SaveAsync(CompressionResult result, CancellationToken ct)
-    {
-        foreach (var def in result.Definitions ?? [])
-            await noteStore.SaveGlossaryEntryAsync(def.Term, def.Definition, result.Title, ct);
-    }
-}
+// rejestracji w DI = kolejnosc wykonania: sprzecznosc -> domykanie luk (slownik: plugin glossary).
 
 // Tylko pojedyncze dodanie (nie import: N linii = N wywolan LLM, 2N byloby za drogie).
 public sealed class ConflictOnNoteAdded(IConflictDetector conflictDetector, INoteStore noteStore) : IEventHandler<NoteAdded>

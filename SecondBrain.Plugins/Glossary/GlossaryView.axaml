@@ -1,0 +1,37 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:acnv="using:Avalonia.Data.Converters"
+             xmlns:local="using:SecondBrain.Plugins.Glossary"
+             x:Class="SecondBrain.Plugins.Glossary.GlossaryView"
+             x:DataType="local:GlossaryTab">
+    <DockPanel Margin="0,20,0,0">
+        <Grid ColumnDefinitions="280,*">
+
+            <Panel Grid.Column="0">
+                <TextBlock Text="Słownik jest jeszcze pusty - pojęcia wyłapane przy zapisie notatek pojawią się tutaj."
+                           Classes="subtle" TextWrapping="Wrap"
+                           IsVisible="{Binding !HasGlossary}" />
+
+                <ListBox ItemsSource="{Binding GlossaryEntries}"
+                         SelectedItem="{Binding SelectedGlossaryEntry}"
+                         IsVisible="{Binding HasGlossary}">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding Term}" FontWeight="Medium" TextWrapping="Wrap" />
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </Panel>
+
+            <DockPanel Grid.Column="1" Margin="20,0,0,0"
+                       IsVisible="{Binding SelectedGlossaryEntry, Converter={x:Static acnv:ObjectConverters.IsNotNull}}">
+                <TextBlock DockPanel.Dock="Top" Text="{Binding SelectedGlossaryEntry.Term}"
+                           FontSize="19" FontWeight="Bold" TextWrapping="Wrap" Margin="0,0,0,4" />
+                <TextBlock DockPanel.Dock="Top" Classes="subtle" FontSize="12" Margin="0,0,0,14">
+                    <Run Text="Źródło: " /><Run Text="{Binding SelectedGlossaryEntry.SourceTitle}" />
+                </TextBlock>
+                <TextBlock Text="{Binding SelectedGlossaryEntry.Definition}" TextWrapping="Wrap" FontSize="15" LineHeight="22" />
+            </DockPanel>
+        </Grid>
+    </DockPanel>
+</UserControl>

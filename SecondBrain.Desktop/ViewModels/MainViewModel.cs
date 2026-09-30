@@ -23,7 +23,6 @@ public partial class MainViewModel(
     public const int TabEditor = 0;
     public const int TabSearch = 1;
     public const int TabNote = 2;
-    public const int TabGlossary = 5;
     public const int TabAgent = 6;
 
     // ---- Drzewo (foldery + notatki, w tym zagniezdzone podstrony) ----
@@ -384,7 +383,6 @@ public partial class MainViewModel(
 
             await LoadTreeAsync();
             await LoadParentOptionsAsync();
-            await LoadGlossaryAsync();
         }
         finally
         {
@@ -437,7 +435,6 @@ public partial class MainViewModel(
 
             await LoadTreeAsync();
             await LoadParentOptionsAsync();
-            await LoadGlossaryAsync();
         }
         finally
         {
@@ -570,7 +567,6 @@ public partial class MainViewModel(
 
             await LoadTreeAsync();
             await LoadBacklinksAsync();
-            await LoadGlossaryAsync();
         }
         finally
         {
@@ -681,26 +677,6 @@ public partial class MainViewModel(
         await LoadTreeAsync();
     }
 
-    // ---- Auto-slownik ----
-
-    public ObservableCollection<GlossaryEntry> GlossaryEntries { get; } = [];
-
-    [ObservableProperty]
-    public partial GlossaryEntry? SelectedGlossaryEntry { get; set; }
-
-    [ObservableProperty]
-    public partial bool HasGlossary { get; set; }
-
-    [RelayCommand]
-    private async Task LoadGlossaryAsync()
-    {
-        GlossaryEntries.Clear();
-        foreach (var e in await noteStore.ListGlossaryAsync())
-            GlossaryEntries.Add(e);
-
-        HasGlossary = GlossaryEntries.Count > 0;
-    }
-
     // ---- Agent (czat z dostepem do calego programu przez narzedzia) ----
     // Globalny, nie ograniczony do aktualnie wybranego folderu - agent sam decyduje ktorych
     // narzedzi/folderow uzyc. Kazda rozmowa to osobna sesja zapisywana na dysk (IAgentSessionStore)
@@ -805,7 +781,6 @@ public partial class MainViewModel(
             if (approved)
             {
                 await LoadTreeAsync();
-                await LoadGlossaryAsync();
             }
         }
         finally
@@ -930,13 +905,10 @@ public partial class MainViewModel(
     public partial bool IsNoteTabActive { get; set; }
 
     [ObservableProperty]
-    public partial bool IsGlossaryTabActive { get; set; }
-
-    [ObservableProperty]
     public partial bool IsAgentTabActive { get; set; }
 
     // Naglowek "Notatka / +" w prawym panelu ma sens tylko dla tych dwoch widokow -
-    // Szukaj, Kosz, Luki i Slownik maja wlasna zawartosc od samej gory.
+    // Szukaj, Kosz i Luki maja wlasna zawartosc od samej gory.
     [ObservableProperty]
     public partial bool IsContentHeaderVisible { get; set; } = true;
 
@@ -981,7 +953,6 @@ public partial class MainViewModel(
         IsEditorTabActive = value == TabEditor;
         IsSearchTabActive = value == TabSearch;
         IsNoteTabActive = value == TabNote;
-        IsGlossaryTabActive = value == TabGlossary;
         IsAgentTabActive = value == TabAgent;
         IsContentHeaderVisible = value is TabEditor or TabNote;
     }
@@ -996,9 +967,6 @@ public partial class MainViewModel(
     private void ShowNoteTab() => SelectedTabIndex = TabNote;
 
     [RelayCommand]
-    private void ShowGlossaryTab() => SelectedTabIndex = TabGlossary;
-
-    [RelayCommand]
     private void ShowAgentTab() => SelectedTabIndex = TabAgent;
 
     // ---- Start ----
@@ -1008,7 +976,6 @@ public partial class MainViewModel(
     {
         await LoadTreeAsync();
         await LoadTemplatesAsync();
-        await LoadGlossaryAsync();
         await LoadAgentSessionsAsync();
     }
 }
