@@ -84,18 +84,6 @@
 
                 <sdk:SlotHost DockPanel.Dock="Top" SlotId="Sidebar.AboveTree" Orientation="Vertical" />
 
-                <Border DockPanel.Dock="Top"
-                        IsVisible="{Binding ActiveTagFilter, Converter={x:Static acnv:ObjectConverters.IsNotNull}}"
-                        Background="{DynamicResource CtpSurface0}"
-                        CornerRadius="6" Padding="8,6" Margin="0,0,0,10">
-                    <Grid ColumnDefinitions="*,Auto">
-                        <TextBlock Grid.Column="0" Classes="subtle" FontSize="12" TextWrapping="Wrap">
-                            <Run Text="tag: " /><Run Text="{Binding ActiveTagFilter}" />
-                        </TextBlock>
-                        <Button Grid.Column="1" Content="×" Classes="subtleAction" Padding="6,0" Command="{Binding ClearTagFilterCommand}" />
-                    </Grid>
-                </Border>
-
                 <Panel>
                     <TextBlock Text="Brak folderów. Utwórz pierwszy poniżej."
                                Classes="subtle" TextWrapping="Wrap"
@@ -260,7 +248,6 @@
                                         Command="{Binding StartEditNoteCommand}" IsVisible="{Binding !IsEditingNote}" />
                                 <sdk:SlotHost Grid.Column="5" SlotId="Note.Actions" Margin="8,0,0,0" IsEnabled="{Binding !IsEditingNote}" />
                             </Grid>
-                            <WrapPanel x:Name="NoteTagsPanel" IsVisible="{Binding !IsEditingNote}" />
                             <sdk:SlotHost SlotId="Note.Header" Orientation="Vertical" IsVisible="{Binding !IsEditingNote}" />
                         </StackPanel>
 

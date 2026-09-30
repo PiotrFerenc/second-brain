@@ -19,14 +19,13 @@ public sealed class NotePipeline(
     INoteStore noteStore,
     IEventBus events)
 {
-    // chooseTags: wywolujacy moze ustalic tagi na podstawie wyniku kompresji i sasiadow
-    // (edytor: tagi reczne albo auto-tagowanie z sasiadow); null = tagi z kompresji.
-    // Handlery NoteCompressed moga je jeszcze zmienic.
+    // userTags: tagi wpisane recznie (edytor); null = tagi z kompresji.
+    // Handlery NoteCompressed moga je jeszcze zmienic (np. plugin tags doklada tagi sasiadow).
     public async Task<AddNoteResult> AddAsync(
         string folder,
         string rawText,
         Guid? parentId = null,
-        Func<CompressionResult, IReadOnlyList<Note>, string[]>? chooseTags = null,
+        string[]? userTags = null,
         bool fromImport = false,
         CancellationToken ct = default)
     {
@@ -38,8 +37,8 @@ public sealed class NotePipeline(
         var vector = await embedder.EmbedAsync(result.CompressedContent, ct);
         var related = (await vectorIndex.SearchAsync(folder, vector, limit: 4, ct)).Select(r => r.Note).Take(3).ToList();
 
-        var tags = (chooseTags?.Invoke(result, related) ?? result.Tags).ToList();
-        await events.PublishAsync(new NoteCompressed(folder, rawText, result, tags, related), ct);
+        var tags = (userTags ?? result.Tags).ToList();
+        await events.PublishAsync(new NoteCompressed(folder, rawText, result, tags, userTags is not null, related), ct);
 
         var note = new Note(Guid.NewGuid(), result.Title, rawText, result.CompressedContent, [.. tags], now, now, ParentId: parentId);
         var path = await noteStore.SaveAsync(folder, note, ct);
