@@ -8,15 +8,12 @@ namespace SecondBrain.Desktop.ViewModels;
 
 public partial class MainViewModel(
     IVectorIndex vectorIndex,
-    IEmbedder embedder,
-    IReranker reranker,
-    ICompressor compressor,
     IAnswerSynthesizer answerSynthesizer,
-    IConflictDetector conflictDetector,
     INoteStore noteStore,
+    NotePipeline pipeline,
+    NoteSearch noteSearch,
     IAgent agent,
     IAgentSessionStore agentSessionStore,
-    GapAutoCloser gapAutoCloser,
     IOcrExtractor ocrExtractor,
     INoteRewriter noteRewriter) : ViewModelBase
 {
@@ -261,12 +258,7 @@ public partial class MainViewModel(
             return;
 
         var existing = await noteStore.LoadAsync(dragged.Note.FilePath);
-        var note = existing with { ParentId = target.Note.Id, UpdatedAt = DateTimeOffset.UtcNow };
-        var path = await noteStore.SaveAsync(dragged.OwningFolder, note);
-        note = note with { FilePath = path };
-
-        var vector = await embedder.EmbedAsync(note.CompressedContent);
-        await vectorIndex.UpsertAsync(dragged.OwningFolder, note, vector);
+        await pipeline.ReindexAsync(dragged.OwningFolder, existing with { ParentId = target.Note.Id, UpdatedAt = DateTimeOffset.UtcNow });
 
         await LoadTreeAsync();
     }
@@ -295,7 +287,7 @@ public partial class MainViewModel(
         if (string.IsNullOrWhiteSpace(NewFolderName))
             return;
 
-        await vectorIndex.CreateFolderAsync(NewFolderName);
+        await pipeline.CreateFolderAsync(NewFolderName);
         SelectedFolder = NewFolderName;
         NewFolderName = "";
 
@@ -318,9 +310,7 @@ public partial class MainViewModel(
             return;
         }
 
-        var folder = SelectedFolder;
-        await vectorIndex.DeleteFolderAsync(folder);
-        await noteStore.DeleteFolderAsync(folder);
+        await pipeline.DeleteFolderAsync(SelectedFolder);
 
         SelectedFolder = null;
         SelectedNote = null;
@@ -417,60 +407,18 @@ public partial class MainViewModel(
         IsBusy = true;
         try
         {
-            EditorStatus = "Kompresuje...";
-            var now = DateTimeOffset.UtcNow;
-            var result = await compressor.CompressAsync(NoteText);
+            EditorStatus = "Zapisuje...";
 
-            // "Auto-linkowanie": zamiast prosic LLM o zgadywanie tytulow (ryzyko halucynacji),
-            // uzywamy juz policzonego wektora notatki do wyszukania faktycznie podobnych. Notatka
-            // jeszcze nie jest w indeksie, wiec wynik nie trzeba filtrowac po jej wlasnym Id.
-            EditorStatus = "Licze embedding...";
-            var vector = await embedder.EmbedAsync(result.CompressedContent);
-            var related = await vectorIndex.SearchAsync(SelectedFolder, vector, limit: 4);
-            var relatedNotes = related.Take(3).Select(r => r.Note).ToList();
-            var relatedTitles = relatedNotes.Select(n => n.Title).ToList();
+            // Tagi: reczne z pola, a gdy puste - propozycja LLM dolozona o najczestsze tagi
+            // podobnych notatek (auto-tagowanie z sasiadow, ktorych pipeline i tak wyszukal).
+            var manualTags = NoteTagsInput.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            var added = await pipeline.AddAsync(SelectedFolder, NoteText, SelectedParentOption?.Id,
+                chooseTags: (result, related) => manualTags.Length > 0 ? manualTags : SuggestTags(result.Tags, related));
 
-            // Auto-tagowanie: gdy user nie wpisal tagow recznie, dolóż do propozycji LLM
-            // najczestsze tagi z podobnych notatek, ktorych jeszcze nie ma.
-            var tags = string.IsNullOrWhiteSpace(NoteTagsInput)
-                ? SuggestTags(result.Tags, relatedNotes)
-                : NoteTagsInput.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-
-            var note = new Note(Guid.NewGuid(), result.Title, NoteText, result.CompressedContent, tags,
-                now, now, ParentId: SelectedParentOption?.Id);
-
-            EditorStatus = "Zapisuje plik...";
-            var path = await noteStore.SaveAsync(SelectedFolder, note);
-            note = note with { FilePath = path };
-
-            foreach (var def in result.Definitions ?? [])
-                await noteStore.SaveGlossaryEntryAsync(def.Term, def.Definition, result.Title);
-
-            await vectorIndex.UpsertAsync(SelectedFolder, note, vector);
-
-            var statusLines = new List<string> { $"Zapisano: {result.Title}" };
-            if (relatedTitles.Count > 0)
-                statusLines.Add($"Może powiązane: {string.Join(", ", relatedTitles)}");
-
-            if (relatedNotes.Count > 0)
-            {
-                var conflict = await conflictDetector.DetectAsync(note.CompressedContent, relatedNotes);
-                if (conflict.HasConflict)
-                {
-                    statusLines.Add($"Możliwa sprzeczność z \"{conflict.ConflictingTitle}\": {conflict.Explanation}");
-
-                    if ((await noteStore.ListFactHistoryAsync(conflict.ConflictingTitle!)).Count == 0)
-                    {
-                        var original = relatedNotes.First(n => n.Title == conflict.ConflictingTitle);
-                        await noteStore.RecordFactVersionAsync(conflict.ConflictingTitle!, original.CompressedContent, original.Title);
-                    }
-                    await noteStore.RecordFactVersionAsync(conflict.ConflictingTitle!, note.CompressedContent, result.Title);
-                }
-            }
-
-            var closedGaps = await gapAutoCloser.TryCloseMatchingGapsAsync();
-            if (closedGaps > 0)
-                statusLines.Add($"Zamknięto {closedGaps} luk(i) w wiedzy.");
+            var statusLines = new List<string> { $"Zapisano: {added.Note.Title}" };
+            if (added.Related.Count > 0)
+                statusLines.Add($"Może powiązane: {string.Join(", ", added.Related.Select(n => n.Title))}");
+            statusLines.AddRange(added.Notices);
 
             EditorStatus = string.Join("\n", statusLines);
 
@@ -481,8 +429,7 @@ public partial class MainViewModel(
             await LoadTreeAsync();
             await LoadParentOptionsAsync();
             await LoadGlossaryAsync();
-            if (closedGaps > 0)
-                await LoadGapsAsync();
+            await LoadGapsAsync();
         }
         finally
         {
@@ -520,45 +467,23 @@ public partial class MainViewModel(
             return;
         }
 
-        var toImport = lines.Select(l => l.Trim()).Where(l => l.Length > 0).ToList();
-        if (toImport.Count == 0)
-            return;
-
         IsBusy = true;
         try
         {
-            var imported = 0;
-            foreach (var line in toImport)
+            EditorStatus = "Importuje...";
+            var imported = await pipeline.ImportAsync(SelectedFolder, lines);
+            if (imported.Count == 0)
             {
-                EditorStatus = $"Importuje {imported + 1}/{toImport.Count}...";
-                var now = DateTimeOffset.UtcNow;
-                var result = await compressor.CompressAsync(line);
-                var note = new Note(Guid.NewGuid(), result.Title, line, result.CompressedContent, result.Tags, now, now);
-
-                var path = await noteStore.SaveAsync(SelectedFolder, note);
-                note = note with { FilePath = path };
-
-                foreach (var def in result.Definitions ?? [])
-                    await noteStore.SaveGlossaryEntryAsync(def.Term, def.Definition, result.Title);
-
-                var vector = await embedder.EmbedAsync(note.CompressedContent);
-                await vectorIndex.UpsertAsync(SelectedFolder, note, vector);
-                imported++;
+                EditorStatus = "";
+                return;
             }
 
-            // Domykanie luk raz, po calym imporcie (nie per linia) - jedno globalne
-            // przeszukanie zamiast N, spojne z decyzja o pominieciu sprawdzania sprzecznosci tutaj.
-            var closedGaps = await gapAutoCloser.TryCloseMatchingGapsAsync();
-
-            EditorStatus = closedGaps > 0
-                ? $"Zaimportowano notatek: {imported}. Zamknięto {closedGaps} luk(i) w wiedzy."
-                : $"Zaimportowano notatek: {imported}.";
+            EditorStatus = string.Join(" ", imported.Notices.Prepend($"Zaimportowano notatek: {imported.Count}."));
 
             await LoadTreeAsync();
             await LoadParentOptionsAsync();
             await LoadGlossaryAsync();
-            if (closedGaps > 0)
-                await LoadGapsAsync();
+            await LoadGapsAsync();
         }
         finally
         {
@@ -635,8 +560,7 @@ public partial class MainViewModel(
             return;
 
         var note = await noteStore.LoadAsync(SelectedNote.FilePath);
-        note = note with { Pinned = !note.Pinned, UpdatedAt = DateTimeOffset.UtcNow };
-        await noteStore.SaveAsync(SelectedNote.Folder, note);
+        note = await pipeline.ReindexAsync(SelectedNote.Folder, note with { Pinned = !note.Pinned, UpdatedAt = DateTimeOffset.UtcNow });
 
         SelectedNote = ToItem(note, SelectedNote.Folder);
         await LoadTreeAsync();
@@ -682,29 +606,9 @@ public partial class MainViewModel(
         IsBusy = true;
         try
         {
-            NoteEditStatus = "Kompresuje...";
+            NoteEditStatus = "Zapisuje...";
             var existing = await noteStore.LoadAsync(SelectedNote.FilePath);
-            var result = await compressor.CompressAsync(EditNoteText);
-
-            var note = existing with
-            {
-                Title = result.Title,
-                RawContent = EditNoteText,
-                CompressedContent = result.CompressedContent,
-                Tags = result.Tags,
-                UpdatedAt = DateTimeOffset.UtcNow
-            };
-
-            NoteEditStatus = "Zapisuje plik...";
-            var path = await noteStore.SaveAsync(SelectedNote.Folder, note);
-            note = note with { FilePath = path };
-
-            foreach (var def in result.Definitions ?? [])
-                await noteStore.SaveGlossaryEntryAsync(def.Term, def.Definition, result.Title);
-
-            NoteEditStatus = "Licze embedding...";
-            var vector = await embedder.EmbedAsync(note.CompressedContent);
-            await vectorIndex.UpsertAsync(SelectedNote.Folder, note, vector);
+            var note = await pipeline.EditAsync(SelectedNote.Folder, existing, EditNoteText);
 
             SelectedNote = ToItem(note, SelectedNote.Folder);
             IsEditingNote = false;
@@ -743,8 +647,7 @@ public partial class MainViewModel(
         if (item is null || string.IsNullOrEmpty(item.FilePath) || string.IsNullOrEmpty(item.Folder))
             return;
 
-        await vectorIndex.DeleteNoteAsync(item.Folder, item.Id);
-        await noteStore.MoveToTrashAsync(item.Folder, item.FilePath);
+        await pipeline.TrashAsync(item.Folder, await noteStore.LoadAsync(item.FilePath));
 
         if (SelectedResult == item)
             SelectedResult = null;
@@ -799,28 +702,14 @@ public partial class MainViewModel(
         IsBusy = true;
         try
         {
-            var queryVector = await embedder.EmbedAsync(SearchQuery);
-
-            IReadOnlyList<string> foldersToSearch = SearchCurrentFolderOnly && SelectedFolder is not null
-                ? [SelectedFolder]
-                : await vectorIndex.ListFoldersAsync();
-
-            var candidatesWithFolder = await HybridNoteSearch.SearchFoldersAsync(
-                vectorIndex, noteStore, foldersToSearch, SearchQuery, queryVector, vectorLimit: 20);
-
-            var folderById = candidatesWithFolder.ToDictionary(c => c.Scored.Note.Id, c => c.Folder);
-            var reranked = await reranker.RerankAsync(SearchQuery, candidatesWithFolder.Select(c => c.Scored).ToList());
+            IReadOnlyList<string>? foldersToSearch = SearchCurrentFolderOnly && SelectedFolder is not null ? [SelectedFolder] : null;
+            var hits = await noteSearch.SearchAsync(SearchQuery, foldersToSearch, vectorLimit: 20);
 
             var notesForAnswer = new List<Note>();
 
-            foreach (var r in reranked.Take(10))
+            foreach (var (folder, note, score) in hits.Take(10))
             {
-                var note = r.Note;
-                if (!string.IsNullOrEmpty(r.Note.FilePath) && File.Exists(r.Note.FilePath))
-                    note = await noteStore.LoadAsync(r.Note.FilePath);
-
-                var folder = folderById.GetValueOrDefault(r.Note.Id, "");
-                SearchResults.Add(new SearchResultItem(note.Id, note.Title, note.Tags, r.Score, note.RawContent, note.FilePath, note.ParentId, note.Pinned, folder, note.CreatedAt));
+                SearchResults.Add(new SearchResultItem(note.Id, note.Title, note.Tags, score, note.RawContent, note.FilePath, note.ParentId, note.Pinned, folder, note.CreatedAt));
 
                 if (notesForAnswer.Count < 5)
                     notesForAnswer.Add(note);
@@ -886,9 +775,7 @@ public partial class MainViewModel(
         if (item is null)
             return;
 
-        var restored = await noteStore.RestoreFromTrashAsync(item.TrashPath);
-        var vector = await embedder.EmbedAsync(restored.Note.CompressedContent);
-        await vectorIndex.UpsertAsync(restored.OriginalFolder, restored.Note, vector);
+        await pipeline.RestoreAsync(item.TrashPath);
 
         await LoadTrashAsync();
         await LoadTreeAsync();

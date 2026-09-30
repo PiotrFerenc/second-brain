@@ -1,11 +1,10 @@
-using Microsoft.Extensions.Options;
 using SecondBrain.Core;
 
 namespace SecondBrain.Infrastructure;
 
 // ponytail: format zapisu jest stały i prosty (kilka pól nagłówka), więc front matter
 // czytamy/piszemy ręcznie zamiast ciągnąć zależność YamlDotNet dla tego zakresu.
-public class FileNoteStore(IOptions<StorageOptions> options) : INoteStore
+public class FileNoteStore(NotesRoot notesRoot) : INoteStore
 {
     private const string OriginalHeader = "## Oryginał";
     private const string CompressedHeader = "## Skompresowane (embedowane)";
@@ -18,9 +17,7 @@ public class FileNoteStore(IOptions<StorageOptions> options) : INoteStore
         ("Zadanie", "## Zadanie\n\nCel: \n\nKroki:\n1. \n\nTermin: \n"),
     ];
 
-    private readonly string _root = string.IsNullOrWhiteSpace(options.Value.NotesRootPath)
-        ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "SecondBrain", "notes")
-        : options.Value.NotesRootPath;
+    private readonly string _root = notesRoot.Path;
 
     public async Task<string> SaveAsync(string folder, Note note, CancellationToken ct = default)
     {

@@ -68,9 +68,12 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<TagMerger>();
         services.AddSingleton<IOcrExtractor, LightOnOcrExtractor>();
         services.AddSingleton<INoteRewriter, FabrykaNoteRewriter>();
+        services.AddSingleton<NotesRoot>();
         services.AddSingleton<INoteStore>(sp => new GitBackedNoteStore(
-            new FileNoteStore(sp.GetRequiredService<IOptions<StorageOptions>>()),
-            sp.GetRequiredService<IOptions<StorageOptions>>()));
+            new FileNoteStore(sp.GetRequiredService<NotesRoot>()),
+            sp.GetRequiredService<NotesRoot>()));
+        services.AddSingleton<NoteSearch>();
+        services.AddSingleton<NotePipeline>();
         services.AddSingleton<IVectorIndex, FileVectorIndex>();
         services.AddSingleton<DuplicateScanner>();
         services.AddSingleton<IAgentSessionStore, FileAgentSessionStore>();

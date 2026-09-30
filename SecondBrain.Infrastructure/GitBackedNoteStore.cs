@@ -1,6 +1,5 @@
 using CliWrap;
 using CliWrap.Buffered;
-using Microsoft.Extensions.Options;
 using SecondBrain.Core;
 
 namespace SecondBrain.Infrastructure;
@@ -8,13 +7,9 @@ namespace SecondBrain.Infrastructure;
 // Dekorator INoteStore: po kazdej mutacji na dysku robi cichy "git commit" w katalogu
 // notatek, wiec uzytkownik dostaje darmowa historie wersji/backup bez zadnej akcji.
 // Owija FileNoteStore zamiast go modyfikowac, zeby nie mieszac sie w logike zapisu.
-public class GitBackedNoteStore(INoteStore inner, IOptions<StorageOptions> options) : INoteStore
+public class GitBackedNoteStore(INoteStore inner, NotesRoot notesRoot) : INoteStore
 {
-    // ponytail: to samo wyliczenie sciezki co w FileNoteStore._root - musi sie zgadzac,
-    // ale nie warto wydzielac wspolnej metody dla dwoch miejsc uzycia w ramach tego zadania.
-    private readonly string _root = string.IsNullOrWhiteSpace(options.Value.NotesRootPath)
-        ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "SecondBrain", "notes")
-        : options.Value.NotesRootPath;
+    private readonly string _root = notesRoot.Path;
 
     // Commity leca w tle (nie blokuja zwrotu z SaveAsync/etc. do UI), ale jeden po drugim -
     // rownolegle "git commit" na tym samym repo walczylyby o .git/index.lock. Lock tylko
