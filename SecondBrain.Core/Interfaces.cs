@@ -14,7 +14,6 @@ public record CompressionResult(
 
 public record TrashedNote(Note Note, string OriginalFolder, string TrashPath);
 
-public record NoteTemplate(string Name, string Content);
 public record AgentSkill(string Name, string Content);
 
 public record AnswerResult(
@@ -82,9 +81,6 @@ public interface INoteStore
     Task<IReadOnlyList<TrashedNote>> ListTrashAsync(CancellationToken ct = default);
     Task<TrashedNote> RestoreFromTrashAsync(string trashPath, CancellationToken ct = default);
     Task PurgeTrashAsync(string trashPath, CancellationToken ct = default);
-
-    // Szablony notatek - pliki .md czytelne i edytowalne przez uzytkownika poza aplikacja.
-    Task<IReadOnlyList<NoteTemplate>> ListTemplatesAsync(CancellationToken ct = default);
 
     // Skille agenta - pliki .md z Skills/ (repo) i .skills/ (notatki), pierwsza linia = opis widoczny dla agenta,
     // pelna tresc (instrukcja) ladowana dopiero gdy agent wywola use_skill.

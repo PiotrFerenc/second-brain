@@ -3,8 +3,7 @@ using SecondBrain.Core;
 
 namespace SecondBrain.Infrastructure.AgentTools;
 
-// Skille i szablony (luki, slownik, fakty, tagi: ich pluginy). Szablony nadal w INoteStore
-// (PLAN-PLUGINS.md: odchudzenie po przeniesieniu tych narzedzi do pluginow).
+// Skille (luki, slownik, fakty, tagi, szablony: ich pluginy).
 
 public sealed class UseSkillTool(INoteStore noteStore) : AgentTool
 {
@@ -32,14 +31,4 @@ public sealed class ListSkillsTool(INoteStore noteStore) : AgentTool
         var skills = await noteStore.ListSkillsAsync(ct);
         return JsonSerializer.Serialize(skills.Select(s => new { s.Name, Description = s.Content.Split('\n', 2)[0].Trim() }));
     }
-}
-
-public sealed class ListTemplatesTool(INoteStore noteStore) : AgentTool
-{
-    public override string Name => "list_templates";
-    public override string Description => "Wylistuj szablony notatek (nazwa + tresc) dostepne do wykorzystania przed dodaniem notatki.";
-    protected override string Parameters => """{"type":"object","properties":{}}""";
-
-    public override async Task<string> ExecuteAsync(JsonElement args, CancellationToken ct = default) =>
-        JsonSerializer.Serialize(await noteStore.ListTemplatesAsync(ct));
 }

@@ -7,20 +7,24 @@ using SecondBrain.Plugins.Sdk;
 namespace SecondBrain.Plugins.Templates;
 
 // Szablony notatek: rzad przyciskow nad edytorem, klik wkleja tresc szablonu do pola.
-// Same pliki .templates zostaja w INoteStore (uzywa ich tez agent przez list_templates).
+// Magazyn .templates/ (TemplateStore) i narzedzie list_templates tez tu - wylaczony plugin nie ma zadnego z nich.
 public sealed class TemplatesPlugin : IPlugin
 {
     public string Id => "templates";
     public string Name => "Szablony";
     public string Description => "Przyciski szablonów nad edytorem nowej notatki.";
 
-    public void ConfigureServices(IServiceCollection services, IConfiguration config) =>
+    public void ConfigureServices(IServiceCollection services, IConfiguration config)
+    {
+        services.AddSingleton<TemplateStore>();
         services.AddSingleton<ISlotContribution, TemplatesSlot>();
+        services.AddSingleton<IAgentTool, ListTemplatesTool>();
+    }
 }
 
 // Lista szablonow czytana raz przy budowie kontrolki (tak jak host robil to raz przy starcie) -
 // nowy plik w .templates/ wymaga restartu, jak dotad.
-public sealed class TemplatesSlot(INoteStore noteStore, IEditorContext editor) : ISlotContribution
+public sealed class TemplatesSlot(TemplateStore templates, IEditorContext editor) : ISlotContribution
 {
     public string SlotId => "Editor.Templates";
     public int Order => 0;
@@ -32,7 +36,7 @@ public sealed class TemplatesSlot(INoteStore noteStore, IEditorContext editor) :
         {
             if (panel.Children.Count > 0)
                 return;
-            foreach (var template in await noteStore.ListTemplatesAsync())
+            foreach (var template in await templates.ListAsync())
             {
                 var button = new Button { Content = template.Name, Classes = { "subtleAction" } };
                 button.Click += (_, _) => editor.Text = template.Content;
