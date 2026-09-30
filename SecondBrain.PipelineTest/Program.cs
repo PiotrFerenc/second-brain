@@ -5,6 +5,7 @@ using SecondBrain.Infrastructure;
 using SecondBrain.PipelineTest;
 using SecondBrain.Plugins.Gaps;
 using SecondBrain.Plugins.Conflicts;
+using SecondBrain.Plugins.Glossary;
 using SecondBrain.Plugins.Search;
 using SecondBrain.Plugins.Sdk;
 
@@ -331,7 +332,13 @@ switch (args.ElementAtOrDefault(0))
 
     case "glossary":
     {
-        var entries = await noteStore.ListGlossaryAsync();
+        if (provider.GetService<GlossaryStore>() is not { } glossary)
+        {
+            Console.WriteLine("Plugin slownika wylaczony.");
+            break;
+        }
+
+        var entries = await glossary.ListAsync();
         if (entries.Count == 0)
         {
             Console.WriteLine("Slownik jest pusty.");

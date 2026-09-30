@@ -21,15 +21,12 @@ public record AnswerResult(
     [property: JsonPropertyName("answered")] bool Answered,
     [property: JsonPropertyName("answer")] string Answer);
 
-public record GlossaryEntry(string Term, string Definition, string SourceTitle);
-
 // Sugestia grupy tagow-duplikatow (np. "spotkanie"/"spotkania") do reczengo scalenia.
 public record TagGroup(string[] Tags, string SuggestedCanonical);
 
 // Notatka wraz z folderem, w ktorym lezy - zwracana tam gdzie wywolujacy (np. TagMerger)
 // musi wiedziec do ktorego pliku wektorow doupsertowac notatke po zmianie na dysku.
 public record FolderedNote(string Folder, Note Note);
-
 
 // Historia calego repo notatek (widok "Historia" - jak SourceTree/GitKraken).
 public record CommitEntry(string Hash, string ShortHash, DateTimeOffset When, string Message);
@@ -102,12 +99,6 @@ public interface INoteStore
     // Skille agenta - pliki .md z Skills/ (repo) i .skills/ (notatki), pierwsza linia = opis widoczny dla agenta,
     // pelna tresc (instrukcja) ladowana dopiero gdy agent wywola use_skill.
     Task<IReadOnlyList<AgentSkill>> ListSkillsAsync(CancellationToken ct = default);
-
-    // Auto-slownik: definicje wylapane przy kompresji, globalne (nie per-folder).
-    // Ten sam termin nadpisuje poprzedni wpis (najnowsza definicja wygrywa).
-    Task SaveGlossaryEntryAsync(string term, string definition, string sourceTitle, CancellationToken ct = default);
-    Task<IReadOnlyList<GlossaryEntry>> ListGlossaryAsync(CancellationToken ct = default);
-    Task<bool> DeleteGlossaryEntryAsync(string term, CancellationToken ct = default);
 
     // Czyszczenie tagow: podmienia kazdy tag z fromTags na toTag we wszystkich notatkach
     // (wszystkie foldery), przepisujac pliki na dysku. Zwraca zaktualizowane notatki wraz

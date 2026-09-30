@@ -165,61 +165,6 @@ public class FileNoteStore(NotesRoot notesRoot, IEventBus events) : INoteStore
         return skills.Values.OrderBy(s => s.Name).ToList();
     }
 
-    public async Task SaveGlossaryEntryAsync(string term, string definition, string sourceTitle, CancellationToken ct = default)
-    {
-        var dir = Path.Combine(_root, ".glossary");
-        Directory.CreateDirectory(dir);
-
-        var slug = Slugify(term);
-        var path = Path.Combine(dir, $"{slug}.md");
-
-        var content = $"""
-            ---
-            term: {term}
-            source: {sourceTitle}
-            updated: {DateTimeOffset.UtcNow:O}
-            ---
-            {definition}
-            """;
-
-        await File.WriteAllTextAsync(path, content, ct);
-        await Changed($"Slownik: {term}", ct);
-    }
-
-    public async Task<IReadOnlyList<GlossaryEntry>> ListGlossaryAsync(CancellationToken ct = default)
-    {
-        var dir = Path.Combine(_root, ".glossary");
-        if (!Directory.Exists(dir))
-            return [];
-
-        var entries = new List<GlossaryEntry>();
-        foreach (var file in Directory.EnumerateFiles(dir, "*.md"))
-        {
-            var lines = await File.ReadAllLinesAsync(file, ct);
-            if (lines.Length < 5 || lines[0] != "---" || lines[4] != "---")
-                continue;
-
-            var term = lines[1][(lines[1].IndexOf(':') + 1)..].Trim();
-            var source = lines[2][(lines[2].IndexOf(':') + 1)..].Trim();
-            var definition = string.Join('\n', lines[5..]).Trim();
-
-            entries.Add(new GlossaryEntry(term, definition, source));
-        }
-
-        return entries.OrderBy(e => e.Term, StringComparer.OrdinalIgnoreCase).ToList();
-    }
-
-    public async Task<bool> DeleteGlossaryEntryAsync(string term, CancellationToken ct = default)
-    {
-        var path = Path.Combine(_root, ".glossary", $"{Slugify(term)}.md");
-        if (!File.Exists(path))
-            return false;
-
-        File.Delete(path);
-        await Changed($"Usunieto z slownika: {term}", ct);
-        return true;
-    }
-
     public async Task<IReadOnlyList<FolderedNote>> MergeTagsAsync(string[] fromTags, string toTag, CancellationToken ct = default)
     {
         var fromSet = new HashSet<string>(fromTags, StringComparer.OrdinalIgnoreCase);
