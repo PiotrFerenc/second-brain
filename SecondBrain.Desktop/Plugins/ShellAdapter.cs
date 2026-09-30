@@ -11,15 +11,22 @@ namespace SecondBrain.Desktop.Plugins;
 
 // IShell/IEditorContext dla pluginow: cienka delegacja do MainViewModel (singleton), zeby
 // plugin nie znal VM hosta, a VM nie znal pluginow.
+//
+// Zakladki brane leniwie z IServiceProvider, NIE przez IEnumerable<ITabContribution> w konstruktorze:
+// zakladki pluginow same wstrzykuja IShell, wiec konstruktorowa zaleznosc w obie strony dawala cykl,
+// ktorego MS DI nie wykrywa przez fabryki (sp => sp.GetRequiredService<GapsTab>()) - watek UI
+// zawieszal sie w StackGuard/WaitOne przy starcie i okno nigdy sie nie pokazywalo.
 public sealed class ShellAdapter : IShell
 {
     private readonly MainViewModel vm;
-    private readonly IEnumerable<ITabContribution> tabs;
+    private readonly IServiceProvider services;
 
-    public ShellAdapter(MainViewModel vm, IEnumerable<ITabContribution> tabs)
+    private IEnumerable<ITabContribution> tabs => services.GetServices<ITabContribution>();
+
+    public ShellAdapter(MainViewModel vm, IServiceProvider services)
     {
         this.vm = vm;
-        this.tabs = tabs;
+        this.services = services;
         vm.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName == nameof(MainViewModel.SelectedNote))

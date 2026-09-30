@@ -42,7 +42,10 @@ Odstępstwa od planu (świadome):
 6. Komunikaty sprzeczności/luk ujednolicone do wersji bez diakrytyków (jedno źródło
    w `Notices`); status importu to jeden „Importuje..." zamiast per linia.
 
-Reguły odkryte w trakcie (obowiązują dla nowych pluginów): handler zdarzenia nigdy nie
+Reguły odkryte w trakcie (obowiązują dla nowych pluginów): host (`ShellAdapter`) nie
+wstrzykuje kontrybucji w konstruktorze — zakładki wstrzykują `IShell`, a cykl przez fabrykę
+DI zawieszał wątek UI przy starcie (okno nigdy się nie mapowało, zależnie od liczby
+pluginów); handler zdarzenia nigdy nie
 czeka na wątek UI; okna/kontrolki pluginu z bezparametrowym konstruktorem; `CreateControl`
 to fabryka; komendy CLI w testach agentów z `timeout`.
 

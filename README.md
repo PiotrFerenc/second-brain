@@ -65,6 +65,7 @@ Reguły, które kosztowały nas czas:
 - Handler zdarzenia nigdy nie czeka na wątek UI (`await Dispatcher.UIThread.InvokeAsync`) – w CLI nie ma pętli Avalonii i wywołanie wisi w nieskończoność. Zakładka ładuje dane przy aktywacji albo używa `Dispatcher.UIThread.Post`.
 - Okna i kontrolki wtyczki mają bezparametrowy konstruktor; zależności idą przez `DataContext`.
 - `CreateControl()` jest wołane osobno dla każdego `SlotHost` – kontrybucja to fabryka, nie pojedyncza kontrolka.
+- Host nie może zależeć od kontrybucji w konstruktorze (`IShell` bierze zakładki leniwie z `IServiceProvider`). Zakładki wstrzykują `IShell`, więc zależność w obie strony to cykl DI, którego kontener nie wykrywa przez fabryki – wątek UI wisi przy starcie i okno się nie pokazuje.
 - Wtyczka nie zna `MainViewModel` ani innych wtyczek; jedyne kanały to `IShell`, `IEditorContext`, zdarzenia i sloty.
 
 Backend wtyczek działa też w CLI (`SecondBrain.PipelineTest`), więc `add` z konsoli robi to samo, co zapis w oknie.
