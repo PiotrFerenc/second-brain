@@ -14,6 +14,7 @@ public sealed class ShellAdapter(MainViewModel vm, IEnumerable<ITabContribution>
 {
     public string? SelectedFolder => vm.SelectedFolder;
     public NoteItem? SelectedNote => vm.SelectedNote;
+    public NoteItem? SelectedSearchResult => vm.SelectedResult;
     public IReadOnlyList<string> Folders => vm.Tree.Where(t => t.IsFolder).Select(t => t.DisplayName).ToList();
 
     public Func<Note, bool>? TreeFilter

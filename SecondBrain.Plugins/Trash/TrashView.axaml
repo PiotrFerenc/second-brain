@@ -1,0 +1,45 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="using:SecondBrain.Plugins.Trash"
+             xmlns:conv="using:SecondBrain.Plugins.Sdk.Converters"
+             xmlns:acnv="using:Avalonia.Data.Converters"
+             xmlns:md="https://github.com/whistyun/Markdown.Avalonia.Tight"
+             x:Class="SecondBrain.Plugins.Trash.TrashView"
+             x:DataType="local:TrashTab">
+    <DockPanel Margin="0,20,0,0">
+        <Grid ColumnDefinitions="280,*">
+
+            <Panel Grid.Column="0">
+                <TextBlock Text="Kosz jest pusty."
+                           Classes="subtle" TextWrapping="Wrap"
+                           IsVisible="{Binding !HasTrash}" />
+
+                <ListBox ItemsSource="{Binding TrashItems}"
+                         SelectedItem="{Binding SelectedTrashItem}"
+                         IsVisible="{Binding HasTrash}">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate x:DataType="local:TrashItem">
+                            <StackPanel Spacing="2">
+                                <TextBlock Text="{Binding Title}" FontWeight="Medium" TextWrapping="Wrap" />
+                                <TextBlock Text="{Binding OriginalFolder}" Classes="subtle" FontSize="11.5" />
+                            </StackPanel>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </Panel>
+
+            <DockPanel Grid.Column="1" Margin="20,0,0,0"
+                       IsVisible="{Binding SelectedTrashItem, Converter={x:Static acnv:ObjectConverters.IsNotNull}}">
+                <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
+                    <Button Content="Przywróć" Classes="accent"
+                            Command="{Binding RestoreFromTrashCommand}"
+                            CommandParameter="{Binding SelectedTrashItem}" />
+                    <Button Content="Usuń na zawsze" Classes="danger"
+                            Command="{Binding PurgeFromTrashCommand}"
+                            CommandParameter="{Binding SelectedTrashItem}" />
+                </StackPanel>
+                <md:MarkdownScrollViewer Markdown="{Binding SelectedTrashItem.RawContent, Converter={x:Static conv:AutoLinkConverter.Instance}}" SelectionEnabled="True" />
+            </DockPanel>
+        </Grid>
+    </DockPanel>
+</UserControl>

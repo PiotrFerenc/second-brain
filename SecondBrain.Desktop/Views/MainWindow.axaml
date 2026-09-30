@@ -40,7 +40,6 @@
                  kolejnej linii zamiast wypadac poza widoczny obszar. -->
             <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,20" ItemSpacing="8" LineSpacing="8">
                 <Button Content="Szukaj" Classes="subtleAction" Command="{Binding ShowSearchTabCommand}" />
-                <Button Content="Kosz" Classes="subtleAction" Command="{Binding ShowTrashTabCommand}" />
                 <Button Content="Słownik" Classes="subtleAction" Command="{Binding ShowGlossaryTabCommand}" />
                 <Button Content="Agent" Classes="subtleAction" Command="{Binding ShowAgentTabCommand}" />
                 <!-- Zakladki z pluginow (ITabContribution, Placement=SidebarToolbar) -->
@@ -324,10 +323,6 @@
                                        IsVisible="{Binding SelectedResult, Converter={x:Static acnv:ObjectConverters.IsNotNull}}">
                                 <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto,Auto,Auto" Margin="0,0,0,8">
                                     <Button Grid.Column="1" Content="Kopiuj" Classes="subtleAction" Click="CopySearchResult_Click" />
-                                    <Button Grid.Column="2" Content="Usuń"
-                                            Classes="subtleAction"
-                                            Command="{Binding DeleteNoteCommand}"
-                                            CommandParameter="{Binding SelectedResult}" />
                                     <sdk:SlotHost Grid.Column="3" SlotId="Search.ResultActions" Margin="8,0,0,0" />
                                 </Grid>
                                 <md:MarkdownScrollViewer Markdown="{Binding SelectedResult.RawContent, Converter={x:Static conv:AutoLinkConverter.Instance}}" SelectionEnabled="True" />
@@ -349,9 +344,6 @@
                                         IsEnabled="{Binding !IsEditingNote}" />
                                 <Button Grid.Column="3" Content="Edytuj" Classes="subtleAction"
                                         Command="{Binding StartEditNoteCommand}" IsVisible="{Binding !IsEditingNote}" />
-                                <Button Grid.Column="4" Content="Usuń" Classes="subtleAction"
-                                        Command="{Binding DeleteNoteCommand}" CommandParameter="{Binding SelectedNote}"
-                                        IsEnabled="{Binding !IsEditingNote}" />
                                 <sdk:SlotHost Grid.Column="5" SlotId="Note.Actions" Margin="8,0,0,0" IsEnabled="{Binding !IsEditingNote}" />
                             </Grid>
                             <WrapPanel x:Name="NoteTagsPanel" IsVisible="{Binding !IsEditingNote}" />
@@ -385,43 +377,6 @@
                             <md:MarkdownScrollViewer Markdown="{Binding SelectedNote.RawContent, Converter={x:Static conv:AutoLinkConverter.Instance}}" SelectionEnabled="True" IsVisible="{Binding !IsEditingNote}" />
                         </Panel>
                     </DockPanel>
-                    </DockPanel>
-
-                    <DockPanel Margin="0,20,0,0" IsVisible="{Binding IsTrashTabActive}">
-                        <Grid ColumnDefinitions="280,*">
-
-                            <Panel Grid.Column="0">
-                                <TextBlock Text="Kosz jest pusty."
-                                           Classes="subtle" TextWrapping="Wrap"
-                                           IsVisible="{Binding !HasTrash}" />
-
-                                <ListBox ItemsSource="{Binding TrashItems}"
-                                         SelectedItem="{Binding SelectedTrashItem}"
-                                         IsVisible="{Binding HasTrash}">
-                                    <ListBox.ItemTemplate>
-                                        <DataTemplate x:DataType="vm:TrashItem">
-                                            <StackPanel Spacing="2">
-                                                <TextBlock Text="{Binding Title}" FontWeight="Medium" TextWrapping="Wrap" />
-                                                <TextBlock Text="{Binding OriginalFolder}" Classes="subtle" FontSize="11.5" />
-                                            </StackPanel>
-                                        </DataTemplate>
-                                    </ListBox.ItemTemplate>
-                                </ListBox>
-                            </Panel>
-
-                            <DockPanel Grid.Column="1" Margin="20,0,0,0"
-                                       IsVisible="{Binding SelectedTrashItem, Converter={x:Static acnv:ObjectConverters.IsNotNull}}">
-                                <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
-                                    <Button Content="Przywróć" Classes="accent"
-                                            Command="{Binding RestoreFromTrashCommand}"
-                                            CommandParameter="{Binding SelectedTrashItem}" />
-                                    <Button Content="Usuń na zawsze" Classes="danger"
-                                            Command="{Binding PurgeFromTrashCommand}"
-                                            CommandParameter="{Binding SelectedTrashItem}" />
-                                </StackPanel>
-                                <md:MarkdownScrollViewer Markdown="{Binding SelectedTrashItem.RawContent, Converter={x:Static conv:AutoLinkConverter.Instance}}" SelectionEnabled="True" />
-                            </DockPanel>
-                        </Grid>
                     </DockPanel>
 
                     <DockPanel Margin="0,20,0,0" IsVisible="{Binding IsGlossaryTabActive}">
