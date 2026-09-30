@@ -1,8 +1,10 @@
 using System.Collections.ObjectModel;
+using Avalonia.Controls;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using SecondBrain.Core;
 using SecondBrain.Infrastructure;
+using SecondBrain.Plugins.Sdk;
 
 namespace SecondBrain.Desktop.ViewModels;
 
@@ -54,6 +56,9 @@ public partial class MainViewModel(
     [ObservableProperty]
     public partial string? ActiveTagFilter { get; set; }
 
+    // Filtr drzewa ustawiany przez pluginy (IShell.TreeFilter); null = bez filtra.
+    public Func<Note, bool>? TreeFilter { get; set; }
+
     [RelayCommand]
     private async Task ClearTagFilterAsync()
     {
@@ -93,6 +98,9 @@ public partial class MainViewModel(
         foreach (var folder in await vectorIndex.ListFoldersAsync())
         {
             var notes = await noteStore.ListAsync(folder);
+
+            if (TreeFilter is not null)
+                notes = notes.Where(TreeFilter).ToList();
 
             if (ActiveTagFilter is not null)
             {
@@ -1260,8 +1268,44 @@ public partial class MainViewModel(
     [ObservableProperty]
     public partial bool IsContentHeaderVisible { get; set; } = true;
 
+    // ---- Zakladki pluginow (ITabContribution) ----
+    // SelectedTabIndex = TabPlugin chowa wszystkie panele rdzenia; widok pluginu tworzony raz
+    // (CreateView) i cache'owany, DataContext = kontrybucja.
+
+    public const int TabPlugin = -1;
+
+    public ObservableCollection<ITabContribution> ToolbarTabs { get; } = [];
+    public ObservableCollection<ITabContribution> HeaderTabs { get; } = [];
+
+    private readonly Dictionary<ITabContribution, Control> _pluginViews = [];
+
+    [ObservableProperty]
+    public partial Control? ActiveTabView { get; set; }
+
+    [ObservableProperty]
+    public partial bool IsPluginTabActive { get; set; }
+
+    [RelayCommand]
+    private async Task ShowPluginTabAsync(ITabContribution? tab)
+    {
+        if (tab is null)
+            return;
+
+        if (!_pluginViews.TryGetValue(tab, out var view))
+        {
+            view = tab.CreateView();
+            view.DataContext = tab;
+            _pluginViews[tab] = view;
+        }
+
+        ActiveTabView = view;
+        SelectedTabIndex = TabPlugin;
+        await tab.OnActivatedAsync(CancellationToken.None);
+    }
+
     partial void OnSelectedTabIndexChanged(int value)
     {
+        IsPluginTabActive = value == TabPlugin;
         IsEditorTabActive = value == TabEditor;
         IsSearchTabActive = value == TabSearch;
         IsNoteTabActive = value == TabNote;

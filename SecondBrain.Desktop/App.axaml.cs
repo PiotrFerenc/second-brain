@@ -9,6 +9,7 @@ using Avalonia.Platform;
 using Microsoft.Extensions.DependencyInjection;
 using SecondBrain.Desktop.ViewModels;
 using SecondBrain.Desktop.Views;
+using SecondBrain.Plugins.Sdk;
 
 namespace SecondBrain.Desktop;
 
@@ -110,6 +111,10 @@ public partial class App : Application
             imageItem.Click += async (_, _) => await NewNoteFromClipboardImageAsync(folder);
             folderMenu.Items.Add(imageItem);
 
+            // Pozycje z pluginow (ITrayNewNoteContribution) - po wbudowanych trzech.
+            foreach (var contribution in Services.GetServices<ITrayNewNoteContribution>())
+                folderMenu.Items.Add(contribution.Build(folder));
+
             _newNoteFolderMenu.Items.Add(new NativeMenuItem(folder) { Menu = folderMenu });
         }
     }
@@ -118,7 +123,7 @@ public partial class App : Application
     // wpisac tekst i Zapisz, bez przelaczania sie na edytor w duzym oknie.
     private QuickNoteWindow? _quickNoteWindow;
 
-    private void OpenQuickNote(string folder)
+    public void OpenQuickNote(string folder)
     {
         if (_mainWindow?.DataContext is not MainViewModel vm)
             return;

@@ -3,6 +3,8 @@ using Microsoft.Extensions.DependencyInjection;
 using SecondBrain.Core;
 using SecondBrain.Infrastructure;
 using SecondBrain.PipelineTest;
+using SecondBrain.Plugins.Hello;
+using SecondBrain.Plugins.Sdk;
 
 var config = new ConfigurationBuilder()
     .SetBasePath(AppContext.BaseDirectory)
@@ -12,8 +14,11 @@ var config = new ConfigurationBuilder()
 var services = new ServiceCollection();
 services.AddSingleton<IConfiguration>(config);
 services.AddSecondBrainInfrastructure(config);
+// Backend pluginow tez w CLI - zeby `add` robil to samo co w Desktopie (patrz PLAN-PLUGINS.md 2.4).
+PluginManager.Discover(typeof(HelloPlugin).Assembly).ConfigureServices(services, config);
 
 await using var provider = services.BuildServiceProvider();
+PluginRuntime.Services = provider;
 
 var store = provider.GetRequiredService<IVectorIndex>();
 var embedder = provider.GetRequiredService<IEmbedder>();

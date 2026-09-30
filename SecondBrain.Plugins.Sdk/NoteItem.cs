@@ -1,6 +1,7 @@
-namespace SecondBrain.Desktop.ViewModels;
+namespace SecondBrain.Plugins.Sdk;
 
-public class SearchResultItem(Guid id, string title, string[] tagList, float score, string rawContent, string filePath, Guid? parentId, bool pinned, string folder, DateTimeOffset createdAt = default)
+// DTO notatki do bindowania w UI (drzewo, szukaj, os czasu, kosz) - wspolne dla hosta i pluginow.
+public class NoteItem(Guid id, string title, string[] tagList, float score, string rawContent, string filePath, Guid? parentId, bool pinned, string folder, DateTimeOffset createdAt = default)
 {
     public Guid Id { get; } = id;
     public string Title { get; } = title;
