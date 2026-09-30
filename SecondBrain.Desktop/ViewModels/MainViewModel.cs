@@ -24,7 +24,6 @@ public partial class MainViewModel(
     public const int TabEditor = 0;
     public const int TabSearch = 1;
     public const int TabNote = 2;
-    public const int TabTrash = 3;
     public const int TabGaps = 4;
     public const int TabGlossary = 5;
     public const int TabAgent = 6;
@@ -650,25 +649,6 @@ public partial class MainViewModel(
         BacklinksText = referencing.Count > 0 ? string.Join(", ", referencing) : "Brak.";
     }
 
-    [RelayCommand]
-    private async Task DeleteNoteAsync(SearchResultItem? item)
-    {
-        item ??= SelectedNote;
-        if (item is null || string.IsNullOrEmpty(item.FilePath) || string.IsNullOrEmpty(item.Folder))
-            return;
-
-        await pipeline.TrashAsync(item.Folder, await noteStore.LoadAsync(item.FilePath));
-
-        if (SelectedResult == item)
-            SelectedResult = null;
-        if (SelectedNote == item)
-            SelectedNote = null;
-
-        SearchResults.Remove(item);
-        HasResults = SearchResults.Count > 0;
-
-        await LoadTreeAsync();
-    }
 
     // ---- Wyszukiwanie (globalne, po wszystkich folderach) ----
 
@@ -755,51 +735,6 @@ public partial class MainViewModel(
 
         ActiveTagFilter = tag;
         await LoadTreeAsync();
-    }
-
-    // ---- Kosz ----
-
-    public ObservableCollection<TrashItem> TrashItems { get; } = [];
-
-    [ObservableProperty]
-    public partial TrashItem? SelectedTrashItem { get; set; }
-
-    [ObservableProperty]
-    public partial bool HasTrash { get; set; }
-
-    [RelayCommand]
-    private async Task LoadTrashAsync()
-    {
-        TrashItems.Clear();
-        foreach (var t in await noteStore.ListTrashAsync())
-            TrashItems.Add(new TrashItem(t.Note.Title, t.OriginalFolder, t.TrashPath, t.Note.RawContent));
-
-        HasTrash = TrashItems.Count > 0;
-    }
-
-    [RelayCommand]
-    private async Task RestoreFromTrashAsync(TrashItem? item)
-    {
-        item ??= SelectedTrashItem;
-        if (item is null)
-            return;
-
-        await pipeline.RestoreAsync(item.TrashPath);
-
-        await LoadTrashAsync();
-        await LoadTreeAsync();
-    }
-
-    [RelayCommand]
-    private async Task PurgeFromTrashAsync(TrashItem? item)
-    {
-        item ??= SelectedTrashItem;
-        if (item is null)
-            return;
-
-        await pipeline.PurgeAsync(item.TrashPath);
-        SelectedTrashItem = null;
-        await LoadTrashAsync();
     }
 
     // ---- Luki w wiedzy ----
@@ -1002,12 +937,11 @@ public partial class MainViewModel(
             await PersistCurrentSessionAsync();
 
             // Agent dziala na noteStore/vectorIndex bezposrednio, mijajac te same komendy
-            // ktore normalnie odswiezaja UI (SaveNoteAsync, DeleteNoteAsync, itd.) - po
+            // ktore normalnie odswiezaja UI (SaveNoteAsync itd.) - po
             // zaakceptowanej akcji trzeba wiec dociagnac stan recznie.
             if (approved)
             {
                 await LoadTreeAsync();
-                await LoadTrashAsync();
                 await LoadGapsAsync();
                 await LoadGlossaryAsync();
             }
@@ -1118,7 +1052,7 @@ public partial class MainViewModel(
     }
 
     // ---- Zakladki / skroty klawiszowe ----
-    // Szukaj i Kosz sa dostepne tylko z paska narzedzi (nie maja wlasnego naglowka
+    // Szukaj jest dostepne tylko z paska narzedzi (nie ma wlasnego naglowka
     // w prawym panelu) - stad wlasne flagi widoczności zamiast TabControl.SelectedIndex.
 
     [ObservableProperty]
@@ -1132,9 +1066,6 @@ public partial class MainViewModel(
 
     [ObservableProperty]
     public partial bool IsNoteTabActive { get; set; }
-
-    [ObservableProperty]
-    public partial bool IsTrashTabActive { get; set; }
 
     [ObservableProperty]
     public partial bool IsGapsTabActive { get; set; }
@@ -1197,7 +1128,6 @@ public partial class MainViewModel(
         IsEditorTabActive = value == TabEditor;
         IsSearchTabActive = value == TabSearch;
         IsNoteTabActive = value == TabNote;
-        IsTrashTabActive = value == TabTrash;
         IsGapsTabActive = value == TabGaps;
         IsGlossaryTabActive = value == TabGlossary;
         IsAgentTabActive = value == TabAgent;
@@ -1217,9 +1147,6 @@ public partial class MainViewModel(
 
     [RelayCommand]
     private void ShowGlossaryTab() => SelectedTabIndex = TabGlossary;
-
-    [RelayCommand]
-    private void ShowTrashTab() => SelectedTabIndex = TabTrash;
 
     [RelayCommand]
     private void ShowGapsTab() => SelectedTabIndex = TabGaps;
@@ -1243,7 +1170,6 @@ public partial class MainViewModel(
     private async Task InitializeAsync()
     {
         await LoadTreeAsync();
-        await LoadTrashAsync();
         await LoadTemplatesAsync();
         await LoadGapsAsync();
         await LoadGlossaryAsync();

@@ -8,6 +8,7 @@ public interface IShell
 {
     string? SelectedFolder { get; }
     NoteItem? SelectedNote { get; }
+    NoteItem? SelectedSearchResult { get; }     // zaznaczony wynik w Szukaj (rdzen do partii B)
     IReadOnlyList<string> Folders { get; }
     void ShowTab(string tabId);
     void ShowNote(NoteItem note);               // przelacza na widok notatki
