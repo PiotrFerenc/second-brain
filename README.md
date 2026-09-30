@@ -70,6 +70,10 @@ Reguły, które kosztowały nas czas:
 
 Backend wtyczek działa też w CLI (`SecondBrain.PipelineTest`), więc `add` z konsoli robi to samo, co zapis w oknie.
 
+## Testy
+
+`dotnet test SecondBrain.Tests` – testy jednostkowe (xunit + NSubstitute) rdzenia, Infrastructure, SDK i pluginów. Nie wywołują żadnego LLM: HTTP jest podstawiany (`StubHttpHandler`), kompresja/embedding/reranker to fałszywki z `Support/Fakes.cs`, pliki idą do katalogu tymczasowego, a `HOME` jest przekierowany, więc prawdziwe `~/SecondBrain` (w tym `plugins.json`) nie jest ruszane. Testy `GitRepository` używają prawdziwego `git`. Klasy korzystające z `PluginManager` są w kolekcji `plugins.json` (nie działają równolegle). Desktop (widoki, `MainViewModel`) nie jest pokryty.
+
 ## Narzędzia agenta
 
 Agent czatowy (zakładka Agent, CLI `dotnet run -- agent`) używa narzędzi typu function calling. Jedno narzędzie to jedna publiczna klasa dziedzicząca po `AgentTool` (`SecondBrain.Infrastructure/AgentTools/`): nazwa, opis, schemat parametrów jako JSON, `IsMutating` (czy pytać Tak/Nie), `Describe` (tekst pytania) i `ExecuteAsync`. Klasy z Infrastructure są rejestrowane automatycznie; wtyczka rejestruje swoje przez `services.AddSingleton<IAgentTool, MojeNarzedzie>()` i po wyłączeniu wtyczki narzędzie znika z listy.

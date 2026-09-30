@@ -50,9 +50,38 @@ Każda funkcja poza rdzeniem (drzewo, foldery, edytor, widok notatki, agent) jes
 - Teksty komunikatów bez diakrytyków tylko tam, gdzie tak robi reszta (`Notices`); nazwy i opisy pluginu z diakrytykami.
 - Zmiana włączenia działa po restarcie – to świadoma decyzja.
 
+## Testy jednostkowe (obowiązkowe dla nowego pluginu)
+
+Projekt `SecondBrain.Tests` (xunit + NSubstitute), uruchomienie: `dotnet test SecondBrain.Tests`. Testy nie mogą wołać LLM, sieci ani prawdziwego `~/SecondBrain`. Wzory: `Plugins/StoresTests.cs`, `Plugins/LogicTests.cs`, `Plugins/PluginToolsTests.cs`, `Plugins/TabsAndHandlersTests.cs`.
+
+Co testować w pluginie (pliki w `SecondBrain.Tests/Plugins/`, nazwa klasy `<Klasa>Tests`):
+
+- **Magazyn** (`<Nazwa>Store`): round-trip zapis→odczyt, pusty/nieistniejący katalog, nadpisanie, sortowanie, uszkodzony plik pomijany, `StorageChanged` po mutacji (`RecordingEventBus`).
+- **Handler zdarzenia**: zdarzenie zbudowane ręcznie (`new NoteAdded(...)`), asercja na efekt (magazyn, `Notices`, tagi). Sprawdź też gałąź „nic nie rób” (np. `FromImport`).
+- **Klient HTTP/LLM**: `StubHttpHandler.Chat("<json>")` + `StubHttpClientFactory`; asercje na wysłane body (`handler.LastBody`: model, prompt, wiadomości), nazwę klienta (`factory.LastName` = nazwa z `AddHttpClient`), sparsowany wynik, błąd HTTP (`HttpRequestException`), niepoprawny JSON.
+- **Narzędzie agenta**: `tool.ExecuteAsync(Sample.Args(new { ... }))` na prawdziwych plikach (`Stack`), asercja na tekst wyniku i stan magazynu; przypadek „nie znaleziono”; `Describe` i `IsMutating`. Nowe narzędzie jest automatycznie sprawdzane w `ToolCatalogTests` (nazwa, schemat, `Describe`) – dopisz je do list `[InlineData]` read-only/mutating oraz do `ExpectedPluginTools_ArePresent`.
+- **Zakładka (ViewModel)**: instancja bez Avalonii (`new GapsTab(store)`), `OnActivatedAsync`, komendy przez `XxxCommand.ExecuteAsync(...)`, `PropertyChanged` dla `Title`. `IShell` = `Substitute.For<IShell>()`. Nie testuj `CreateView()`/XAML.
+- **Plugin jako całość**: dopisz `Id` do `Expected` w `PluginCatalogTests` (lista posortowana ordinalnie); reszta (unikalne Id/Order zakładek, znane `SlotId`, wyłączenie usuwa kontrybucje) sprawdza się sama.
+
+Infrastruktura testowa (`Support/Fakes.cs`):
+
+- `TempRoot` – katalog w `/tmp`, `.Notes` daje `NotesRoot`, `Dispose` sprząta.
+- `Stack` – prawdziwy `NotePipeline`/`FileNoteStore`/`FileVectorIndex`/`NoteSearch` na `TempRoot` z podmienialnymi `Compressor`, `Embedder`, `Synthesizer`; `new Stack(services => ...)` dokłada własne handlery.
+- `FakeCompressor.Factory`, `FakeEmbedder.Map` (wektor per tekst, domyślnie wektory tego samego tekstu są identyczne), `FakeSynthesizer(factory)`, `CaptureHandler<T>(akcja)`, `RecordingEventBus`, `Sample.Note(...)`, `Sample.Args(...)`.
+- Domyślna kompresja: tytuł `T:<tekst>`, treść `C:<tekst>`, tag `tag`.
+
+Pułapki:
+
+- Klasa testowa używająca `PluginManager.Discover` / `SetEnabled` / `plugins.json` **musi** mieć `[Collection(PluginStateCollection.Name)]` (współdzielony plik, brak równoległości). `HOME` jest już przekierowany na katalog tymczasowy (`TestEnvironment`) – nie omijaj tego.
+- `FileVectorIndex.UpsertAsync` wymaga wcześniejszego `CreateFolder` (`Pipeline.CreateFolderAsync`), inaczej `DirectoryNotFoundException`.
+- Commity gita są w tle: zamiast `Task.Delay` polluj `ListCommitsAsync` (patrz `PollAsync` w `GitRepositoryTests`), a zmiany pliku rób dopiero po zobaczeniu poprzedniego commita.
+- `Application.Current` w testach jest `null` – kod z `Dispatcher.UIThread` idzie ścieżką „bez UI” (jak CLI); nie mockuj dispatchera.
+- `IAsyncDisposable`-only serwisy (np. `McpToolSource`) w `ServiceProvider` zwalniaj przez `DisposeAsync().AsTask().GetAwaiter().GetResult()`.
+- Test dokumentujący znane ograniczenie nazwij jasno (`..._Throws...`) – padnie, gdy ograniczenie naprawisz, i przypomni o aktualizacji.
+
 ## Weryfikacja (obowiązkowa)
 
-1. `dotnet build SecondBrain.slnx` → 0 błędów, 0 ostrzeżeń.
+1. `dotnet build SecondBrain.slnx` → 0 błędów, 0 ostrzeżeń; `dotnet test SecondBrain.Tests` → wszystko zielone (uruchom 2-3 razy, testy nie mogą być niestabilne).
 2. Backend z CLI (jeśli plugin ma backend): `cd SecondBrain.PipelineTest && timeout 60 dotnet run -- <komenda>`. Zawsze z `timeout`. `dotnet run -- tools` sprawdza, że narzędzia agenta są na liście.
 3. Desktop **z** pluginem i **bez** (`~/SecondBrain/plugins.json` → `{"disabled":["<id>"]}`): start bez wyjątków w logu.
 4. **Okno musi być zmapowane** – brak wyjątków nie wystarcza:

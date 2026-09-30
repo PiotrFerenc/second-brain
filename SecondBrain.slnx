@@ -3,6 +3,7 @@
   <Project Path="SecondBrain.Desktop/SecondBrain.Desktop.csproj" />
   <Project Path="SecondBrain.Infrastructure/SecondBrain.Infrastructure.csproj" />
   <Project Path="SecondBrain.PipelineTest/SecondBrain.PipelineTest.csproj" />
+  <Project Path="SecondBrain.Tests/SecondBrain.Tests.csproj" />
   <Project Path="SecondBrain.Plugins.Sdk/SecondBrain.Plugins.Sdk.csproj" />
   <Project Path="SecondBrain.Plugins/SecondBrain.Plugins.csproj" />
 </Solution>
