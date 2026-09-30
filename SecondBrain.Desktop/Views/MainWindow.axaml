@@ -317,7 +317,7 @@
                                 </Border>
                                 <Grid ColumnDefinitions="*,Auto">
                                     <TextBox x:Name="AgentInputBox" Grid.Column="0" Text="{Binding AgentInputText}"
-                                             PlaceholderText="Napisz do agenta... (@ dla notatek/folderow)"
+                                             PlaceholderText="Napisz do agenta... (@ notatki/foldery, / skille)"
                                              IsEnabled="{Binding !IsAgentBusy}" Margin="0,0,8,0"
                                              TextChanged="AgentInput_TextChanged" KeyDown="AgentInput_KeyDown" />
                                     <Popup x:Name="MentionPopup" IsOpen="{Binding ShowMentionSuggestions}"

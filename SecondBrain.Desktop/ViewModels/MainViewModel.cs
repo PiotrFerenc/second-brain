@@ -449,12 +449,23 @@ public partial class MainViewModel(
     [ObservableProperty]
     public partial int MentionSuggestionIndex { get; set; }
 
-    public void UpdateMentionQuery(string? query)
+    // Nazwy skilli do podpowiedzi "/skill" - odswiezane przy wejsciu w zakladke agenta
+    // (nowy plik w .skills/ dziala bez restartu).
+    private List<string> _skillNames = [];
+
+    private async Task RefreshSkillNamesAsync() =>
+        _skillNames = (await noteStore.ListSkillsAsync()).Select(s => s.Name).ToList();
+
+    // '/' = podpowiedzi skilli (tylko na poczatku wiadomosci), '@' = folderow/notatek.
+    public char MentionTrigger { get; private set; } = '@';
+
+    public void UpdateMentionQuery(char trigger, string? query)
     {
+        MentionTrigger = trigger;
         MentionSuggestions.Clear();
         if (query is not null)
         {
-            foreach (var name in _mentionNames
+            foreach (var name in (trigger == '/' ? _skillNames : _mentionNames)
                          .Where(n => n.Contains(query, StringComparison.OrdinalIgnoreCase))
                          .Distinct()
                          .Take(8))
@@ -484,7 +495,7 @@ public partial class MainViewModel(
         IsAgentBusy = true;
         try
         {
-            var step = await agent.SendAsync(_agentConversationState, message);
+            var step = await agent.SendAsync(_agentConversationState, SkillCommand.Expand(message, _skillNames));
             ApplyAgentStep(step);
             await PersistCurrentSessionAsync();
         }
@@ -687,6 +698,8 @@ public partial class MainViewModel(
         IsEditorTabActive = value == TabEditor;
         IsNoteTabActive = value == TabNote;
         IsAgentTabActive = value == TabAgent;
+        if (IsAgentTabActive)
+            _ = RefreshSkillNamesAsync();
         IsContentHeaderVisible = value is TabEditor or TabNote;
     }
 

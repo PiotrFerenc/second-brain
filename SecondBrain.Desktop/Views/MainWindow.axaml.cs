@@ -194,7 +194,12 @@ public partial class MainWindow : Window
         if (DataContext is not MainViewModel vm || sender is not TextBox box)
             return;
 
-        vm.UpdateMentionQuery(ExtractMentionQuery(box.Text ?? "", box.CaretIndex));
+        var text = box.Text ?? "";
+        var slash = ExtractSkillQuery(text, box.CaretIndex);
+        if (slash is not null)
+            vm.UpdateMentionQuery('/', slash);
+        else
+            vm.UpdateMentionQuery('@', ExtractMentionQuery(text, box.CaretIndex));
     }
 
     // "@" zaczyna wzmianke tylko na poczatku tekstu lub po bialym znaku (jak w Slacku/Discordzie),
@@ -208,6 +213,17 @@ public partial class MainWindow : Window
             return null;
 
         var token = text[(at + 1)..caret];
+        return token.Any(char.IsWhiteSpace) ? null : token;
+    }
+
+    // "/" wywoluje skill tylko na samym poczatku wiadomosci; token konczy sie na pierwszej spacji.
+    private static string? ExtractSkillQuery(string text, int caret)
+    {
+        caret = Math.Clamp(caret, 0, text.Length);
+        if (caret == 0 || text[0] != '/')
+            return null;
+
+        var token = text[1..caret];
         return token.Any(char.IsWhiteSpace) ? null : token;
     }
 
@@ -252,7 +268,7 @@ public partial class MainWindow : Window
     {
         var text = box.Text ?? "";
         var caret = Math.Clamp(box.CaretIndex, 0, text.Length);
-        var at = text.LastIndexOf('@', Math.Max(0, caret - 1));
+        var at = vm.MentionTrigger == '/' ? 0 : text.LastIndexOf('@', Math.Max(0, caret - 1));
         if (at < 0)
             return;
 
