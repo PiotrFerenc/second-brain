@@ -23,11 +23,6 @@ public record AnswerResult(
 
 public record KnowledgeGap(string Query, DateTimeOffset AskedAt, string Path);
 
-public record ConflictResult(
-    [property: JsonPropertyName("hasConflict")] bool HasConflict,
-    [property: JsonPropertyName("conflictingTitle")] string? ConflictingTitle,
-    [property: JsonPropertyName("explanation")] string? Explanation);
-
 public record GlossaryEntry(string Term, string Definition, string SourceTitle);
 
 // Sugestia grupy tagow-duplikatow (np. "spotkanie"/"spotkania") do reczengo scalenia.
@@ -79,13 +74,6 @@ public interface IReranker
 public interface IAnswerSynthesizer
 {
     Task<AnswerResult> SynthesizeAsync(string query, IReadOnlyList<Note> notes, CancellationToken ct = default);
-}
-
-// Porownuje tresc nowej notatki z juz istniejacymi (podobnymi) notatkami i probuje
-// wykryc sprzecznosc faktow (np. dwie rozne godziny tego samego spotkania).
-public interface IConflictDetector
-{
-    Task<ConflictResult> DetectAsync(string newContent, IReadOnlyList<Note> candidates, CancellationToken ct = default);
 }
 
 // Grupuje semantycznie zduplikowane tagi z calej bazy (liczba pojedyncza/mnoga, literowki,
