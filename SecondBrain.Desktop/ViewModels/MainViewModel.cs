@@ -16,8 +16,7 @@ public partial class MainViewModel(
     NoteSearch noteSearch,
     IEventBus events,
     IAgent agent,
-    IAgentSessionStore agentSessionStore,
-    INoteRewriter noteRewriter) : ViewModelBase
+    IAgentSessionStore agentSessionStore) : ViewModelBase
 {
     public const int TabEditor = 0;
     public const int TabSearch = 1;
@@ -282,9 +281,6 @@ public partial class MainViewModel(
     public partial string NoteTagsInput { get; set; } = "";
 
     [ObservableProperty]
-    public partial string RewriteInstruction { get; set; } = "";
-
-    [ObservableProperty]
     public partial string EditorStatus { get; set; } = "";
 
     [ObservableProperty]
@@ -417,33 +413,6 @@ public partial class MainViewModel(
 
             await LoadTreeAsync();
             await LoadParentOptionsAsync();
-        }
-        finally
-        {
-            IsBusy = false;
-        }
-    }
-
-    // Instrukcja idzie jako system prompt, tresc notatki jako user - odpowiedz zastepuje NoteText.
-    [RelayCommand]
-    private async Task RewriteNoteAsync()
-    {
-        if (string.IsNullOrWhiteSpace(RewriteInstruction) || string.IsNullOrWhiteSpace(NoteText))
-        {
-            EditorStatus = "Wpisz instrukcje i tresc notatki.";
-            return;
-        }
-
-        IsBusy = true;
-        try
-        {
-            EditorStatus = "Przetwarzam wg instrukcji...";
-            NoteText = await noteRewriter.RewriteAsync(RewriteInstruction, NoteText);
-            EditorStatus = "Tresc zastapiona odpowiedzia - sprawdz i zapisz.";
-        }
-        catch (Exception ex)
-        {
-            EditorStatus = $"Blad: {ex.Message}";
         }
         finally
         {

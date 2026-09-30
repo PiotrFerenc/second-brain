@@ -105,12 +105,6 @@ public class RerankerOptions : HttpClientOptions
     public string Model { get; set; } = "rerank-v3.5";
 }
 
-// System prompt podaje user w edytorze (pole instrukcji), wiec tu tylko model - bez SystemPrompt.
-public class NoteRewriteOptions : HttpClientOptions
-{
-    public string Model { get; set; } = "gpt-3.5-turbo";
-}
-
 public class VectorIndexOptions
 {
     // Rozmiar wektora embeddingu - musi zgadzac sie z modelem w EmbeddingOptions.

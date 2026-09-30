@@ -27,7 +27,6 @@ public static class ServiceCollectionExtensions
         services.Configure<RerankerOptions>(config.GetSection("Reranker"));
         services.Configure<VectorIndexOptions>(config.GetSection("VectorIndex"));
         services.Configure<StorageOptions>(config.GetSection("Storage"));
-        services.Configure<NoteRewriteOptions>(config.GetSection("NoteRewrite"));
 
         services.AddHttpClient("Compression", (sp, client) =>
             HttpClientHeaders.Apply(client, sp.GetRequiredService<IOptions<CompressionOptions>>().Value));
@@ -50,9 +49,6 @@ public static class ServiceCollectionExtensions
         services.AddHttpClient("Reranker", (sp, client) =>
             HttpClientHeaders.Apply(client, sp.GetRequiredService<IOptions<RerankerOptions>>().Value));
 
-        services.AddHttpClient("NoteRewrite", (sp, client) =>
-            HttpClientHeaders.Apply(client, sp.GetRequiredService<IOptions<NoteRewriteOptions>>().Value));
-
         services.AddSingleton<IEmbedder, MockEmbedder>();
         services.AddSingleton<IReranker, MockReranker>();
         services.AddSingleton<ICompressor, FabrykaCompressor>();
@@ -61,7 +57,6 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IAgent, FabrykaAgent>();
         services.AddSingleton<ITagCleaner, FabrykaTagCleaner>();
         services.AddSingleton<TagMerger>();
-        services.AddSingleton<INoteRewriter, FabrykaNoteRewriter>();
         services.AddSingleton<NotesRoot>();
         services.AddSingleton<IEventBus, EventBus>();
         services.AddSingleton<INoteStore, FileNoteStore>();

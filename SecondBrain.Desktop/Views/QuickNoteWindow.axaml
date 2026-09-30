@@ -1,6 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:SecondBrain.Desktop.ViewModels"
+        xmlns:sdk="using:SecondBrain.Plugins.Sdk"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d" d:DesignWidth="420" d:DesignHeight="320"
@@ -18,12 +19,7 @@
             <TextBlock Text="{Binding EditorStatus}" Classes="subtle" VerticalAlignment="Center" TextWrapping="Wrap" MaxWidth="240" />
             <Button Content="Zapisz" Click="Save_Click" IsEnabled="{Binding !IsBusy}" Classes="accent" />
         </StackPanel>
-        <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,8">
-            <TextBox Grid.Column="0" Text="{Binding RewriteInstruction}"
-                     PlaceholderText="Instrukcja dla LLM (np. popraw styl)" />
-            <Button Grid.Column="1" Content="Wyślij" Margin="8,0,0,0"
-                    Command="{Binding RewriteNoteCommand}" IsEnabled="{Binding !IsBusy}" />
-        </Grid>
+        <sdk:SlotHost DockPanel.Dock="Top" SlotId="Editor.Footer" Orientation="Vertical" Margin="0,0,0,8" />
         <TextBox x:Name="NoteTextBox" Text="{Binding NoteText}" AcceptsReturn="True" TextWrapping="Wrap"
                  PlaceholderText="Wpisz notatkę... (Ctrl+Enter zapisuje)" VerticalContentAlignment="Top" />
     </DockPanel>
