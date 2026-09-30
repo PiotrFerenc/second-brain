@@ -37,7 +37,6 @@ public partial class MainWindow : Window
             {
                 vm.PropertyChanged += (_, e) => OnViewModelPropertyChanged(vm, e);
                 await vm.InitializeCommand.ExecuteAsync(null);
-                BuildTemplateButtons(vm);
                 BuildTagChips(vm);
                 RegisterPluginTabs(vm);
                 await App.Services.GetRequiredService<PluginManager>().StartAsync(App.Services);
@@ -135,19 +134,8 @@ public partial class MainWindow : Window
         }
     }
 
-    // Szablony i tagi sa listami dynamicznymi - prosciej dopisac przyciski w code-behind
+    // Tagi sa lista dynamiczna - prosciej dopisac przyciski w code-behind
     // niz wiazac Command z zewnetrznym DataContext przez ItemsControl.
-    private void BuildTemplateButtons(MainViewModel vm)
-    {
-        TemplatesPanel.Children.Clear();
-        foreach (var template in vm.Templates)
-        {
-            var button = new Button { Content = template.Name, Classes = { "subtleAction" } };
-            button.Click += (_, _) => vm.NoteText = template.Content;
-            TemplatesPanel.Children.Add(button);
-        }
-    }
-
     private void BuildTagChips(MainViewModel vm)
     {
         NoteTagsPanel.Children.Clear();
