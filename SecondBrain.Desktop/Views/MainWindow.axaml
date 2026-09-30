@@ -1,7 +1,8 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:SecondBrain.Desktop.ViewModels"
-        xmlns:conv="using:SecondBrain.Desktop.Converters"
+        xmlns:conv="using:SecondBrain.Plugins.Sdk.Converters"
+        xmlns:sdk="using:SecondBrain.Plugins.Sdk"
         xmlns:acnv="using:Avalonia.Data.Converters"
         xmlns:md="https://github.com/whistyun/Markdown.Avalonia.Tight"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -46,6 +47,21 @@
                 <Button Content="Oś czasu" Classes="subtleAction" Command="{Binding ShowTimelineTabCommand}" />
                 <Button Content="Historia" Classes="subtleAction" Command="{Binding ShowHistoryTabCommand}" />
                 <Button Content="Agent" Classes="subtleAction" Command="{Binding ShowAgentTabCommand}" />
+                <!-- Zakladki z pluginow (ITabContribution, Placement=SidebarToolbar) -->
+                <ItemsControl ItemsSource="{Binding ToolbarTabs}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel Orientation="Horizontal" Spacing="8" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="sdk:ITabContribution">
+                            <Button Content="{Binding Title}" Classes="subtleAction"
+                                    Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).ShowPluginTabCommand}"
+                                    CommandParameter="{Binding}" />
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
             </WrapPanel>
 
             <StackPanel DockPanel.Dock="Bottom" Spacing="8" Margin="0,20,0,0">
@@ -73,6 +89,8 @@
 
             <DockPanel>
                 <TextBlock DockPanel.Dock="Top" Text="FOLDERY" Classes="label" Margin="10,0,0,8" />
+
+                <sdk:SlotHost DockPanel.Dock="Top" SlotId="Sidebar.AboveTree" Orientation="Vertical" />
 
                 <Border DockPanel.Dock="Top"
                         IsVisible="{Binding ActiveTagFilter, Converter={x:Static acnv:ObjectConverters.IsNotNull}}"
@@ -159,6 +177,20 @@
                                 FontSize="24"
                                 Command="{Binding ShowEditorTabCommand}"
                                 ToolTip.Tip="Nowa notatka" />
+                        <ItemsControl ItemsSource="{Binding HeaderTabs}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <StackPanel Orientation="Horizontal" Spacing="24" />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="sdk:ITabContribution">
+                                    <Button Content="{Binding Title}" Classes="tabHeader"
+                                            Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).ShowPluginTabCommand}"
+                                            CommandParameter="{Binding}" />
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
                     </StackPanel>
 
                     <Border Grid.Column="1"
@@ -172,6 +204,8 @@
 
                 <Panel>
 
+                <ContentControl Content="{Binding ActiveTabView}" IsVisible="{Binding IsPluginTabActive}" Margin="0,20,0,0" />
+
                 <DockPanel Margin="0,20,0,0" IsVisible="{Binding IsEditorTabActive}">
                         <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="12" Margin="0,16,0,0">
                             <Button Content="Zapisz"
@@ -184,14 +218,18 @@
                                        TextWrapping="Wrap" />
                         </StackPanel>
 
+                        <sdk:SlotHost DockPanel.Dock="Bottom" SlotId="Editor.Footer" Orientation="Vertical" Margin="0,12,0,0" />
+
                         <StackPanel DockPanel.Dock="Top" Spacing="8" Margin="0,0,0,12">
-                            <Grid ColumnDefinitions="*,Auto,Auto,Auto">
+                            <sdk:SlotHost SlotId="Editor.Templates" />
+                            <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto">
                                 <StackPanel Grid.Column="0" x:Name="TemplatesPanel" Orientation="Horizontal" Spacing="8" />
                                 <Button Grid.Column="1" Content="Wklej obrazek ze schowka" Classes="subtleAction"
                                         Click="PasteImage_Click" Margin="0,0,8,0" />
                                 <Button Grid.Column="2" Content="Importuj z pliku..." Classes="subtleAction"
                                         Click="ImportFile_Click" Margin="0,0,8,0" />
                                 <Button Grid.Column="3" Content="Importuj z folderu..." Classes="subtleAction" Click="ImportFolder_Click" />
+                                <sdk:SlotHost Grid.Column="4" SlotId="Editor.Toolbar" Margin="8,0,0,0" />
                             </Grid>
                             <TextBox Text="{Binding NoteTagsInput}" PlaceholderText="tagi po przecinku (puste = LLM zaproponuje)" />
                             <Grid ColumnDefinitions="*,Auto">
@@ -205,7 +243,7 @@
                                       PlaceholderText="Notatka nadrzędna (opcjonalnie)"
                                       HorizontalAlignment="Stretch">
                                 <ComboBox.ItemTemplate>
-                                    <DataTemplate x:DataType="vm:SearchResultItem">
+                                    <DataTemplate x:DataType="sdk:NoteItem">
                                         <TextBlock Text="{Binding Title}" />
                                     </DataTemplate>
                                 </ComboBox.ItemTemplate>
@@ -239,6 +277,7 @@
                                       VerticalAlignment="Center" />
                             <Button Content="Szukaj po obrazku" Classes="subtleAction" Click="PasteImageSearch_Click"
                                     ToolTip.Tip="OCR obrazka ze schowka jako zapytanie" />
+                            <sdk:SlotHost SlotId="Search.Toolbar" />
                         </StackPanel>
 
                         <Border DockPanel.Dock="Top"
@@ -273,7 +312,7 @@
                                          SelectedItem="{Binding SelectedResult}"
                                          IsVisible="{Binding HasResults}">
                                     <ListBox.ItemTemplate>
-                                        <DataTemplate x:DataType="vm:SearchResultItem">
+                                        <DataTemplate x:DataType="sdk:NoteItem">
                                             <StackPanel Spacing="2">
                                                 <TextBlock Text="{Binding Title}" FontWeight="Medium" TextWrapping="Wrap" />
                                                 <TextBlock Classes="subtle" FontSize="11.5">
@@ -287,12 +326,13 @@
 
                             <DockPanel Grid.Column="1" Margin="20,0,0,0"
                                        IsVisible="{Binding SelectedResult, Converter={x:Static acnv:ObjectConverters.IsNotNull}}">
-                                <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto,Auto" Margin="0,0,0,8">
+                                <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto,Auto,Auto" Margin="0,0,0,8">
                                     <Button Grid.Column="1" Content="Kopiuj" Classes="subtleAction" Click="CopySearchResult_Click" />
                                     <Button Grid.Column="2" Content="Usuń"
                                             Classes="subtleAction"
                                             Command="{Binding DeleteNoteCommand}"
                                             CommandParameter="{Binding SelectedResult}" />
+                                    <sdk:SlotHost Grid.Column="3" SlotId="Search.ResultActions" Margin="8,0,0,0" />
                                 </Grid>
                                 <md:MarkdownScrollViewer Markdown="{Binding SelectedResult.RawContent, Converter={x:Static conv:AutoLinkConverter.Instance}}" SelectionEnabled="True" />
                             </DockPanel>
@@ -302,7 +342,7 @@
                     <DockPanel Margin="0,20,0,0" IsVisible="{Binding IsNoteTabActive}">
                     <DockPanel IsVisible="{Binding SelectedNote, Converter={x:Static acnv:ObjectConverters.IsNotNull}}">
                         <StackPanel DockPanel.Dock="Top" Spacing="6" Margin="0,0,0,14">
-                            <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto">
+                            <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto,Auto">
                                 <TextBlock Grid.Column="0" Text="{Binding SelectedNote.Title}"
                                            FontSize="19" FontWeight="Bold" TextWrapping="Wrap" VerticalAlignment="Center" />
                                 <Button Grid.Column="1"
@@ -316,12 +356,16 @@
                                 <Button Grid.Column="4" Content="Usuń" Classes="subtleAction"
                                         Command="{Binding DeleteNoteCommand}" CommandParameter="{Binding SelectedNote}"
                                         IsEnabled="{Binding !IsEditingNote}" />
+                                <sdk:SlotHost Grid.Column="5" SlotId="Note.Actions" Margin="8,0,0,0" IsEnabled="{Binding !IsEditingNote}" />
                             </Grid>
                             <WrapPanel x:Name="NoteTagsPanel" IsVisible="{Binding !IsEditingNote}" />
+                            <sdk:SlotHost SlotId="Note.Header" Orientation="Vertical" IsVisible="{Binding !IsEditingNote}" />
                             <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" IsVisible="{Binding !IsEditingNote}">
                                 <Run Text="Odnośniki do tej notatki: " /><Run Text="{Binding BacklinksText}" />
                             </TextBlock>
                         </StackPanel>
+
+                        <sdk:SlotHost DockPanel.Dock="Bottom" SlotId="Note.Footer" Orientation="Vertical" Margin="0,12,0,0" IsVisible="{Binding !IsEditingNote}" />
 
                         <Panel>
                             <DockPanel IsVisible="{Binding IsEditingNote}">
@@ -466,7 +510,7 @@
                                             <TextBlock Text="{Binding Label}" Classes="label" />
                                             <ItemsControl ItemsSource="{Binding Items}">
                                                 <ItemsControl.ItemTemplate>
-                                                    <DataTemplate x:DataType="vm:SearchResultItem">
+                                                    <DataTemplate x:DataType="sdk:NoteItem">
                                                         <Button Classes="subtleAction"
                                                                 HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
                                                                 Margin="0,0,0,4"

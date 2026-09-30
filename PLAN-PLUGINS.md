@@ -117,13 +117,14 @@ SecondBrain.Infrastructure       dochodzą: NotePipeline, NoteSearch, EventBus, 
                                  GapAutoCloser, TagCleaning, DuplicateScanner, Ocr, NoteRewrite, ConflictDetection
                                  (przenoszą się do pluginów); INoteStore chudnie (sekcja 2.6)
 SecondBrain.Plugins.Sdk  (nowy)  kontrakty UI: IPlugin, ITabContribution, ISlotContribution, ITrayNewNoteContribution,
-                                 IShell, IEditorContext, NoteItem (dziś SearchResultItem), Converters/, kontrolka SlotHost
+                                 IShell, IEditorContext, NoteItem (dziś SearchResultItem), Converters/, kontrolka SlotHost,
+                                 PluginManager (tu, nie w Desktop - CLI też go używa, a nie może referencować WinExe)
                                  refs: Core, Avalonia, CommunityToolkit.Mvvm, Microsoft.Extensions.DependencyInjection.Abstractions,
                                  Microsoft.Extensions.Configuration.Abstractions
 SecondBrain.Plugins      (nowy)  jeden projekt, folder na plugin: Search/, Trash/, Gaps/, Glossary/, Conflicts/, Timeline/,
                                  History/, Ocr/, Import/, Rewrite/, Templates/, Tags/, Backlinks/, QuickNote/, Duplicates/
                                  refs: Sdk, Infrastructure, Markdown.Avalonia.Tight, CliWrap (History)
-SecondBrain.Desktop              host: powłoka, rdzeń UI, PluginManager, zakładka Wtyczki; refs: Plugins
+SecondBrain.Desktop              host: powłoka, rdzeń UI, adaptery IShell/IEditorContext, zakładka Wtyczki; refs: Plugins
 SecondBrain.PipelineTest         CLI: też ładuje pluginy (backend), żeby `add` zachowywał się jak w Desktopie; refs: Plugins
 ```
 
@@ -165,13 +166,13 @@ Kontrybucje UI to zwykłe rejestracje DI (`services.AddSingleton<ITabContributio
 host zbiera je przez `IEnumerable<...>`:
 
 ```csharp
-public enum TabPlacement { SidebarToolbar, ContentHeader, Hidden }
+public enum TabArea { SidebarToolbar, ContentHeader, Hidden }
 
 public interface ITabContribution : INotifyPropertyChanged   // ObservableObject w praktyce
 {
     string Id { get; }                  // "gaps" — cel dla IShell.ShowTab
     string Title { get; }               // bindowalne: "Luki (3)" aktualizuje przycisk
-    TabPlacement Placement { get; }
+    TabArea Placement { get; }
     int Order { get; }
     KeyGesture? Shortcut { get; }       // np. Ctrl+F dla search
     Control CreateView();               // raz, host cache'uje; DataContext = this
@@ -257,7 +258,7 @@ Zdarzenia (rekordy w `Core/Events.cs`), publikowane **wyłącznie** przez `NoteP
 to, co dziś robi każda z 7 kopii pipeline'u, tylko że każdy komunikat powstaje w jednym
 miejscu.
 
-### 2.4. Menedżer pluginów (host)
+### 2.4. Menedżer pluginów (`PluginManager` w Sdk, UI w hoście)
 
 ```csharp
 public sealed class PluginManager
@@ -280,7 +281,7 @@ public sealed class PluginManager
 - Stan w `~/SecondBrain/plugins.json` obok `window.json` — to lokalny stan użytkownika,
   nie konfiguracja providerów (`appsettings.json`). Lista **wyłączonych**, nie włączonych:
   nowy plugin po aktualizacji jest domyślnie włączony bez dotykania pliku.
-- Zakładka „Wtyczki" (rdzeń, `TabPlacement.SidebarToolbar`, ostatnia): lista
+- Zakładka „Wtyczki" (rdzeń, `TabArea.SidebarToolbar`, ostatnia): lista
   Name / Description / `ToggleSwitch`; pod listą tekst „Zmiany zadziałają po ponownym
   uruchomieniu" i przycisk „Uruchom ponownie" (`Process.Start(Environment.ProcessPath)` +
   `CloseFromTray`, best-effort).

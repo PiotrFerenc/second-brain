@@ -7,7 +7,9 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform.Storage;
+using Microsoft.Extensions.DependencyInjection;
 using SecondBrain.Desktop.ViewModels;
+using SecondBrain.Plugins.Sdk;
 
 namespace SecondBrain.Desktop.Views;
 
@@ -37,6 +39,8 @@ public partial class MainWindow : Window
                 await vm.InitializeCommand.ExecuteAsync(null);
                 BuildTemplateButtons(vm);
                 BuildTagChips(vm);
+                RegisterPluginTabs(vm);
+                await App.Services.GetRequiredService<PluginManager>().StartAsync(App.Services);
             }
         };
 
@@ -113,6 +117,22 @@ public partial class MainWindow : Window
     {
         if (e.PropertyName == nameof(MainViewModel.SelectedNote))
             BuildTagChips(vm);
+    }
+
+    // Zakladki z pluginow: przyciski w pasku/naglowku (ItemsControl w XAML) i skroty klawiszowe.
+    private void RegisterPluginTabs(MainViewModel vm)
+    {
+        foreach (var tab in App.Services.GetServices<ITabContribution>().OrderBy(t => t.Order))
+        {
+            switch (tab.Placement)
+            {
+                case TabArea.SidebarToolbar: vm.ToolbarTabs.Add(tab); break;
+                case TabArea.ContentHeader: vm.HeaderTabs.Add(tab); break;
+            }
+
+            if (tab.Shortcut is { } gesture)
+                KeyBindings.Add(new KeyBinding { Gesture = gesture, Command = vm.ShowPluginTabCommand, CommandParameter = tab });
+        }
     }
 
     // Szablony i tagi sa listami dynamicznymi - prosciej dopisac przyciski w code-behind

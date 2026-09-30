@@ -1,0 +1,31 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="using:SecondBrain.Desktop.Plugins"
+             xmlns:sdk="using:SecondBrain.Plugins.Sdk"
+             x:Class="SecondBrain.Desktop.Plugins.PluginsView"
+             x:DataType="local:PluginsTab">
+    <DockPanel>
+        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="12" Margin="0,16,0,0">
+            <Button Content="Uruchom ponownie" Classes="accent" Command="{Binding RestartCommand}" />
+            <TextBlock Text="Zmiany zadziałają po ponownym uruchomieniu." Classes="subtle" VerticalAlignment="Center" />
+        </StackPanel>
+
+        <ScrollViewer>
+            <ItemsControl ItemsSource="{Binding Plugins}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="sdk:PluginEntry">
+                        <Border Background="{DynamicResource CtpSurface0}" CornerRadius="8" Padding="14,10" Margin="0,0,0,8">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <StackPanel Grid.Column="0" Spacing="2">
+                                    <TextBlock Text="{Binding Name}" FontWeight="Medium" />
+                                    <TextBlock Text="{Binding Description}" Classes="subtle" FontSize="12" TextWrapping="Wrap" />
+                                </StackPanel>
+                                <ToggleSwitch Grid.Column="1" IsChecked="{Binding IsEnabled}" OnContent="" OffContent="" VerticalAlignment="Center" />
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+    </DockPanel>
+</UserControl>

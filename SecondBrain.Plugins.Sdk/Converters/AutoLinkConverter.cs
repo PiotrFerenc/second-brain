@@ -2,7 +2,7 @@ using System.Globalization;
 using System.Text.RegularExpressions;
 using Avalonia.Data.Converters;
 
-namespace SecondBrain.Desktop.Converters;
+namespace SecondBrain.Plugins.Sdk.Converters;
 
 // Markdown.Avalonia nie autolinkuje golych URLi wklejonych jako zwykly tekst (nawet nie
 // CommonMark-owe <url>) - notatki czesto maja linki wklejone tak wlasnie, wiec owijamy je

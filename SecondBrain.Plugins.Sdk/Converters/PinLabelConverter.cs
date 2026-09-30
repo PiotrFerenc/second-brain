@@ -1,7 +1,7 @@
 using System.Globalization;
 using Avalonia.Data.Converters;
 
-namespace SecondBrain.Desktop.Converters;
+namespace SecondBrain.Plugins.Sdk.Converters;
 
 public class PinLabelConverter : IValueConverter
 {

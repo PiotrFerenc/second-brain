@@ -1,8 +1,10 @@
 using Avalonia;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using SecondBrain.Desktop.ViewModels;
+using SecondBrain.Desktop.Plugins;
 using SecondBrain.Infrastructure;
+using SecondBrain.Plugins.Hello;
+using SecondBrain.Plugins.Sdk;
 using Serilog;
 using System;
 using System.Diagnostics;
@@ -27,10 +29,13 @@ sealed class Program
                 .AddJsonFile("appsettings.json")
                 .Build();
 
+            // Kolejnosc z PLAN-PLUGINS.md 2.4: infrastruktura -> powloka -> pluginy (tylko wlaczone) -> provider.
             var services = new ServiceCollection();
             services.AddSecondBrainInfrastructure(config);
-            services.AddTransient<MainViewModel>();
+            services.AddSecondBrainShell();
+            PluginManager.Discover(typeof(HelloPlugin).Assembly).ConfigureServices(services, config);
             App.Services = services.BuildServiceProvider();
+            PluginRuntime.Services = App.Services;
 
             BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
         }

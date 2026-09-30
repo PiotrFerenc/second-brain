@@ -2,7 +2,7 @@ using System.Globalization;
 using Avalonia.Data.Converters;
 using Avalonia.Media;
 
-namespace SecondBrain.Desktop.Converters;
+namespace SecondBrain.Plugins.Sdk.Converters;
 
 // Przypisuje folderowi staly (w ramach sesji) kolor z akcentow Catppuccin - odpowiednik
 // kolorowych sekcji w OneNote. Kolory sa z wariantu Mocha; w jasnym motywie kropka

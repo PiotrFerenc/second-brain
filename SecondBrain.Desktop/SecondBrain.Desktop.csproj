@@ -32,6 +32,7 @@
   <ItemGroup>
     <ProjectReference Include="..\SecondBrain.Core\SecondBrain.Core.csproj" />
     <ProjectReference Include="..\SecondBrain.Infrastructure\SecondBrain.Infrastructure.csproj" />
+    <ProjectReference Include="..\SecondBrain.Plugins\SecondBrain.Plugins.csproj" />
   </ItemGroup>
 
   <ItemGroup>
