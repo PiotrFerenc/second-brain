@@ -14,6 +14,9 @@ var config = new ConfigurationBuilder()
 var services = new ServiceCollection();
 services.AddSingleton<IConfiguration>(config);
 services.AddSecondBrainInfrastructure(config);
+// Powloka no-op: zakladki pluginow bywaja tez handlerami zdarzen i wstrzykuja IShell.
+services.AddSingleton<IShell, NullShell>();
+services.AddSingleton<IEditorContext, NullEditorContext>();
 // Backend pluginow tez w CLI - zeby `add` robil to samo co w Desktopie (patrz PLAN-PLUGINS.md 2.4).
 PluginManager.Discover(typeof(HelloPlugin).Assembly).ConfigureServices(services, config);
 
