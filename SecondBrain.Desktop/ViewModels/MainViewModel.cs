@@ -12,6 +12,8 @@ public partial class MainViewModel(
     INoteStore noteStore,
     NotePipeline pipeline,
     NoteSearch noteSearch,
+    IEventBus events,
+    GitRepository git,
     IAgent agent,
     IAgentSessionStore agentSessionStore,
     IOcrExtractor ocrExtractor,
@@ -725,9 +727,8 @@ public partial class MainViewModel(
                 HasAnswer = !string.IsNullOrWhiteSpace(SynthesizedAnswer);
 
                 // "Luka w wiedzy": RAG jawnie mowi ze notatki nie zawieraja odpowiedzi -
-                // zapisujemy pytanie, zeby nie zginelo, i user mial co dopisac.
-                if (!answer.Answered)
-                    await noteStore.LogGapAsync(SearchQuery);
+                // handler GapLogOnSearch zapisuje pytanie, zeby nie zginelo i user mial co dopisac.
+                await events.PublishAsync(new SearchCompleted(SearchQuery, answer.Answered));
             }
         }
         finally
@@ -788,7 +789,7 @@ public partial class MainViewModel(
         if (item is null)
             return;
 
-        await noteStore.PurgeTrashAsync(item.TrashPath);
+        await pipeline.PurgeAsync(item.TrashPath);
         SelectedTrashItem = null;
         await LoadTrashAsync();
     }
@@ -876,7 +877,7 @@ public partial class MainViewModel(
     private async Task LoadCommitsAsync()
     {
         Commits.Clear();
-        foreach (var c in await noteStore.ListCommitsAsync())
+        foreach (var c in await git.ListCommitsAsync())
             Commits.Add(c);
 
         HasCommits = Commits.Count > 0;
@@ -888,7 +889,7 @@ public partial class MainViewModel(
     {
         CommitDiffFiles.Clear();
         if (SelectedCommit is not null)
-            foreach (var file in await noteStore.GetCommitDiffAsync(SelectedCommit.Hash))
+            foreach (var file in await git.GetCommitDiffAsync(SelectedCommit.Hash))
                 CommitDiffFiles.Add(file);
 
         HasCommitDiff = CommitDiffFiles.Count > 0;

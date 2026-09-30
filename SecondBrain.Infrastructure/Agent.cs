@@ -15,6 +15,7 @@ public class FabrykaAgent(
     INoteStore noteStore,
     NotePipeline pipeline,
     NoteSearch noteSearch,
+    IEventBus events,
     ITagCleaner tagCleaner,
     TagMerger tagMerger,
     DuplicateScanner duplicateScanner) : IAgent
@@ -297,8 +298,7 @@ public class FabrykaAgent(
                     return "Brak notatek pasujacych do tego pytania.";
 
                 var answer = await answerSynthesizer.SynthesizeAsync(query, fullNotes, ct);
-                if (!answer.Answered)
-                    await noteStore.LogGapAsync(query, ct);
+                await events.PublishAsync(new SearchCompleted(query, answer.Answered), ct);
                 return answer.Answer;
             }
 
@@ -340,7 +340,7 @@ public class FabrykaAgent(
             }
 
             case "purge_note":
-                await noteStore.PurgeTrashAsync(Req("trashPath"), ct);
+                await pipeline.PurgeAsync(Req("trashPath"), ct);
                 return "Usunieto trwale.";
 
             case "list_gaps":
@@ -443,7 +443,7 @@ public class FabrykaAgent(
             {
                 var trashed = await noteStore.ListTrashAsync(ct);
                 foreach (var t in trashed)
-                    await noteStore.PurgeTrashAsync(t.TrashPath, ct);
+                    await pipeline.PurgeAsync(t.TrashPath, ct);
                 return $"Trwale usunieto {trashed.Count} notatek z kosza.";
             }
 
@@ -483,7 +483,7 @@ public class FabrykaAgent(
             case "bulk_purge":
             {
                 foreach (var trashPath in ReqArr("trashPaths"))
-                    await noteStore.PurgeTrashAsync(trashPath, ct);
+                    await pipeline.PurgeAsync(trashPath, ct);
                 return $"Trwale usunieto {ReqArr("trashPaths").Length} notatek z kosza.";
             }
 

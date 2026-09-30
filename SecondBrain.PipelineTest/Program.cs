@@ -21,6 +21,7 @@ var answerSynthesizer = provider.GetRequiredService<IAnswerSynthesizer>();
 var noteStore = provider.GetRequiredService<INoteStore>();
 var pipeline = provider.GetRequiredService<NotePipeline>();
 var noteSearch = provider.GetRequiredService<NoteSearch>();
+var events = provider.GetRequiredService<IEventBus>();
 var agent = provider.GetRequiredService<IAgent>();
 var tagCleaner = provider.GetRequiredService<ITagCleaner>();
 var tagMerger = provider.GetRequiredService<TagMerger>();
@@ -160,7 +161,7 @@ switch (args.ElementAtOrDefault(0))
 
     case "purge" when args.Length >= 2:
     {
-        await noteStore.PurgeTrashAsync(args[1]);
+        await pipeline.PurgeAsync(args[1]);
         Console.WriteLine("Usunieto na zawsze.");
         break;
     }
@@ -187,11 +188,9 @@ switch (args.ElementAtOrDefault(0))
             var answer = await answerSynthesizer.SynthesizeAsync(query, fullNotes);
             Console.WriteLine($"\nOdpowiedz:\n{answer.Answer}");
 
+            await events.PublishAsync(new SearchCompleted(query, answer.Answered));
             if (!answer.Answered)
-            {
-                await noteStore.LogGapAsync(query);
                 Console.WriteLine("(zapisano jako luka w wiedzy)");
-            }
         }
         break;
     }

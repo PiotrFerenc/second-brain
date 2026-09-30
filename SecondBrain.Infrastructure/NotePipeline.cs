@@ -2,32 +2,32 @@ using SecondBrain.Core;
 
 namespace SecondBrain.Infrastructure;
 
-// Notices: komunikaty dla uzytkownika powstale po drodze (sprzecznosc, domkniete luki) -
-// wywolujacy (edytor, agent, CLI) pokazuje je po swojemu.
+// Notices: komunikaty dla uzytkownika dopisane przez handlery zdarzen (sprzecznosc, domkniete
+// luki) - wywolujacy (edytor, agent, CLI) pokazuje je po swojemu.
 public record AddNoteResult(Note Note, CompressionResult Result, IReadOnlyList<Note> Related, IReadOnlyList<string> Notices);
 
 public record ImportResult(int Count, IReadOnlyList<string> Notices);
 
-// Jedyne miejsce cyklu zycia notatki: kompresja -> zapis -> slownik -> embedding -> upsert ->
-// powiazane -> sprzecznosc + wersje faktow -> domykanie luk. Wczesniej ta sekwencja byla
-// skopiowana w edytorze, imporcie, edycji, agencie (x3) i CLI - i zdazyla sie rozjechac.
+// Jedyne miejsce cyklu zycia notatki: kompresja -> zapis -> embedding -> upsert, a reszta
+// (slownik, sprzecznosc + wersje faktow, domykanie luk, backup gita) to handlery zdarzen
+// z szyny - patrz NoteEventHandlers. Wczesniej ta sekwencja byla skopiowana w edytorze,
+// imporcie, edycji, agencie (x3) i CLI - i zdazyla sie rozjechac.
 public sealed class NotePipeline(
     ICompressor compressor,
     IEmbedder embedder,
     IVectorIndex vectorIndex,
     INoteStore noteStore,
-    IConflictDetector conflictDetector,
-    GapAutoCloser gapAutoCloser)
+    IEventBus events)
 {
     // chooseTags: wywolujacy moze ustalic tagi na podstawie wyniku kompresji i sasiadow
     // (edytor: tagi reczne albo auto-tagowanie z sasiadow); null = tagi z kompresji.
+    // Handlery NoteCompressed moga je jeszcze zmienic.
     public async Task<AddNoteResult> AddAsync(
         string folder,
         string rawText,
         Guid? parentId = null,
         Func<CompressionResult, IReadOnlyList<Note>, string[]>? chooseTags = null,
-        bool detectConflicts = true,
-        bool closeGaps = true,
+        bool fromImport = false,
         CancellationToken ct = default)
     {
         var now = DateTimeOffset.UtcNow;
@@ -38,43 +38,17 @@ public sealed class NotePipeline(
         var vector = await embedder.EmbedAsync(result.CompressedContent, ct);
         var related = (await vectorIndex.SearchAsync(folder, vector, limit: 4, ct)).Select(r => r.Note).Take(3).ToList();
 
-        var tags = chooseTags?.Invoke(result, related) ?? result.Tags;
-        var note = new Note(Guid.NewGuid(), result.Title, rawText, result.CompressedContent, tags, now, now, ParentId: parentId);
+        var tags = (chooseTags?.Invoke(result, related) ?? result.Tags).ToList();
+        await events.PublishAsync(new NoteCompressed(folder, rawText, result, tags, related), ct);
 
+        var note = new Note(Guid.NewGuid(), result.Title, rawText, result.CompressedContent, [.. tags], now, now, ParentId: parentId);
         var path = await noteStore.SaveAsync(folder, note, ct);
         note = note with { FilePath = path };
-
-        foreach (var def in result.Definitions ?? [])
-            await noteStore.SaveGlossaryEntryAsync(def.Term, def.Definition, result.Title, ct);
-
         await vectorIndex.UpsertAsync(folder, note, vector, ct);
 
         var notices = new List<string>();
-
-        if (detectConflicts && related.Count > 0)
-        {
-            var conflict = await conflictDetector.DetectAsync(note.CompressedContent, related, ct);
-            if (conflict.HasConflict)
-            {
-                notices.Add($"UWAGA - mozliwa sprzecznosc z \"{conflict.ConflictingTitle}\": {conflict.Explanation}");
-
-                // Pierwsza sprzecznosc dla tematu: dopisz tez PIERWOTNA wersje, zeby historia
-                // od razu miala obie strony.
-                if ((await noteStore.ListFactHistoryAsync(conflict.ConflictingTitle!, ct)).Count == 0)
-                {
-                    var original = related.First(n => n.Title == conflict.ConflictingTitle);
-                    await noteStore.RecordFactVersionAsync(conflict.ConflictingTitle!, original.CompressedContent, original.Title, ct);
-                }
-                await noteStore.RecordFactVersionAsync(conflict.ConflictingTitle!, note.CompressedContent, result.Title, ct);
-            }
-        }
-
-        if (closeGaps)
-        {
-            var closed = await gapAutoCloser.TryCloseMatchingGapsAsync(ct);
-            if (closed > 0)
-                notices.Add($"Zamknieto {closed} luk(i) w wiedzy.");
-        }
+        await events.PublishAsync(new NoteAdded(folder, note, result, related, fromImport, notices), ct);
+        await events.PublishAsync(new NotesChanged(), ct);
 
         return new AddNoteResult(note, result, related, notices);
     }
@@ -95,32 +69,27 @@ public sealed class NotePipeline(
 
         var path = await noteStore.SaveAsync(folder, note, ct);
         note = note with { FilePath = path };
-
-        foreach (var def in result.Definitions ?? [])
-            await noteStore.SaveGlossaryEntryAsync(def.Term, def.Definition, result.Title, ct);
-
         await vectorIndex.UpsertAsync(folder, note, await embedder.EmbedAsync(note.CompressedContent, ct), ct);
+
+        await events.PublishAsync(new NoteEdited(folder, note, result, new List<string>()), ct);
+        await events.PublishAsync(new NotesChanged(), ct);
         return note;
     }
 
-    // Import: kazdy tekst przez AddAsync bez wykrywania sprzecznosci (N wywolan LLM juz jest,
-    // 2N byloby za drogie), domykanie luk raz na koniec (koszt tylko gdy sa otwarte luki).
+    // Import: kazdy tekst przez AddAsync jako FromImport (handlery pomijaja wykrywanie
+    // sprzecznosci - N wywolan LLM juz jest, 2N byloby za drogie), luki domykane raz na koniec.
     public async Task<ImportResult> ImportAsync(string folder, IReadOnlyList<string> texts, CancellationToken ct = default)
     {
         var count = 0;
         foreach (var text in texts.Select(t => t.Trim()).Where(t => t.Length > 0))
         {
-            await AddAsync(folder, text, detectConflicts: false, closeGaps: false, ct: ct);
+            await AddAsync(folder, text, fromImport: true, ct: ct);
             count++;
         }
 
         var notices = new List<string>();
         if (count > 0)
-        {
-            var closed = await gapAutoCloser.TryCloseMatchingGapsAsync(ct);
-            if (closed > 0)
-                notices.Add($"Zamknieto {closed} luk(i) w wiedzy.");
-        }
+            await events.PublishAsync(new ImportCompleted(folder, count, notices), ct);
 
         return new ImportResult(count, notices);
     }
@@ -131,6 +100,9 @@ public sealed class NotePipeline(
         var path = await noteStore.SaveAsync(folder, note, ct);
         note = note with { FilePath = path };
         await vectorIndex.UpsertAsync(folder, note, await embedder.EmbedAsync(note.CompressedContent, ct), ct);
+
+        await events.PublishAsync(new NoteReindexed(folder, note), ct);
+        await events.PublishAsync(new NotesChanged(), ct);
         return note;
     }
 
@@ -146,6 +118,9 @@ public sealed class NotePipeline(
         note = note with { FilePath = newPath };
         await vectorIndex.DeleteNoteAsync(fromFolder, note.Id, ct);
         await vectorIndex.UpsertAsync(toFolder, note, await embedder.EmbedAsync(note.CompressedContent, ct), ct);
+
+        await events.PublishAsync(new NoteReindexed(toFolder, note), ct);
+        await events.PublishAsync(new NotesChanged(), ct);
         return note;
     }
 
@@ -153,22 +128,45 @@ public sealed class NotePipeline(
     {
         await vectorIndex.DeleteNoteAsync(folder, note.Id, ct);
         await noteStore.MoveToTrashAsync(folder, note.FilePath, ct);
+
+        await events.PublishAsync(new NoteTrashed(folder, note), ct);
+        await events.PublishAsync(new NotesChanged(), ct);
     }
 
     public async Task<TrashedNote> RestoreAsync(string trashPath, CancellationToken ct = default)
     {
         var restored = await noteStore.RestoreFromTrashAsync(trashPath, ct);
         await vectorIndex.UpsertAsync(restored.OriginalFolder, restored.Note, await embedder.EmbedAsync(restored.Note.CompressedContent, ct), ct);
+
+        await events.PublishAsync(new NoteRestored(restored), ct);
+        await events.PublishAsync(new NotesChanged(), ct);
         return restored;
     }
 
-    public Task<bool> CreateFolderAsync(string name, CancellationToken ct = default) =>
-        vectorIndex.CreateFolderAsync(name, ct);
+    public async Task PurgeAsync(string trashPath, CancellationToken ct = default)
+    {
+        await noteStore.PurgeTrashAsync(trashPath, ct);
+        await events.PublishAsync(new NotePurged(trashPath), ct);
+    }
+
+    public async Task<bool> CreateFolderAsync(string name, CancellationToken ct = default)
+    {
+        var created = await vectorIndex.CreateFolderAsync(name, ct);
+        if (created)
+        {
+            await events.PublishAsync(new FolderCreated(name), ct);
+            await events.PublishAsync(new NotesChanged(), ct);
+        }
+        return created;
+    }
 
     // Trwale (bez kosza) - patrz decyzja w PLAN.md.
     public async Task DeleteFolderAsync(string folder, CancellationToken ct = default)
     {
         await vectorIndex.DeleteFolderAsync(folder, ct);
         await noteStore.DeleteFolderAsync(folder, ct);
+
+        await events.PublishAsync(new FolderDeleted(folder), ct);
+        await events.PublishAsync(new NotesChanged(), ct);
     }
 }

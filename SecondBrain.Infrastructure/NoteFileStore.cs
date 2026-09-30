@@ -4,7 +4,7 @@ namespace SecondBrain.Infrastructure;
 
 // ponytail: format zapisu jest stały i prosty (kilka pól nagłówka), więc front matter
 // czytamy/piszemy ręcznie zamiast ciągnąć zależność YamlDotNet dla tego zakresu.
-public class FileNoteStore(NotesRoot notesRoot) : INoteStore
+public class FileNoteStore(NotesRoot notesRoot, IEventBus events) : INoteStore
 {
     private const string OriginalHeader = "## Oryginał";
     private const string CompressedHeader = "## Skompresowane (embedowane)";
@@ -21,6 +21,13 @@ public class FileNoteStore(NotesRoot notesRoot) : INoteStore
 
     public async Task<string> SaveAsync(string folder, Note note, CancellationToken ct = default)
     {
+        var path = await WriteAsync(folder, note, ct);
+        await Changed($"Zapisano notatke: {note.Title}", ct);
+        return path;
+    }
+
+    private async Task<string> WriteAsync(string folder, Note note, CancellationToken ct)
+    {
         var dir = Path.Combine(_root, folder, note.CreatedAt.Year.ToString());
         Directory.CreateDirectory(dir);
         var path = Path.Combine(dir, $"{note.Id}.md");
@@ -28,6 +35,10 @@ public class FileNoteStore(NotesRoot notesRoot) : INoteStore
         await File.WriteAllTextAsync(path, Render(note), ct);
         return path;
     }
+
+    // Kazda mutacja na dysku zglasza sie szynie - backup do gita (GitCommitOnChange) i inni
+    // zainteresowani nie musza znac tej klasy.
+    private Task Changed(string message, CancellationToken ct) => events.PublishAsync(new StorageChanged(message), ct);
 
     public async Task<Note> LoadAsync(string filePath, CancellationToken ct = default)
     {
@@ -50,20 +61,21 @@ public class FileNoteStore(NotesRoot notesRoot) : INoteStore
 
     public async Task<string> MoveAsync(string fromFolder, string toFolder, Note note, CancellationToken ct = default)
     {
-        var newPath = await SaveAsync(toFolder, note, ct);
+        var newPath = await WriteAsync(toFolder, note, ct);
         if (!string.IsNullOrEmpty(note.FilePath) && note.FilePath != newPath && File.Exists(note.FilePath))
             File.Delete(note.FilePath);
 
+        await Changed($"Przeniesiono notatke: {note.Title} ({fromFolder} -> {toFolder})", ct);
         return newPath;
     }
 
-    public Task DeleteFolderAsync(string folder, CancellationToken ct = default)
+    public async Task DeleteFolderAsync(string folder, CancellationToken ct = default)
     {
         var dir = Path.Combine(_root, folder);
         if (Directory.Exists(dir))
             Directory.Delete(dir, recursive: true);
 
-        return Task.CompletedTask;
+        await Changed($"Usunieto folder: {folder}", ct);
     }
 
     public async Task<string> MoveToTrashAsync(string folder, string filePath, CancellationToken ct = default)
@@ -74,6 +86,7 @@ public class FileNoteStore(NotesRoot notesRoot) : INoteStore
 
         var trashPath = Path.Combine(trashDir, $"{folder}{TrashSeparator}{note.Id}.md");
         File.Move(filePath, trashPath, overwrite: true);
+        await Changed($"Notatka w koszu (folder {folder})", ct);
         return trashPath;
     }
 
@@ -103,16 +116,17 @@ public class FileNoteStore(NotesRoot notesRoot) : INoteStore
         Directory.CreateDirectory(dir);
         var restoredPath = Path.Combine(dir, $"{note.Id}.md");
         File.Move(trashPath, restoredPath, overwrite: true);
+        await Changed("Przywrocono notatke z kosza", ct);
 
         return new TrashedNote(note with { FilePath = restoredPath }, folder, restoredPath);
     }
 
-    public Task PurgeTrashAsync(string trashPath, CancellationToken ct = default)
+    public async Task PurgeTrashAsync(string trashPath, CancellationToken ct = default)
     {
         if (File.Exists(trashPath))
             File.Delete(trashPath);
 
-        return Task.CompletedTask;
+        await Changed("Trwale usunieto notatke z kosza", ct);
     }
 
     public async Task<IReadOnlyList<NoteTemplate>> ListTemplatesAsync(CancellationToken ct = default)
@@ -165,6 +179,7 @@ public class FileNoteStore(NotesRoot notesRoot) : INoteStore
             """;
 
         await File.WriteAllTextAsync(path, content, ct);
+        await Changed($"Zapisano luke w wiedzy: {query}", ct);
     }
 
     public async Task<IReadOnlyList<KnowledgeGap>> ListGapsAsync(CancellationToken ct = default)
@@ -190,12 +205,12 @@ public class FileNoteStore(NotesRoot notesRoot) : INoteStore
         return gaps.OrderByDescending(g => g.AskedAt).ToList();
     }
 
-    public Task ResolveGapAsync(string path, CancellationToken ct = default)
+    public async Task ResolveGapAsync(string path, CancellationToken ct = default)
     {
         if (File.Exists(path))
             File.Delete(path);
 
-        return Task.CompletedTask;
+        await Changed("Odrzucono luke w wiedzy", ct);
     }
 
     public async Task SaveGlossaryEntryAsync(string term, string definition, string sourceTitle, CancellationToken ct = default)
@@ -216,6 +231,7 @@ public class FileNoteStore(NotesRoot notesRoot) : INoteStore
             """;
 
         await File.WriteAllTextAsync(path, content, ct);
+        await Changed($"Slownik: {term}", ct);
     }
 
     public async Task<IReadOnlyList<GlossaryEntry>> ListGlossaryAsync(CancellationToken ct = default)
@@ -241,14 +257,15 @@ public class FileNoteStore(NotesRoot notesRoot) : INoteStore
         return entries.OrderBy(e => e.Term, StringComparer.OrdinalIgnoreCase).ToList();
     }
 
-    public Task<bool> DeleteGlossaryEntryAsync(string term, CancellationToken ct = default)
+    public async Task<bool> DeleteGlossaryEntryAsync(string term, CancellationToken ct = default)
     {
         var path = Path.Combine(_root, ".glossary", $"{Slugify(term)}.md");
         if (!File.Exists(path))
-            return Task.FromResult(false);
+            return false;
 
         File.Delete(path);
-        return Task.FromResult(true);
+        await Changed($"Usunieto z slownika: {term}", ct);
+        return true;
     }
 
     public async Task<IReadOnlyList<FolderedNote>> MergeTagsAsync(string[] fromTags, string toTag, CancellationToken ct = default)
@@ -279,6 +296,9 @@ public class FileNoteStore(NotesRoot notesRoot) : INoteStore
             }
         }
 
+        if (updated.Count > 0)
+            await Changed($"Scalono tagi: {string.Join(", ", fromTags)} -> {toTag}", ct);
+
         return updated;
     }
 
@@ -301,6 +321,7 @@ public class FileNoteStore(NotesRoot notesRoot) : INoteStore
         // historii na raz.
         var existing = File.Exists(path) ? await File.ReadAllTextAsync(path, ct) + "\n\n" : "";
         await File.WriteAllTextAsync(path, existing + entry, ct);
+        await Changed($"Wersja faktu: {subject}", ct);
     }
 
     public async Task<IReadOnlyList<FactVersion>> ListFactHistoryAsync(string subject, CancellationToken ct = default)

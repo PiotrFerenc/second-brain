@@ -69,11 +69,20 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IOcrExtractor, LightOnOcrExtractor>();
         services.AddSingleton<INoteRewriter, FabrykaNoteRewriter>();
         services.AddSingleton<NotesRoot>();
-        services.AddSingleton<INoteStore>(sp => new GitBackedNoteStore(
-            new FileNoteStore(sp.GetRequiredService<NotesRoot>()),
-            sp.GetRequiredService<NotesRoot>()));
+        services.AddSingleton<IEventBus, EventBus>();
+        services.AddSingleton<INoteStore, FileNoteStore>();
+        services.AddSingleton<GitRepository>();
         services.AddSingleton<NoteSearch>();
         services.AddSingleton<NotePipeline>();
+
+        // Reakcje na zdarzenia - kolejnosc rejestracji = kolejnosc wykonania.
+        services.AddSingleton<IEventHandler<NoteAdded>, GlossaryOnNoteAdded>();
+        services.AddSingleton<IEventHandler<NoteEdited>, GlossaryOnNoteAdded>();
+        services.AddSingleton<IEventHandler<NoteAdded>, ConflictOnNoteAdded>();
+        services.AddSingleton<IEventHandler<NoteAdded>, GapAutoCloseOnNoteAdded>();
+        services.AddSingleton<IEventHandler<ImportCompleted>, GapAutoCloseOnNoteAdded>();
+        services.AddSingleton<IEventHandler<SearchCompleted>, GapLogOnSearch>();
+        services.AddSingleton<IEventHandler<StorageChanged>, GitCommitOnChange>();
         services.AddSingleton<IVectorIndex, FileVectorIndex>();
         services.AddSingleton<DuplicateScanner>();
         services.AddSingleton<IAgentSessionStore, FileAgentSessionStore>();
