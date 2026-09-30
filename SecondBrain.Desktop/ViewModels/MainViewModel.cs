@@ -28,7 +28,6 @@ public partial class MainViewModel(
     public const int TabGaps = 4;
     public const int TabGlossary = 5;
     public const int TabAgent = 6;
-    public const int TabTimeline = 7;
     public const int TabHistory = 8;
 
     // ---- Drzewo (foldery + notatki, w tym zagniezdzone podstrony) ----
@@ -116,58 +115,9 @@ public partial class MainViewModel(
         ApplyExpandedKeys(Tree, expandedKeys);
         HasFolders = Tree.Count > 0;
         RebuildMentionNames();
-        BuildTimeline();
 
         if (selectedNoteId is { } id)
             SelectedNote = FindNote(Tree, id);
-    }
-
-    // Oś czasu: pochodna drzewa juz zaladowanego wyzej (bez dodatkowego odczytu z dysku) -
-    // splaszcz wszystkie notatki ze wszystkich folderow, pogrupuj po dacie utworzenia.
-    public ObservableCollection<TimelineGroup> TimelineGroups { get; } = [];
-
-    [ObservableProperty]
-    public partial bool HasTimeline { get; set; }
-
-    [ObservableProperty]
-    public partial SearchResultItem? SelectedTimelineNote { get; set; }
-
-    private void BuildTimeline()
-    {
-        TimelineGroups.Clear();
-
-        var allNotes = new List<SearchResultItem>();
-        CollectNotes(Tree, allNotes);
-
-        foreach (var group in allNotes
-                     .OrderByDescending(n => n.CreatedAt)
-                     .GroupBy(n => n.CreatedAt.Date))
-        {
-            var label = group.Key.ToString("d MMMM yyyy", new System.Globalization.CultureInfo("pl-PL"));
-            TimelineGroups.Add(new TimelineGroup(label, group.ToList()));
-        }
-
-        HasTimeline = TimelineGroups.Count > 0;
-    }
-
-    private static void CollectNotes(IEnumerable<TreeItem> nodes, List<SearchResultItem> notes)
-    {
-        foreach (var node in nodes)
-        {
-            if (node.Note is not null)
-                notes.Add(node.Note);
-            CollectNotes(node.Children, notes);
-        }
-    }
-
-    [RelayCommand]
-    private void OpenTimelineNote(SearchResultItem? item)
-    {
-        if (item is null)
-            return;
-
-        SelectedNote = item;
-        SelectedTabIndex = TabNote;
     }
 
     // LoadTreeAsync przebudowuje drzewo od zera (nowe instancje TreeItem) po kazdej akcji
@@ -1146,9 +1096,6 @@ public partial class MainViewModel(
     public partial bool IsAgentTabActive { get; set; }
 
     [ObservableProperty]
-    public partial bool IsTimelineTabActive { get; set; }
-
-    [ObservableProperty]
     public partial bool IsHistoryTabActive { get; set; }
 
     // Naglowek "Notatka / +" w prawym panelu ma sens tylko dla tych dwoch widokow -
@@ -1201,7 +1148,6 @@ public partial class MainViewModel(
         IsGapsTabActive = value == TabGaps;
         IsGlossaryTabActive = value == TabGlossary;
         IsAgentTabActive = value == TabAgent;
-        IsTimelineTabActive = value == TabTimeline;
         IsHistoryTabActive = value == TabHistory;
         IsContentHeaderVisible = value is TabEditor or TabNote;
     }
@@ -1226,9 +1172,6 @@ public partial class MainViewModel(
 
     [RelayCommand]
     private void ShowAgentTab() => SelectedTabIndex = TabAgent;
-
-    [RelayCommand]
-    private void ShowTimelineTab() => SelectedTabIndex = TabTimeline;
 
     [RelayCommand]
     private async Task ShowHistoryTabAsync()
