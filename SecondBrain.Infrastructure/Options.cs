@@ -49,23 +49,6 @@ public class AnswerSynthesisOptions : HttpClientOptions
         "zdanie ze notatki nie zawieraja odpowiedzi - bez zgadywania i bez wiedzy spoza notatek).";
 }
 
-public class TagCleaningOptions : HttpClientOptions
-{
-    // ponytail: grupowanie tagow to ekstrakcja/kategoryzacja, nie twarde rozumowanie jak
-    // wykrywanie sprzecznosci - domyslny model jak w Compression wystarcza (patrz PLAN.md
-    // decyzje: ConflictModel/AgentModel istnieja bo gpt-3.5-turbo konkretnie zawodzil na
-    // tamtym zadaniu, to tu nie zaobserwowano). Konfiguracja mimo to osobna, jak kazdy provider.
-    public string Model { get; set; } = "gpt-3.5-turbo";
-
-    public string SystemPrompt { get; set; } =
-        "Dostajesz liste WSZYSTKICH tagow uzywanych w osobistej bazie notatek uzytkownika. " +
-        "Znajdz grupy tagow ktore znacza to samo (liczba pojedyncza/mnoga, oczywiste literowki, " +
-        "synonimy) i zasugeruj jedna kanoniczna forme dla kazdej grupy. Pomin tagi ktore nie maja " +
-        "duplikatu - nie twórz grup jednoelementowych. Zwroc WYLACZNIE obiekt JSON o jednym polu " +
-        "\"groups\": tablica obiektow {\"tags\": [...], \"suggestedCanonical\": \"...\"}. Jesli nie " +
-        "ma zadnych duplikatow, zwroc {\"groups\": []}.";
-}
-
 public class AgentOptions : HttpClientOptions
 {
     // Agent orkiestruje wywolania narzedzi (co wywolac, w jakiej kolejnosci, kiedy skonczyc) -

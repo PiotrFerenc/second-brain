@@ -21,9 +21,6 @@ public record AnswerResult(
     [property: JsonPropertyName("answered")] bool Answered,
     [property: JsonPropertyName("answer")] string Answer);
 
-// Sugestia grupy tagow-duplikatow (np. "spotkanie"/"spotkania") do reczengo scalenia.
-public record TagGroup(string[] Tags, string SuggestedCanonical);
-
 // Notatka wraz z folderem, w ktorym lezy - zwracana tam gdzie wywolujacy (np. TagMerger)
 // musi wiedziec do ktorego pliku wektorow doupsertowac notatke po zmianie na dysku.
 public record FolderedNote(string Folder, Note Note);
@@ -65,13 +62,6 @@ public interface IReranker
 public interface IAnswerSynthesizer
 {
     Task<AnswerResult> SynthesizeAsync(string query, IReadOnlyList<Note> notes, CancellationToken ct = default);
-}
-
-// Grupuje semantycznie zduplikowane tagi z calej bazy (liczba pojedyncza/mnoga, literowki,
-// synonimy) i sugeruje jedna kanoniczna forme na grupe - do recznego scalenia przez usera.
-public interface ITagCleaner
-{
-    Task<IReadOnlyList<TagGroup>> FindDuplicateGroupsAsync(IReadOnlyList<string> allTags, CancellationToken ct = default);
 }
 
 public interface INoteStore

@@ -3,10 +3,35 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Options;
 using SecondBrain.Core;
+using SecondBrain.Infrastructure;
 
-namespace SecondBrain.Infrastructure;
+namespace SecondBrain.Plugins.Tags;
 
-public class FabrykaTagCleaner(IHttpClientFactory httpClientFactory, IOptions<TagCleaningOptions> options) : ITagCleaner
+// Sugestia grupy tagow-duplikatow (np. "spotkanie"/"spotkania") do recznego scalenia.
+public record TagGroup(string[] Tags, string SuggestedCanonical);
+
+public class TagCleaningOptions : HttpClientOptions
+{
+    // ponytail: grupowanie tagow to ekstrakcja/kategoryzacja, nie twarde rozumowanie jak
+    // wykrywanie sprzecznosci - domyslny model jak w Compression wystarcza (patrz PLAN.md
+    // decyzje: ConflictModel/AgentModel istnieja bo gpt-3.5-turbo konkretnie zawodzil na
+    // tamtym zadaniu, to tu nie zaobserwowano). Konfiguracja mimo to osobna, jak kazdy provider.
+    public string Model { get; set; } = "gpt-3.5-turbo";
+
+    public string SystemPrompt { get; set; } =
+        "Dostajesz liste WSZYSTKICH tagow uzywanych w osobistej bazie notatek uzytkownika. " +
+        "Znajdz grupy tagow ktore znacza to samo (liczba pojedyncza/mnoga, oczywiste literowki, " +
+        "synonimy) i zasugeruj jedna kanoniczna forme dla kazdej grupy. Pomin tagi ktore nie maja " +
+        "duplikatu - nie twórz grup jednoelementowych. Zwroc WYLACZNIE obiekt JSON o jednym polu " +
+        "\"groups\": tablica obiektow {\"tags\": [...], \"suggestedCanonical\": \"...\"}. Jesli nie " +
+        "ma zadnych duplikatow, zwroc {\"groups\": []}.";
+}
+
+// Grupuje semantycznie zduplikowane tagi z calej bazy (liczba pojedyncza/mnoga, literowki,
+// synonimy) i sugeruje jedna kanoniczna forme na grupe - do recznego scalenia przez usera.
+// Jedna implementacja, jeden uzytkownik (ten plugin) - bez interfejsu.
+
+public class TagCleaner(IHttpClientFactory httpClientFactory, IOptions<TagCleaningOptions> options)
 {
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
 
