@@ -8,14 +8,22 @@ public interface IShell
 {
     string? SelectedFolder { get; }
     NoteItem? SelectedNote { get; }
-    NoteItem? SelectedSearchResult { get; }     // zaznaczony wynik w Szukaj (rdzen do partii B)
+    NoteItem? SelectedSearchResult { get; }     // zaznaczony wynik w zakladce pluginu search (ISearchTab); null gdy plugin wylaczony
     IReadOnlyList<string> Folders { get; }
     void ShowTab(string tabId);
     void ShowNote(NoteItem note);               // przelacza na widok notatki
-    void Search(string query);                  // Szukaj z gotowym zapytaniem (Szukaj jest jeszcze w rdzeniu - partia B przeniesie to do pluginu search)
+    void Search(string query);                  // otwiera zakladke search z gotowym zapytaniem; no-op (ostrzezenie w logu) gdy plugin wylaczony
     Func<Note, bool>? TreeFilter { get; set; }  // zawezenie drzewa; null = bez filtra
     Task RefreshTreeAsync();                    // tylko dla TreeFilter; mutacje ida zdarzeniami
     TopLevel TopLevel { get; }                  // schowek, StorageProvider
+}
+
+// Zakladka pluginu search widziana przez host (IShell.Search / SelectedSearchResult): host szuka
+// kontrybucji o Id "search" i rzutuje na ten interfejs, bez referencji do samego pluginu.
+public interface ISearchTab
+{
+    void Search(string query);
+    NoteItem? SelectedResult { get; }
 }
 
 // Stan edytora nowej notatki.

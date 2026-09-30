@@ -16,7 +16,6 @@
 
     <Window.KeyBindings>
         <KeyBinding Gesture="Ctrl+N" Command="{Binding ShowEditorTabCommand}" />
-        <KeyBinding Gesture="Ctrl+F" Command="{Binding ShowSearchTabCommand}" />
         <KeyBinding Gesture="Ctrl+S" Command="{Binding SaveNoteCommand}" />
     </Window.KeyBindings>
 
@@ -39,7 +38,6 @@
                  StackPanel - sidebar ma stala szerokosc (270px), przyciski musza zawijac sie do
                  kolejnej linii zamiast wypadac poza widoczny obszar. -->
             <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,20" ItemSpacing="8" LineSpacing="8">
-                <Button Content="Szukaj" Classes="subtleAction" Command="{Binding ShowSearchTabCommand}" />
                 <Button Content="Agent" Classes="subtleAction" Command="{Binding ShowAgentTabCommand}" />
                 <!-- Zakladki z pluginow (ITabContribution, Placement=SidebarToolbar) -->
                 <ItemsControl ItemsSource="{Binding ToolbarTabs}">
@@ -243,75 +241,6 @@
                             <Border Grid.Column="1" Width="1" Background="{DynamicResource CtpSurface2}" Margin="16,0" />
 
                             <md:MarkdownScrollViewer Grid.Column="2" Markdown="{Binding NoteText, Converter={x:Static conv:AutoLinkConverter.Instance}}" />
-                        </Grid>
-                    </DockPanel>
-
-                    <DockPanel Margin="0,20,0,0" IsVisible="{Binding IsSearchTabActive}">
-                        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="10" Margin="0,0,0,16">
-                            <TextBox Text="{Binding SearchQuery}" PlaceholderText="Zadaj pytanie..." Width="420" />
-                            <Button Content="Szukaj"
-                                    Classes="accent"
-                                    Command="{Binding SearchCommand}"
-                                    IsEnabled="{Binding !IsBusy}" />
-                            <CheckBox Content="{Binding SelectedFolder, StringFormat='tylko w folderze: {0}'}"
-                                      IsChecked="{Binding SearchCurrentFolderOnly}"
-                                      IsEnabled="{Binding SelectedFolder, Converter={x:Static acnv:ObjectConverters.IsNotNull}}"
-                                      VerticalAlignment="Center" />
-                            <sdk:SlotHost SlotId="Search.Toolbar" />
-                        </StackPanel>
-
-                        <Border DockPanel.Dock="Top"
-                                IsVisible="{Binding HasAnswer}"
-                                Background="{DynamicResource CtpSurface0}"
-                                CornerRadius="10"
-                                Padding="16,14"
-                                Margin="0,0,0,16">
-                            <StackPanel Spacing="6">
-                                <Grid ColumnDefinitions="*,Auto">
-                                    <TextBlock Grid.Column="0" Text="ODPOWIEDŹ" Classes="label" VerticalAlignment="Center" />
-                                    <Button Grid.Column="1" Content="Kopiuj" Classes="subtleAction" Click="CopyAnswer_Click" />
-                                </Grid>
-                                <TextBlock Text="{Binding SynthesizedAnswer}"
-                                           TextWrapping="Wrap" FontSize="14.5" LineHeight="21" />
-                            </StackPanel>
-                        </Border>
-
-                        <Grid ColumnDefinitions="280,*">
-
-                            <Panel Grid.Column="0">
-                                <StackPanel Spacing="4" IsVisible="{Binding !HasResults}">
-                                    <TextBlock Text="Wpisz pytanie i kliknij Szukaj."
-                                               Classes="subtle" TextWrapping="Wrap"
-                                               IsVisible="{Binding !HasSearched}" />
-                                    <TextBlock Text="Brak wyników dla tego zapytania."
-                                               Classes="subtle" TextWrapping="Wrap"
-                                               IsVisible="{Binding HasSearched}" />
-                                </StackPanel>
-
-                                <ListBox ItemsSource="{Binding SearchResults}"
-                                         SelectedItem="{Binding SelectedResult}"
-                                         IsVisible="{Binding HasResults}">
-                                    <ListBox.ItemTemplate>
-                                        <DataTemplate x:DataType="sdk:NoteItem">
-                                            <StackPanel Spacing="2">
-                                                <TextBlock Text="{Binding Title}" FontWeight="Medium" TextWrapping="Wrap" />
-                                                <TextBlock Classes="subtle" FontSize="11.5">
-                                                    <Run Text="{Binding Folder}" /><Run Text=" · trafność " /><Run Text="{Binding Score, StringFormat='{}{0:0.00}'}" />
-                                                </TextBlock>
-                                            </StackPanel>
-                                        </DataTemplate>
-                                    </ListBox.ItemTemplate>
-                                </ListBox>
-                            </Panel>
-
-                            <DockPanel Grid.Column="1" Margin="20,0,0,0"
-                                       IsVisible="{Binding SelectedResult, Converter={x:Static acnv:ObjectConverters.IsNotNull}}">
-                                <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto,Auto,Auto" Margin="0,0,0,8">
-                                    <Button Grid.Column="1" Content="Kopiuj" Classes="subtleAction" Click="CopySearchResult_Click" />
-                                    <sdk:SlotHost Grid.Column="3" SlotId="Search.ResultActions" Margin="8,0,0,0" />
-                                </Grid>
-                                <md:MarkdownScrollViewer Markdown="{Binding SelectedResult.RawContent, Converter={x:Static conv:AutoLinkConverter.Instance}}" SelectionEnabled="True" />
-                            </DockPanel>
                         </Grid>
                     </DockPanel>
 
