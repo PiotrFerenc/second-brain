@@ -230,6 +230,21 @@ switch (args.ElementAtOrDefault(0))
         break;
     }
 
+    // Zloty plik do porownania przed/po refaktorze narzedzi agenta (PLAN-AGENT-PLUGINS.md P2).
+    case "tools":
+    {
+        var registry = provider.GetRequiredService<SecondBrain.Infrastructure.AgentTools.AgentToolRegistry>();
+        var all = (await registry.ListAsync()).OrderBy(t => t.Name, StringComparer.Ordinal).ToList();
+        if (args.Length >= 2 && args[1] == "--mutating")
+        {
+            foreach (var t in all)
+                Console.WriteLine($"{t.Name}\t{(t.IsMutating ? "mutating" : "readonly")}");
+            break;
+        }
+        Console.WriteLine(FabrykaAgent.ToolDefinitions(all).ToJsonString(new System.Text.Json.JsonSerializerOptions { WriteIndented = true, Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping }));
+        break;
+    }
+
     case "agent":
     {
         Console.WriteLine("Czat z agentem. Pusta linia = wyjscie.\n");
