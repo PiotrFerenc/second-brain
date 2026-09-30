@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using SecondBrain.Core;
 using SecondBrain.Infrastructure;
 using SecondBrain.PipelineTest;
+using SecondBrain.Plugins.Gaps;
 using SecondBrain.Plugins.Search;
 using SecondBrain.Plugins.Sdk;
 
@@ -35,6 +36,7 @@ var tagCleaner = provider.GetRequiredService<ITagCleaner>();
 var tagMerger = provider.GetRequiredService<TagMerger>();
 var ocrExtractor = provider.GetService<IOcrExtractor>();   // null gdy plugin OCR wylaczony
 var duplicateScanner = provider.GetRequiredService<DuplicateScanner>();
+var gapStore = provider.GetService<GapStore>();   // null gdy plugin luk wylaczony
 
 async Task AddNoteAsync(string folder, string rawText)
 {
@@ -211,7 +213,13 @@ switch (args.ElementAtOrDefault(0))
 
     case "gaps":
     {
-        var gaps = await noteStore.ListGapsAsync();
+        if (gapStore is null)
+        {
+            Console.WriteLine("Plugin luk wylaczony.");
+            break;
+        }
+
+        var gaps = await gapStore.ListAsync();
         if (gaps.Count == 0)
         {
             Console.WriteLine("Brak luk w wiedzy.");
@@ -225,7 +233,13 @@ switch (args.ElementAtOrDefault(0))
 
     case "resolve-gap" when args.Length >= 2:
     {
-        await noteStore.ResolveGapAsync(args[1]);
+        if (gapStore is null)
+        {
+            Console.WriteLine("Plugin luk wylaczony.");
+            break;
+        }
+
+        await gapStore.ResolveAsync(args[1]);
         Console.WriteLine("Odrzucono luke.");
         break;
     }

@@ -4,10 +4,10 @@ using SecondBrain.Infrastructure;
 namespace SecondBrain.Plugins.Gaps;
 
 // RAG jawnie powiedzial "notatki tego nie zawieraja" - pytanie zostaje jako luka w wiedzy.
-public sealed class GapLogOnSearch(INoteStore noteStore) : IEventHandler<SearchCompleted>
+public sealed class GapLogOnSearch(GapStore gaps) : IEventHandler<SearchCompleted>
 {
     public Task HandleAsync(SearchCompleted e, CancellationToken ct = default) =>
-        e.Answered ? Task.CompletedTask : noteStore.LogGapAsync(e.Query, ct);
+        e.Answered ? Task.CompletedTask : gaps.LogAsync(e.Query, ct);
 }
 
 // Po pojedynczym dodaniu i raz po calym imporcie (nie per linia).
@@ -26,11 +26,11 @@ public sealed class GapAutoCloseOnNoteAdded(GapAutoCloser gapAutoCloser) : IEven
 
 // Po kazdej nowej notatce probujemy ponownie odpowiedziec na otwarte luki - jesli RAG teraz
 // zwroci Answered:true, luka zamyka sie sama, bez akcji uzytkownika.
-public sealed class GapAutoCloser(INoteStore noteStore, NoteSearch noteSearch, IAnswerSynthesizer answerSynthesizer)
+public sealed class GapAutoCloser(GapStore gapStore, NoteSearch noteSearch, IAnswerSynthesizer answerSynthesizer)
 {
     public async Task<int> TryCloseMatchingGapsAsync(CancellationToken ct = default)
     {
-        var gaps = await noteStore.ListGapsAsync(ct);
+        var gaps = await gapStore.ListAsync(ct);
         if (gaps.Count == 0)
             return 0;
 
@@ -45,7 +45,7 @@ public sealed class GapAutoCloser(INoteStore noteStore, NoteSearch noteSearch, I
             if (!answer.Answered)
                 continue;
 
-            await noteStore.ResolveGapAsync(gap.Path, ct);
+            await gapStore.ResolveAsync(gap.Path, ct);
             closed++;
         }
 
