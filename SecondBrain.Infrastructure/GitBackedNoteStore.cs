@@ -52,6 +52,9 @@ public class GitBackedNoteStore(INoteStore inner, IOptions<StorageOptions> optio
     public Task<IReadOnlyList<NoteTemplate>> ListTemplatesAsync(CancellationToken ct = default) =>
         inner.ListTemplatesAsync(ct);
 
+    public Task<IReadOnlyList<AgentSkill>> ListSkillsAsync(CancellationToken ct = default) =>
+        inner.ListSkillsAsync(ct);
+
     public Task LogGapAsync(string query, CancellationToken ct = default) =>
         WithCommitAsync(() => inner.LogGapAsync(query, ct), $"Zapisano luke w wiedzy: {query}");
 

@@ -15,6 +15,7 @@ public record CompressionResult(
 public record TrashedNote(Note Note, string OriginalFolder, string TrashPath);
 
 public record NoteTemplate(string Name, string Content);
+public record AgentSkill(string Name, string Content);
 
 public record AnswerResult(
     [property: JsonPropertyName("answered")] bool Answered,
@@ -122,6 +123,10 @@ public interface INoteStore
 
     // Szablony notatek - pliki .md czytelne i edytowalne przez uzytkownika poza aplikacja.
     Task<IReadOnlyList<NoteTemplate>> ListTemplatesAsync(CancellationToken ct = default);
+
+    // Skille agenta - pliki .md w .skills/, pierwsza linia = opis widoczny dla agenta,
+    // pelna tresc (instrukcja) ladowana dopiero gdy agent wywola use_skill.
+    Task<IReadOnlyList<AgentSkill>> ListSkillsAsync(CancellationToken ct = default);
 
     // Luki w wiedzy: pytania, na ktore RAG jawnie odpowiedzial "notatki tego nie zawieraja".
     Task LogGapAsync(string query, CancellationToken ct = default);

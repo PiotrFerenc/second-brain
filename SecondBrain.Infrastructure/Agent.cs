@@ -50,6 +50,7 @@ public class FabrykaAgent(
           { "type": "function", "function": { "name": "edit_note", "description": "Edytuj tresc istniejacej notatki - nowy tekst zostanie skompresowany na nowo (tytul/tagi tez sie przelicza) i podmieni stara tresc.", "parameters": { "type": "object", "properties": { "folder": { "type": "string" }, "noteId": { "type": "string" }, "text": { "type": "string" } }, "required": ["folder", "noteId", "text"] } } },
           { "type": "function", "function": { "name": "set_note_pinned", "description": "Przypnij lub odepnij notatke.", "parameters": { "type": "object", "properties": { "folder": { "type": "string" }, "noteId": { "type": "string" }, "pinned": { "type": "boolean" } }, "required": ["folder", "noteId", "pinned"] } } },
           { "type": "function", "function": { "name": "bulk_import", "description": "Zaimportuj wiele notatek naraz - kazda linia z listy staje sie osobna notatka (kompresja+indeksowanie), bez wykrywania sprzecznosci (za duzo wywolan LLM przy imporcie).", "parameters": { "type": "object", "properties": { "folder": { "type": "string" }, "lines": { "type": "array", "items": { "type": "string" } } }, "required": ["folder", "lines"] } } },
+          { "type": "function", "function": { "name": "use_skill", "description": "Zaladuj pelna instrukcje skilla (z listy dostepnych skilli w prompcie systemowym) i postepuj wedlug niej.", "parameters": { "type": "object", "properties": { "name": { "type": "string" } }, "required": ["name"] } } },
           { "type": "function", "function": { "name": "list_templates", "description": "Wylistuj szablony notatek (nazwa + tresc) dostepne do wykorzystania przed dodaniem notatki.", "parameters": { "type": "object", "properties": {} } } },
           { "type": "function", "function": { "name": "fact_history", "description": "Pokaz historie sprzecznych wersji faktu dla danego tematu (wykryte wczesniej przez wykrywacz sprzecznosci).", "parameters": { "type": "object", "properties": { "subject": { "type": "string" } }, "required": ["subject"] } } },
           { "type": "function", "function": { "name": "list_by_tag", "description": "Wylistuj notatki majace dokladnie podany tag (nie semantyczne - dokladne dopasowanie tagu). Bez folderu przeszukuje wszystkie foldery.", "parameters": { "type": "object", "properties": { "tag": { "type": "string" }, "folder": { "type": "string" } }, "required": ["tag"] } } },
@@ -149,7 +150,7 @@ public class FabrykaAgent(
 
     private async Task<JsonObject> CallChatCompletionsAsync(JsonArray conversation, CancellationToken ct)
     {
-        var allMessages = new JsonArray { new JsonObject { ["role"] = "system", ["content"] = _options.SystemPrompt } };
+        var allMessages = new JsonArray { new JsonObject { ["role"] = "system", ["content"] = await BuildSystemPromptAsync(ct) } };
         foreach (var m in conversation)
             allMessages.Add(m!.DeepClone());
 
@@ -170,6 +171,18 @@ public class FabrykaAgent(
         var doc = JsonNode.Parse(raw) ?? throw new InvalidOperationException("Pusta odpowiedz Fabryka chat/completions.");
         var message = doc["choices"]![0]!["message"]!.AsObject();
         return (JsonObject)message.DeepClone();
+    }
+
+    // Katalog skilli doklejany do promptu przy kazdym wywolaniu - nowy plik w .skills/
+    // dziala od razu, bez restartu. Tylko nazwa + pierwsza linia, reszta przez use_skill.
+    private async Task<string> BuildSystemPromptAsync(CancellationToken ct)
+    {
+        var skills = await noteStore.ListSkillsAsync(ct);
+        if (skills.Count == 0)
+            return _options.SystemPrompt;
+
+        var catalog = string.Join("\n", skills.Select(s => $"- {s.Name}: {s.Content.Split('\n', 2)[0].Trim()}"));
+        return _options.SystemPrompt + "\n\nDostepne skille (gdy zadanie pasuje do opisu, najpierw wywolaj use_skill z nazwa):\n" + catalog;
     }
 
     private static JsonArray LoadMessages(string conversationState) =>
@@ -639,6 +652,13 @@ public class FabrykaAgent(
             {
                 var lines = Req("notes").Split(',').Select(s => s.Trim()).Where(s => s.Length > 0).ToList();
                 return await BulkCreateNotesAsync(Req("folder"), lines, ct);
+            }
+
+            case "use_skill":
+            {
+                var name = Req("name");
+                var skill = (await noteStore.ListSkillsAsync(ct)).FirstOrDefault(s => s.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+                return skill?.Content ?? $"Nie ma skilla '{name}'.";
             }
 
             case "list_templates":

@@ -135,6 +135,19 @@ public class FileNoteStore(IOptions<StorageOptions> options) : INoteStore
         return templates;
     }
 
+    public async Task<IReadOnlyList<AgentSkill>> ListSkillsAsync(CancellationToken ct = default)
+    {
+        var dir = Path.Combine(_root, ".skills");
+        if (!Directory.Exists(dir))
+            return [];
+
+        var skills = new List<AgentSkill>();
+        foreach (var file in Directory.EnumerateFiles(dir, "*.md").OrderBy(f => f))
+            skills.Add(new AgentSkill(Path.GetFileNameWithoutExtension(file), await File.ReadAllTextAsync(file, ct)));
+
+        return skills;
+    }
+
     public async Task LogGapAsync(string query, CancellationToken ct = default)
     {
         var dir = Path.Combine(_root, ".gaps");
