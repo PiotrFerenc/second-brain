@@ -8,6 +8,7 @@ public interface IShell
 {
     string? SelectedFolder { get; }
     NoteItem? SelectedNote { get; }
+    event Action? SelectedNoteChanged;          // dla slotow widoku notatki (chipy tagow itp.)
     NoteItem? SelectedSearchResult { get; }     // zaznaczony wynik w zakladce pluginu search (ISearchTab); null gdy plugin wylaczony
     IReadOnlyList<string> Folders { get; }
     void ShowTab(string tabId);

@@ -10,10 +10,25 @@ namespace SecondBrain.Desktop.Plugins;
 
 // IShell/IEditorContext dla pluginow: cienka delegacja do MainViewModel (singleton), zeby
 // plugin nie znal VM hosta, a VM nie znal pluginow.
-public sealed class ShellAdapter(MainViewModel vm, IEnumerable<ITabContribution> tabs) : IShell
+public sealed class ShellAdapter : IShell
 {
+    private readonly MainViewModel vm;
+    private readonly IEnumerable<ITabContribution> tabs;
+
+    public ShellAdapter(MainViewModel vm, IEnumerable<ITabContribution> tabs)
+    {
+        this.vm = vm;
+        this.tabs = tabs;
+        vm.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(MainViewModel.SelectedNote))
+                SelectedNoteChanged?.Invoke();
+        };
+    }
+
     public string? SelectedFolder => vm.SelectedFolder;
     public NoteItem? SelectedNote => vm.SelectedNote;
+    public event Action? SelectedNoteChanged;
     public NoteItem? SelectedSearchResult => SearchTab?.SelectedResult;
 
     private ISearchTab? SearchTab => tabs.FirstOrDefault(t => t.Id == "search") as ISearchTab;

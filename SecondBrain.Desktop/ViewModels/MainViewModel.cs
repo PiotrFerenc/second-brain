@@ -38,20 +38,8 @@ public partial class MainViewModel(
     [ObservableProperty]
     public partial bool HasFolders { get; set; }
 
-    // Aktywny filtr po tagu (klikniecie w chip w widoku Notatka) - zawezia drzewo do
-    // notatek majacych ten tag, ze wszystkich folderow, dopoki nie zostanie wyczyszczony.
-    [ObservableProperty]
-    public partial string? ActiveTagFilter { get; set; }
-
     // Filtr drzewa ustawiany przez pluginy (IShell.TreeFilter); null = bez filtra.
     public Func<Note, bool>? TreeFilter { get; set; }
-
-    [RelayCommand]
-    private async Task ClearTagFilterAsync()
-    {
-        ActiveTagFilter = null;
-        await LoadTreeAsync();
-    }
 
     partial void OnSelectedTreeItemChanged(TreeItem? value)
     {
@@ -87,11 +75,8 @@ public partial class MainViewModel(
             var notes = await noteStore.ListAsync(folder);
 
             if (TreeFilter is not null)
-                notes = notes.Where(TreeFilter).ToList();
-
-            if (ActiveTagFilter is not null)
             {
-                notes = notes.Where(n => n.Tags.Any(t => string.Equals(t, ActiveTagFilter, StringComparison.OrdinalIgnoreCase))).ToList();
+                notes = notes.Where(TreeFilter).ToList();
                 if (notes.Count == 0)
                     continue;
             }
@@ -338,11 +323,10 @@ public partial class MainViewModel(
         {
             EditorStatus = "Zapisuje...";
 
-            // Tagi: reczne z pola, a gdy puste - propozycja LLM dolozona o najczestsze tagi
-            // podobnych notatek (auto-tagowanie z sasiadow, ktorych pipeline i tak wyszukal).
+            // Tagi: reczne z pola, a gdy puste - propozycja LLM (plugin tags moze dolozyc tagi sasiadow).
             var manualTags = NoteTagsInput.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
             var added = await pipeline.AddAsync(SelectedFolder, NoteText, SelectedParentOption?.Id,
-                chooseTags: (result, related) => manualTags.Length > 0 ? manualTags : SuggestTags(result.Tags, related));
+                userTags: manualTags.Length > 0 ? manualTags : null);
 
             var statusLines = new List<string> { $"Zapisano: {added.Note.Title}" };
             if (added.Related.Count > 0)
@@ -362,21 +346,6 @@ public partial class MainViewModel(
         {
             IsBusy = false;
         }
-    }
-
-    // ponytail: tagi sasiadow liczone czestosciowo (bez wag/podobienstwa), max 2 dolozone -
-    // podmienic na cos madrzejszego gdy prosta czestosc zacznie realnie zawadzac.
-    private static string[] SuggestTags(string[] baseTags, IReadOnlyList<Note> neighbors)
-    {
-        var extra = neighbors
-            .SelectMany(n => n.Tags)
-            .Where(t => !baseTags.Contains(t, StringComparer.OrdinalIgnoreCase))
-            .GroupBy(t => t, StringComparer.OrdinalIgnoreCase)
-            .OrderByDescending(g => g.Count())
-            .Select(g => g.Key)
-            .Take(2);
-
-        return [.. baseTags, .. extra];
     }
 
     // ---- Notatka (podglad wybranej w drzewie) ----
@@ -465,18 +434,6 @@ public partial class MainViewModel(
             .ToList();
 
         BacklinksText = referencing.Count > 0 ? string.Join(", ", referencing) : "Brak.";
-    }
-
-    // Klikniecie w tag: zawezia DRZEWO folderow do notatek z tym tagiem (ze wszystkich
-    // folderow), zamiast pokazywac plaska liste wynikow - patrz ActiveTagFilter/LoadTreeAsync.
-    [RelayCommand]
-    private async Task FilterByTagAsync(string? tag)
-    {
-        if (string.IsNullOrWhiteSpace(tag))
-            return;
-
-        ActiveTagFilter = tag;
-        await LoadTreeAsync();
     }
 
     // ---- Agent (czat z dostepem do calego programu przez narzedzia) ----

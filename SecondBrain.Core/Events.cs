@@ -14,7 +14,8 @@ public interface IEventBus
 }
 
 // Po kompresji, PRZED zapisem - handler moze zmienic Tags (np. auto-tagowanie z sasiadow).
-public record NoteCompressed(string Folder, string RawText, CompressionResult Result, IList<string> Tags, IReadOnlyList<Note> Related);
+// TagsFromUser: tagi wpisane recznie (nie z kompresji) - handlery nie powinny ich dokladac.
+public record NoteCompressed(string Folder, string RawText, CompressionResult Result, IList<string> Tags, bool TagsFromUser, IReadOnlyList<Note> Related);
 
 // Notices: komunikaty dla uzytkownika dopisywane przez handlery (sprzecznosc, domkniete luki) -
 // wywolujacy (edytor, agent, CLI) pokazuje je po swojemu.

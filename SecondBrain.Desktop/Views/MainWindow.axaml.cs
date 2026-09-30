@@ -34,9 +34,7 @@ public partial class MainWindow : Window
         {
             if (DataContext is MainViewModel vm)
             {
-                vm.PropertyChanged += (_, e) => OnViewModelPropertyChanged(vm, e);
                 await vm.InitializeCommand.ExecuteAsync(null);
-                BuildTagChips(vm);
                 RegisterPluginTabs(vm);
                 await App.Services.GetRequiredService<PluginManager>().StartAsync(App.Services);
             }
@@ -111,12 +109,6 @@ public partial class MainWindow : Window
         Hide();
     }
 
-    private void OnViewModelPropertyChanged(MainViewModel vm, PropertyChangedEventArgs e)
-    {
-        if (e.PropertyName == nameof(MainViewModel.SelectedNote))
-            BuildTagChips(vm);
-    }
-
     // Zakladki z pluginow: przyciski w pasku/naglowku (ItemsControl w XAML) i skroty klawiszowe.
     private void RegisterPluginTabs(MainViewModel vm)
     {
@@ -130,19 +122,6 @@ public partial class MainWindow : Window
 
             if (tab.Shortcut is { } gesture)
                 KeyBindings.Add(new KeyBinding { Gesture = gesture, Command = vm.ShowPluginTabCommand, CommandParameter = tab });
-        }
-    }
-
-    // Tagi sa lista dynamiczna - prosciej dopisac przyciski w code-behind
-    // niz wiazac Command z zewnetrznym DataContext przez ItemsControl.
-    private void BuildTagChips(MainViewModel vm)
-    {
-        NoteTagsPanel.Children.Clear();
-        foreach (var tag in vm.SelectedNote?.TagList ?? [])
-        {
-            var button = new Button { Content = tag, Classes = { "subtleAction" } };
-            button.Click += (_, _) => vm.FilterByTagCommand.Execute(tag);
-            NoteTagsPanel.Children.Add(button);
         }
     }
 
