@@ -98,3 +98,20 @@ public class StorageOptions
     // Puste = ~/SecondBrain/notes
     public string NotesRootPath { get; set; } = "";
 }
+
+// Serwery MCP (pluginy zewnetrzne agenta, patrz PLAN-AGENT-PLUGINS.md 2.3): sekcja "Plugins": { "Mcp": [ ... ] }.
+// Tylko stdio - proces uruchamiany przez aplikacje, zyje do jej zamkniecia; zmiana = restart.
+public class PluginsOptions
+{
+    public List<McpServerOptions> Mcp { get; set; } = [];
+}
+
+public class McpServerOptions
+{
+    public string Name { get; set; } = "";
+    public string Command { get; set; } = "";
+    public string[] Args { get; set; } = [];
+    public Dictionary<string, string> Env { get; set; } = new();
+    public bool Enabled { get; set; } = true;
+    public int TimeoutSeconds { get; set; } = 30;
+}

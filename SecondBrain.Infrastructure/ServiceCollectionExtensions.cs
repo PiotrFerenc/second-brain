@@ -27,6 +27,7 @@ public static class ServiceCollectionExtensions
         services.Configure<RerankerOptions>(config.GetSection("Reranker"));
         services.Configure<VectorIndexOptions>(config.GetSection("VectorIndex"));
         services.Configure<StorageOptions>(config.GetSection("Storage"));
+        services.Configure<PluginsOptions>(config.GetSection("Plugins"));
 
         services.AddHttpClient("Compression", (sp, client) =>
             HttpClientHeaders.Apply(client, sp.GetRequiredService<IOptions<CompressionOptions>>().Value));
@@ -55,9 +56,10 @@ public static class ServiceCollectionExtensions
         // Narzedzia agenta: kazda konkretna klasa IAgentTool z tego asemblera (patrz AgentTools/),
         // plus rejestr sklejajacy je ze zrodlami runtime (MCP). Pluginy dokladaja swoje przez DI.
         foreach (var toolType in typeof(ServiceCollectionExtensions).Assembly.GetTypes()
-                     .Where(t => t is { IsClass: true, IsAbstract: false } && typeof(IAgentTool).IsAssignableFrom(t)))
+                     .Where(t => t is { IsClass: true, IsAbstract: false, IsPublic: true } && typeof(IAgentTool).IsAssignableFrom(t)))
             services.AddSingleton(typeof(IAgentTool), toolType);
         services.AddSingleton<AgentToolRegistry>();
+        services.AddSingleton<IAgentToolSource, McpToolSource>();
         services.AddSingleton<ITagCleaner, FabrykaTagCleaner>();
         services.AddSingleton<TagMerger>();
         services.AddSingleton<NotesRoot>();

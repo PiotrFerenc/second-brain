@@ -342,6 +342,32 @@ switch (args.ElementAtOrDefault(0))
         break;
     }
 
+    // Narzedzia agenta ze zrodel runtime (serwery MCP) - do odbioru bez czatu z LLM.
+    case "mcp-tools":
+    {
+        var tools = await provider.GetRequiredService<SecondBrain.Infrastructure.AgentTools.AgentToolRegistry>().ListAsync();
+        foreach (var t in tools)
+            Console.WriteLine($"{t.Name}  [{(t.IsMutating ? "mutating" : "readonly")}]  {t.Description}");
+        if (tools.Count == 0)
+            Console.WriteLine("Brak narzedzi.");
+        break;
+    }
+
+    case "mcp-call" when args.Length >= 2:
+    {
+        var tools = await provider.GetRequiredService<SecondBrain.Infrastructure.AgentTools.AgentToolRegistry>().ListAsync();
+        var tool = tools.FirstOrDefault(t => t.Name == args[1]);
+        if (tool is null)
+        {
+            Console.WriteLine($"Nie ma narzedzia '{args[1]}'.");
+            break;
+        }
+
+        var callArgs = System.Text.Json.JsonDocument.Parse(args.Length >= 3 ? args[2] : "{}").RootElement;
+        Console.WriteLine(await tool.ExecuteAsync(callArgs));
+        break;
+    }
+
     default:
         Console.WriteLine("""
             Uzycie:
@@ -365,6 +391,8 @@ switch (args.ElementAtOrDefault(0))
               dotnet run -- merge-tags <docelowy-tag> <tag1> [tag2 ...]
               dotnet run -- fact-history <temat>
               dotnet run -- find-duplicates
+              dotnet run -- mcp-tools
+              dotnet run -- mcp-call <narzedzie> [json-args]
             """);
         break;
 }

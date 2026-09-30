@@ -69,3 +69,28 @@ Reguły, które kosztowały nas czas:
 - Wtyczka nie zna `MainViewModel` ani innych wtyczek; jedyne kanały to `IShell`, `IEditorContext`, zdarzenia i sloty.
 
 Backend wtyczek działa też w CLI (`SecondBrain.PipelineTest`), więc `add` z konsoli robi to samo, co zapis w oknie.
+
+## Pluginy MCP agenta
+
+Agent czatowy może korzystać z narzędzi dowolnego serwera [MCP](https://modelcontextprotocol.io) (Model Context Protocol) uruchamianego przez stdio – bez pisania kodu, samą konfiguracją. Sekcja `Plugins.Mcp` w `appsettings.json` (Desktop i CLI mają osobne pliki):
+
+```json
+"Plugins": {
+  "Mcp": [
+    {
+      "Name": "filesystem",
+      "Command": "npx",
+      "Args": ["-y", "@modelcontextprotocol/server-filesystem", "/home/ja/Dokumenty"],
+      "Env": {},
+      "Enabled": true,
+      "TimeoutSeconds": 30
+    }
+  ]
+}
+```
+
+- Proces serwera startuje przy pierwszej wiadomości do agenta i żyje do zamknięcia aplikacji. Zmiana konfiguracji wymaga restartu.
+- Narzędzia dostają prefiks serwera: `filesystem__list_directory`, `filesystem__write_file`. Dwa serwery mogą mieć narzędzie o tej samej nazwie.
+- Potwierdzenia: narzędzie MCP jest **domyślnie mutujące** i pokazuje kartę Tak/Nie. Tylko narzędzie z adnotacją `readOnlyHint: true` wykonuje się od razu. `destructiveHint: false` nie zwalnia z potwierdzenia.
+- Serwer, który nie wystartuje albo nie odpowie w `TimeoutSeconds`, jest pomijany z ostrzeżeniem na stderr; pozostałe serwery i narzędzia wbudowane działają.
+- Podgląd bez czatu: `dotnet run -- mcp-tools` (lista z flagą readonly/mutating) i `dotnet run -- mcp-call <narzędzie> '<json>'` w `SecondBrain.PipelineTest`.
