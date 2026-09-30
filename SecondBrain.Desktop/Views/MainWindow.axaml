@@ -21,40 +21,45 @@
 
     <Grid>
         <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto" />
             <ColumnDefinition Width="270" MinWidth="200" MaxWidth="500" />
             <ColumnDefinition Width="Auto" />
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
 
+        <!-- Pionowy pasek po lewej: Agent (rdzen) + zakladki pluginow (ITabContribution, Placement=SidebarToolbar),
+             pluginy posortowane alfabetycznie po tytule w MainWindow.RegisterPluginTabs. -->
+        <Border Grid.Column="0" Padding="10,28,10,24" Background="{DynamicResource CtpMantle}">
+            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <StackPanel Spacing="8">
+                    <Button Content="Agent" Classes="subtleAction" HorizontalAlignment="Stretch"
+                            HorizontalContentAlignment="Left" Command="{Binding ShowAgentTabCommand}" />
+                    <ItemsControl ItemsSource="{Binding ToolbarTabs}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Orientation="Vertical" Spacing="8" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="sdk:ITabContribution">
+                                <Button Content="{Binding Title}" Classes="subtleAction" HorizontalAlignment="Stretch"
+                                        HorizontalContentAlignment="Left"
+                                        Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).ShowPluginTabCommand}"
+                                        CommandParameter="{Binding}" />
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
+
         <!-- Boczny panel: drzewo folderow (kolorowe kropki jak sekcje OneNote) i notatek -->
-        <DockPanel Grid.Column="0" Margin="24,28,16,24">
+        <DockPanel Grid.Column="1" Margin="16,28,16,24">
 
             <StackPanel DockPanel.Dock="Top" Spacing="2" Margin="0,0,0,16">
                 <TextBlock Text="Second Brain" FontSize="20" FontWeight="Bold" />
                 <TextBlock Text="Twoja baza wiedzy" Classes="subtle" FontSize="12.5" />
             </StackPanel>
-
-            <!-- Pasek narzedzi: akcje globalne, niezalezne od wybranego folderu. WrapPanel zamiast
-                 StackPanel - sidebar ma stala szerokosc (270px), przyciski musza zawijac sie do
-                 kolejnej linii zamiast wypadac poza widoczny obszar. -->
-            <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,20" ItemSpacing="8" LineSpacing="8">
-                <Button Content="Agent" Classes="subtleAction" Command="{Binding ShowAgentTabCommand}" />
-                <!-- Zakladki z pluginow (ITabContribution, Placement=SidebarToolbar) -->
-                <ItemsControl ItemsSource="{Binding ToolbarTabs}">
-                    <ItemsControl.ItemsPanel>
-                        <ItemsPanelTemplate>
-                            <StackPanel Orientation="Horizontal" Spacing="8" />
-                        </ItemsPanelTemplate>
-                    </ItemsControl.ItemsPanel>
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate x:DataType="sdk:ITabContribution">
-                            <Button Content="{Binding Title}" Classes="subtleAction"
-                                    Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).ShowPluginTabCommand}"
-                                    CommandParameter="{Binding}" />
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-            </WrapPanel>
 
             <StackPanel DockPanel.Dock="Bottom" Spacing="8" Margin="0,20,0,0">
                 <TextBox Text="{Binding NewFolderName}" PlaceholderText="nazwa nowego folderu" />
@@ -125,7 +130,7 @@
 
         <!-- Uchwyt do reczengo rozciagania sidebaru - dlugie tytuly notatek nie miescily sie
              w stalych 270px. Dyskretny w spoczynku, widoczny na hover/podczas przeciagania. -->
-        <GridSplitter Grid.Column="1"
+        <GridSplitter Grid.Column="2"
                       Width="5"
                       Background="Transparent"
                       ResizeDirection="Columns"
@@ -134,7 +139,7 @@
                       Cursor="SizeWestEast" />
 
         <!-- "Kartka" z treścią - jaśniejsza plaszczyzna nad ciemniejszym chrome, jak strona w OneNote -->
-        <Border Grid.Column="2"
+        <Border Grid.Column="3"
                 Background="{DynamicResource CtpBase}"
                 CornerRadius="16,0,0,0"
                 Margin="0,12,0,0"

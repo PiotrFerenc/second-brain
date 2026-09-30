@@ -112,7 +112,12 @@ public partial class MainWindow : Window
     // Zakladki z pluginow: przyciski w pasku/naglowku (ItemsControl w XAML) i skroty klawiszowe.
     private void RegisterPluginTabs(MainViewModel vm)
     {
-        foreach (var tab in App.Services.GetServices<ITabContribution>().OrderBy(t => t.Order))
+        // Pasek boczny: alfabetycznie po tytule (kultura pl), pozostale miejsca wg Order.
+        var pl = new System.Globalization.CultureInfo("pl-PL");
+        foreach (var tab in App.Services.GetServices<ITabContribution>()
+                     .OrderBy(t => t.Placement == TabArea.SidebarToolbar ? 0 : 1)
+                     .ThenBy(t => t.Placement == TabArea.SidebarToolbar ? t.Title : "", StringComparer.Create(pl, true))
+                     .ThenBy(t => t.Order))
         {
             switch (tab.Placement)
             {
