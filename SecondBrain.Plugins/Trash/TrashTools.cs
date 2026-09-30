@@ -1,7 +1,12 @@
 using System.Text.Json;
 using SecondBrain.Core;
+using SecondBrain.Infrastructure;
+using SecondBrain.Infrastructure.AgentTools;
 
-namespace SecondBrain.Infrastructure.AgentTools;
+namespace SecondBrain.Plugins.Trash;
+
+// Narzedzia agenta pluginu kosza - rejestrowane w TrashPlugin, wiec wylaczony plugin ich nie ma.
+// Magazyn kosza (.trash) i NotePipeline.Trash/Restore/Purge zostaja w rdzeniu (CLI, widok notatki).
 
 public sealed class TrashNoteTool(NotePipeline pipeline, INoteStore noteStore) : AgentTool
 {
@@ -119,5 +124,30 @@ public sealed class BulkPurgeTool(NotePipeline pipeline) : AgentTool
         foreach (var trashPath in paths)
             await pipeline.PurgeAsync(trashPath, ct);
         return $"Trwale usunieto {paths.Length} notatek z kosza.";
+    }
+}
+
+public sealed class BulkTrashTool(NotePipeline pipeline, INoteStore noteStore) : AgentTool
+{
+    public override string Name => "bulk_trash";
+    public override string Description => "Przenies wiele notatek naraz do kosza (po liscie id, wszystkie w jednym folderze).";
+    protected override string Parameters => """{"type":"object","properties":{"folder":{"type":"string"},"noteIds":{"type":"array","items":{"type":"string"}}},"required":["folder","noteIds"]}""";
+    public override bool IsMutating => true;
+    public override string Describe(JsonElement args) => $"Przeniesc {SArr(args, "noteIds").Length} notatek z folderu '{S(args, "folder")}' do kosza?";
+
+    public override async Task<string> ExecuteAsync(JsonElement args, CancellationToken ct = default)
+    {
+        var folder = args.Req("folder");
+        var notes = await noteStore.ListAsync(folder, ct);
+        var results = new List<string>();
+        foreach (var noteId in args.ReqArr("noteIds").Select(Guid.Parse))
+        {
+            var note = notes.FirstOrDefault(n => n.Id == noteId);
+            if (note is null) { results.Add($"Nie znaleziono notatki {noteId}."); continue; }
+
+            await pipeline.TrashAsync(folder, note, ct);
+            results.Add($"Do kosza: {note.Title}");
+        }
+        return string.Join("\n", results);
     }
 }

@@ -1,7 +1,12 @@
 using System.Text.Json;
 using SecondBrain.Core;
+using SecondBrain.Infrastructure;
+using SecondBrain.Infrastructure.AgentTools;
 
-namespace SecondBrain.Infrastructure.AgentTools;
+namespace SecondBrain.Plugins.Search;
+
+// Narzedzia agenta pluginu szukania - rejestrowane w SearchPlugin, wiec wylaczony plugin ich nie ma.
+// NoteSearch zostaje w rdzeniu (luki, CLI).
 
 public sealed class SearchNotesTool(NoteSearch noteSearch) : AgentTool
 {
