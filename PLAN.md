@@ -259,6 +259,17 @@ Te ustalenia są wiążące — nie zmieniaj ich bez wyraźnej prośby użytkown
 Rdzeń działa end-to-end (na mockach embeddingu/rerankera). To, co zostało, to odblokowanie
 realnych providerów i dopracowanie UX — żadne z tych zadań nie blokuje pozostałych.
 
+Dwa osobne dokumenty z planami większych zmian:
+
+- `PLAN-PLUGINS.md` — system pluginów dla całej aplikacji (poza agentem): każda funkcja
+  jako plugin z warstwą backendową i wizualną, menedżer wtyczek, migracja 15 istniejących
+  funkcji, szyna zdarzeń, sloty w widokach.
+- `PLAN-AGENT-PLUGINS.md` — pluginy agenta czatowego (skille `.md` → narzędzia
+  `IAgentTool` → serwery MCP) i refaktoryzacja `FabrykaAgent`.
+
+Wspólny pierwszy krok obu planów: `NotePipeline` (P1 w `PLAN-AGENT-PLUGINS.md`,
+F0.1 w `PLAN-PLUGINS.md`) — wykonać raz.
+
 ### Zadanie 6 — przywrócić realny embedding OpenAI
 
 1. Ustal z OpenAI dlaczego `text-embedding-3-small` zwraca `403 model_not_found` mimo
