@@ -24,10 +24,9 @@ Fazy 0 i 1 wykonane i scalone na `master`; faza 2 częściowo (sprzątanie zale�
 
 Odstępstwa od planu (świadome):
 
-1. **`duplicates` nie jest pluginem**, a `ITagCleaner`/`TagMerger`/`DuplicateScanner`
-   zostają w Infrastructure — wstrzykuje je `FabrykaAgent`, a Infrastructure nie może
-   referencować `SecondBrain.Plugins`. Przenoszą się razem z narzędziami agenta
-   (`PLAN-AGENT-PLUGINS.md` P2).
+1. ~~`duplicates` nie jest pluginem~~ — zrobione po P2 agenta: plugin `duplicates`
+   (backend-only: `DuplicateScanner` + narzędzie `find_duplicate_notes`), `TagCleaner`/
+   `TagMerger` w pluginie `tags`. W Infrastructure nie ma już serwisów funkcji.
 2. **`INoteStore` nie schudł** (luki, słownik, fakty, szablony, scalanie tagów zostają) —
    ten sam powód: agent i CLI wołają te metody. Magazyny pluginów (`GapStore` itd.)
    powstaną przy P2; do tego czasu pluginy używają `INoteStore`.
@@ -49,8 +48,8 @@ pluginów); handler zdarzenia nigdy nie
 czeka na wątek UI; okna/kontrolki pluginu z bezparametrowym konstruktorem; `CreateControl`
 to fabryka; komendy CLI w testach agentów z `timeout`.
 
-Pozostało z fazy 2: `README` „Wtyczki" ✅, `PLAN.md` ✅, `hello` usunięty ✅; odchudzenie
-`INoteStore` i `duplicates` → po P2 agenta.
+Pozostało z fazy 2: `README` „Wtyczki", `PLAN.md`, `hello` usunięty, `duplicates` — zrobione;
+odchudzenie `INoteStore` — w toku (P5, po P2 agenta).
 
 ## 0. W skrócie
 
