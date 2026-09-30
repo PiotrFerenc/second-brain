@@ -50,7 +50,12 @@ public sealed class ShellAdapter(MainViewModel vm, IEnumerable<ITabContribution>
         _ = vm.SearchCommand.ExecuteAsync(null);
     }
 
-    public Task RefreshTreeAsync() => vm.LoadTreeCommand.ExecuteAsync(null);
+    // Lista rodzicow w edytorze to pochodna notatek folderu - odswiezana razem z drzewem.
+    public async Task RefreshTreeAsync()
+    {
+        await vm.LoadTreeCommand.ExecuteAsync(null);
+        await vm.LoadParentOptionsCommand.ExecuteAsync(null);
+    }
 }
 
 public sealed class EditorContextAdapter(MainViewModel vm) : IEditorContext

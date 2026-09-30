@@ -159,63 +159,6 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void ImportFile_Click(object? sender, RoutedEventArgs e)
-    {
-        if (DataContext is not MainViewModel vm)
-            return;
-
-        var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
-        {
-            Title = "Wybierz plik do importu (kazda linia = nowa notatka)",
-            AllowMultiple = false,
-            FileTypeFilter = [new FilePickerFileType("Tekst") { Patterns = ["*.txt", "*.md"] }]
-        });
-
-        if (files.Count == 0)
-            return;
-
-        await using var stream = await files[0].OpenReadAsync();
-        using var reader = new StreamReader(stream);
-        var lines = new List<string>();
-        string? line;
-        while ((line = await reader.ReadLineAsync()) is not null)
-            lines.Add(line);
-
-        await vm.ImportLinesCommand.ExecuteAsync(lines);
-    }
-
-    // Import z folderu: kazdy plik .txt/.md = jedna notatka (cala tresc pliku, nie linia po
-    // linii jak w ImportFile_Click) - reuzywa ImportLinesCommand, bo dla niego "linia" to po
-    // prostu jeden tekst do skompresowania i zapisania, wiec cala tresc pliku tez pasuje.
-    private async void ImportFolder_Click(object? sender, RoutedEventArgs e)
-    {
-        if (DataContext is not MainViewModel vm)
-            return;
-
-        var folders = await StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
-        {
-            Title = "Wybierz folder do importu (kazdy plik .txt/.md = nowa notatka)",
-            AllowMultiple = false
-        });
-
-        if (folders.Count == 0)
-            return;
-
-        var folderPath = folders[0].TryGetLocalPath();
-        if (folderPath is null)
-            return;
-
-        var files = Directory.EnumerateFiles(folderPath)
-            .Where(f => f.EndsWith(".txt", StringComparison.OrdinalIgnoreCase) || f.EndsWith(".md", StringComparison.OrdinalIgnoreCase))
-            .Order();
-
-        var contents = new List<string>();
-        foreach (var file in files)
-            contents.Add(await File.ReadAllTextAsync(file));
-
-        await vm.ImportLinesCommand.ExecuteAsync(contents);
-    }
-
     // OCR ze schowka: obraz -> base64 -> IOcrExtractor -> tekst do wglądu w polu notatki
     // (nie zapisujemy od razu - OCR bywa niedokladny, user ma szanse poprawic przed Zapisz).
     private async void PasteImage_Click(object? sender, RoutedEventArgs e)

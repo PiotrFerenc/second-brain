@@ -216,14 +216,11 @@
 
                         <StackPanel DockPanel.Dock="Top" Spacing="8" Margin="0,0,0,12">
                             <sdk:SlotHost SlotId="Editor.Templates" />
-                            <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto">
+                            <Grid ColumnDefinitions="*,Auto,Auto">
                                 <StackPanel Grid.Column="0" x:Name="TemplatesPanel" Orientation="Horizontal" Spacing="8" />
                                 <Button Grid.Column="1" Content="Wklej obrazek ze schowka" Classes="subtleAction"
                                         Click="PasteImage_Click" Margin="0,0,8,0" />
-                                <Button Grid.Column="2" Content="Importuj z pliku..." Classes="subtleAction"
-                                        Click="ImportFile_Click" Margin="0,0,8,0" />
-                                <Button Grid.Column="3" Content="Importuj z folderu..." Classes="subtleAction" Click="ImportFolder_Click" />
-                                <sdk:SlotHost Grid.Column="4" SlotId="Editor.Toolbar" Margin="8,0,0,0" />
+                                <sdk:SlotHost Grid.Column="2" SlotId="Editor.Toolbar" />
                             </Grid>
                             <TextBox Text="{Binding NoteTagsInput}" PlaceholderText="tagi po przecinku (puste = LLM zaproponuje)" />
                             <Grid ColumnDefinitions="*,Auto">
