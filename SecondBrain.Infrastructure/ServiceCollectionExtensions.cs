@@ -13,14 +13,13 @@ public static class ServiceCollectionExtensions
     // (np. services.AddSingleton&lt;IEmbedder, FabrykaEmbedder&gt;()) - ostatnia wygrywa.
     //
     // Kazdy provider strzelajacy do API ma wlasna sekcje configu i wlasny named HttpClient -
-    // Compression/AnswerSynthesis/ConflictDetection/Agent/TagCleaning/Embedding moga wiec
+    // Compression/AnswerSynthesis/Agent/TagCleaning/Embedding moga wiec
     // wskazywac na rozne adresy/klucze, nawet jesli dzis wszystkie mierza w ta sama infrastrukture.
     // VectorIndex to lokalny plikowy magazyn wektorow (FileVectorIndex), nie provider LLM - zostaje jak jest.
     public static IServiceCollection AddSecondBrainInfrastructure(this IServiceCollection services, IConfiguration config)
     {
         services.Configure<CompressionOptions>(config.GetSection("Compression"));
         services.Configure<AnswerSynthesisOptions>(config.GetSection("AnswerSynthesis"));
-        services.Configure<ConflictDetectionOptions>(config.GetSection("ConflictDetection"));
         services.Configure<AgentOptions>(config.GetSection("Agent"));
         services.Configure<TagCleaningOptions>(config.GetSection("TagCleaning"));
         services.Configure<EmbeddingOptions>(config.GetSection("Embedding"));
@@ -33,9 +32,6 @@ public static class ServiceCollectionExtensions
 
         services.AddHttpClient("AnswerSynthesis", (sp, client) =>
             HttpClientHeaders.Apply(client, sp.GetRequiredService<IOptions<AnswerSynthesisOptions>>().Value));
-
-        services.AddHttpClient("ConflictDetection", (sp, client) =>
-            HttpClientHeaders.Apply(client, sp.GetRequiredService<IOptions<ConflictDetectionOptions>>().Value));
 
         services.AddHttpClient("Agent", (sp, client) =>
             HttpClientHeaders.Apply(client, sp.GetRequiredService<IOptions<AgentOptions>>().Value));
@@ -53,7 +49,6 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IReranker, MockReranker>();
         services.AddSingleton<ICompressor, FabrykaCompressor>();
         services.AddSingleton<IAnswerSynthesizer, FabrykaAnswerSynthesizer>();
-        services.AddSingleton<IConflictDetector, FabrykaConflictDetector>();
         services.AddSingleton<IAgent, FabrykaAgent>();
         services.AddSingleton<ITagCleaner, FabrykaTagCleaner>();
         services.AddSingleton<TagMerger>();
@@ -63,8 +58,6 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<NoteSearch>();
         services.AddSingleton<NotePipeline>();
 
-        // Reakcje na zdarzenia - kolejnosc rejestracji = kolejnosc wykonania.
-        services.AddSingleton<IEventHandler<NoteAdded>, ConflictOnNoteAdded>();
         services.AddSingleton<IVectorIndex, FileVectorIndex>();
         services.AddSingleton<DuplicateScanner>();
         services.AddSingleton<IAgentSessionStore, FileAgentSessionStore>();

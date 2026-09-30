@@ -4,9 +4,17 @@ using System.Text.Json.Serialization;
 using Microsoft.Extensions.Options;
 using SecondBrain.Core;
 
-namespace SecondBrain.Infrastructure;
+namespace SecondBrain.Plugins.Conflicts;
 
-public class FabrykaConflictDetector(IHttpClientFactory httpClientFactory, IOptions<ConflictDetectionOptions> options) : IConflictDetector
+// Porownuje tresc nowej notatki z juz istniejacymi (podobnymi) notatkami i probuje
+// wykryc sprzecznosc faktow (np. dwie rozne godziny tego samego spotkania).
+// Jedna implementacja, jedyny uzytkownik to ConflictOnNoteAdded - bez interfejsu.
+public record ConflictResult(
+    [property: JsonPropertyName("hasConflict")] bool HasConflict,
+    [property: JsonPropertyName("conflictingTitle")] string? ConflictingTitle,
+    [property: JsonPropertyName("explanation")] string? Explanation);
+
+public class ConflictDetector(IHttpClientFactory httpClientFactory, IOptions<ConflictDetectionOptions> options)
 {
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
 

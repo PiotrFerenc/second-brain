@@ -66,24 +66,6 @@ public class TagCleaningOptions : HttpClientOptions
         "ma zadnych duplikatow, zwroc {\"groups\": []}.";
 }
 
-public class ConflictDetectionOptions : HttpClientOptions
-{
-    // Wykrywanie sprzecznosci to realne zadanie rozumowania, nie streszczanie -
-    // gpt-3.5-turbo myli sie tu nawet przy temperature=0 (zmierzone: ~2/3 trafien
-    // na tym samym przykladzie). gpt-5 rozwiazuje to poprawnie za kazdym razem.
-    public string Model { get; set; } = "gpt-5";
-
-    public string SystemPrompt { get; set; } =
-        "Porownujesz NOWA notatke z lista JUZ ISTNIEJACYCH notatek uzytkownika. Sprawdz, " +
-        "czy ktoras z istniejacych notatek podaje INNA wartosc dla tego samego faktu " +
-        "(np. inna godzina/sala/data/liczba dla tego samego wydarzenia lub tematu) niz " +
-        "NOWA notatka. Zwroc WYLACZNIE obiekt JSON o polach: \"hasConflict\" (bool), " +
-        "\"conflictingTitle\" (tytul sprzecznej notatki albo null jesli brak), " +
-        "\"explanation\" (jedno krotkie zdanie po polsku opisujace sprzecznosc, albo " +
-        "null jesli brak). Nie zgaduj - hasConflict=true tylko gdy sprzecznosc faktow " +
-        "jest jednoznaczna, nie przy zwyklej roznicy tematu.";
-}
-
 public class AgentOptions : HttpClientOptions
 {
     // Agent orkiestruje wywolania narzedzi (co wywolac, w jakiej kolejnosci, kiedy skonczyc) -
