@@ -1,3 +1,4 @@
+using SecondBrain.Infrastructure.AgentTools;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -50,6 +51,13 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<ICompressor, FabrykaCompressor>();
         services.AddSingleton<IAnswerSynthesizer, FabrykaAnswerSynthesizer>();
         services.AddSingleton<IAgent, FabrykaAgent>();
+
+        // Narzedzia agenta: kazda konkretna klasa IAgentTool z tego asemblera (patrz AgentTools/),
+        // plus rejestr sklejajacy je ze zrodlami runtime (MCP). Pluginy dokladaja swoje przez DI.
+        foreach (var toolType in typeof(ServiceCollectionExtensions).Assembly.GetTypes()
+                     .Where(t => t is { IsClass: true, IsAbstract: false } && typeof(IAgentTool).IsAssignableFrom(t)))
+            services.AddSingleton(typeof(IAgentTool), toolType);
+        services.AddSingleton<AgentToolRegistry>();
         services.AddSingleton<ITagCleaner, FabrykaTagCleaner>();
         services.AddSingleton<TagMerger>();
         services.AddSingleton<NotesRoot>();
