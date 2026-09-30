@@ -333,23 +333,6 @@ public partial class MainViewModel(
         SelectedTabIndex = TabEditor;
     }
 
-    public ObservableCollection<NoteTemplate> Templates { get; } = [];
-
-    [RelayCommand]
-    private async Task LoadTemplatesAsync()
-    {
-        Templates.Clear();
-        foreach (var t in await noteStore.ListTemplatesAsync())
-            Templates.Add(t);
-    }
-
-    [RelayCommand]
-    private void ApplyTemplate(NoteTemplate? template)
-    {
-        if (template is not null)
-            NoteText = template.Content;
-    }
-
     [RelayCommand]
     private async Task SaveNoteAsync()
     {
@@ -975,7 +958,6 @@ public partial class MainViewModel(
     private async Task InitializeAsync()
     {
         await LoadTreeAsync();
-        await LoadTemplatesAsync();
         await LoadAgentSessionsAsync();
     }
 }

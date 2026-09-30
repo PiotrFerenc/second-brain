@@ -215,9 +215,8 @@
                         <sdk:SlotHost DockPanel.Dock="Bottom" SlotId="Editor.Footer" Orientation="Vertical" Margin="0,12,0,0" />
 
                         <StackPanel DockPanel.Dock="Top" Spacing="8" Margin="0,0,0,12">
-                            <sdk:SlotHost SlotId="Editor.Templates" />
                             <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto">
-                                <StackPanel Grid.Column="0" x:Name="TemplatesPanel" Orientation="Horizontal" Spacing="8" />
+                                <sdk:SlotHost Grid.Column="0" SlotId="Editor.Templates" />
                                 <Button Grid.Column="1" Content="Wklej obrazek ze schowka" Classes="subtleAction"
                                         Click="PasteImage_Click" Margin="0,0,8,0" />
                                 <Button Grid.Column="2" Content="Importuj z pliku..." Classes="subtleAction"
