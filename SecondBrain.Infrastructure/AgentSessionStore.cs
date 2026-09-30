@@ -1,5 +1,4 @@
 using System.Text.Json;
-using Microsoft.Extensions.Options;
 using SecondBrain.Core;
 
 namespace SecondBrain.Infrastructure;
@@ -8,13 +7,11 @@ namespace SecondBrain.Infrastructure;
 // sesja ma zagniezdzona liste wiadomosci, wiec plaski parser front matter (celowy wybor dla
 // notatek) tu tylko by przeszkadzal. System.Text.Json jest juz zaleznoscia wszedzie indziej
 // w tym projekcie (Compression/AnswerSynthesis/...), wiec to nie nowa biblioteka.
-public class FileAgentSessionStore(IOptions<StorageOptions> options) : IAgentSessionStore
+public class FileAgentSessionStore(NotesRoot notesRoot) : IAgentSessionStore
 {
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 
-    private readonly string _root = string.IsNullOrWhiteSpace(options.Value.NotesRootPath)
-        ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "SecondBrain", "notes")
-        : options.Value.NotesRootPath;
+    private readonly string _root = notesRoot.Path;
 
     private string SessionsDir => Path.Combine(_root, ".agent-sessions");
 

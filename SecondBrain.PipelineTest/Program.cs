@@ -22,13 +22,12 @@ PluginRuntime.Services = provider;
 
 var store = provider.GetRequiredService<IVectorIndex>();
 var embedder = provider.GetRequiredService<IEmbedder>();
-var reranker = provider.GetRequiredService<IReranker>();
-var compressor = provider.GetRequiredService<ICompressor>();
 var answerSynthesizer = provider.GetRequiredService<IAnswerSynthesizer>();
-var conflictDetector = provider.GetRequiredService<IConflictDetector>();
 var noteStore = provider.GetRequiredService<INoteStore>();
+var pipeline = provider.GetRequiredService<NotePipeline>();
+var noteSearch = provider.GetRequiredService<NoteSearch>();
+var events = provider.GetRequiredService<IEventBus>();
 var agent = provider.GetRequiredService<IAgent>();
-var gapAutoCloser = provider.GetRequiredService<GapAutoCloser>();
 var tagCleaner = provider.GetRequiredService<ITagCleaner>();
 var tagMerger = provider.GetRequiredService<TagMerger>();
 var ocrExtractor = provider.GetRequiredService<IOcrExtractor>();
@@ -36,49 +35,16 @@ var duplicateScanner = provider.GetRequiredService<DuplicateScanner>();
 
 async Task AddNoteAsync(string folder, string rawText)
 {
-    var now = DateTimeOffset.UtcNow;
+    var added = await pipeline.AddAsync(folder, rawText);
+    var note = added.Note;
 
-    var result = await compressor.CompressAsync(rawText);
-    var note = new Note(Guid.NewGuid(), result.Title, rawText, result.CompressedContent, result.Tags, now, now);
+    Console.WriteLine($"Zapisano: {note.FilePath}\nId: {note.Id}\nTytul (LLM): {note.Title}\nTagi (LLM): {string.Join(", ", note.Tags)}\nSkompresowano do: {note.CompressedContent}");
 
-    var path = await noteStore.SaveAsync(folder, note);
-    note = note with { FilePath = path };
+    if ((added.Result.Definitions ?? []).Length > 0)
+        Console.WriteLine($"Definicje do slownika: {string.Join(", ", added.Result.Definitions!.Select(d => d.Term))}");
 
-    foreach (var def in result.Definitions ?? [])
-        await noteStore.SaveGlossaryEntryAsync(def.Term, def.Definition, result.Title);
-
-    var vector = await embedder.EmbedAsync(note.CompressedContent);
-    await store.UpsertAsync(folder, note, vector);
-
-    var related = await store.SearchAsync(folder, vector, limit: 4);
-    var relatedNotes = related.Where(r => r.Note.Id != note.Id).Take(3).Select(r => r.Note).ToList();
-
-    Console.WriteLine($"Zapisano: {path}\nId: {note.Id}\nTytul (LLM): {result.Title}\nTagi (LLM): {string.Join(", ", result.Tags)}\nSkompresowano do: {result.CompressedContent}");
-
-    if ((result.Definitions ?? []).Length > 0)
-        Console.WriteLine($"Definicje do slownika: {string.Join(", ", result.Definitions!.Select(d => d.Term))}");
-
-    if (relatedNotes.Count > 0)
-    {
-        var conflict = await conflictDetector.DetectAsync(note.CompressedContent, relatedNotes);
-        if (conflict.HasConflict)
-        {
-            Console.WriteLine($"UWAGA - mozliwa sprzecznosc z \"{conflict.ConflictingTitle}\": {conflict.Explanation}");
-
-            // Pierwsza wykryta sprzecznosc dla tego tematu - dopisz tez PIERWOTNA
-            // (konfliktujaca) wersje, zeby historia od razu miala obie strony sprzecznosci.
-            if ((await noteStore.ListFactHistoryAsync(conflict.ConflictingTitle!)).Count == 0)
-            {
-                var original = relatedNotes.First(n => n.Title == conflict.ConflictingTitle);
-                await noteStore.RecordFactVersionAsync(conflict.ConflictingTitle!, original.CompressedContent, original.Title);
-            }
-            await noteStore.RecordFactVersionAsync(conflict.ConflictingTitle!, note.CompressedContent, result.Title);
-        }
-    }
-
-    var closedGaps = await gapAutoCloser.TryCloseMatchingGapsAsync();
-    if (closedGaps > 0)
-        Console.WriteLine($"Zamknieto {closedGaps} luk(i) w wiedzy.");
+    foreach (var notice in added.Notices)
+        Console.WriteLine(notice);
 }
 
 switch (args.ElementAtOrDefault(0))
@@ -92,7 +58,7 @@ switch (args.ElementAtOrDefault(0))
 
     case "create" when args.Length >= 2:
     {
-        var created = await store.CreateFolderAsync(args[1]);
+        var created = await pipeline.CreateFolderAsync(args[1]);
         Console.WriteLine(created ? $"Utworzono folder '{args[1]}'." : $"Folder '{args[1]}' juz istnieje.");
         break;
     }
@@ -100,8 +66,7 @@ switch (args.ElementAtOrDefault(0))
     case "delete-folder" when args.Length >= 2:
     {
         var folder = args[1];
-        await store.DeleteFolderAsync(folder);
-        await noteStore.DeleteFolderAsync(folder);
+        await pipeline.DeleteFolderAsync(folder);
         Console.WriteLine($"Usunieto folder '{folder}' (indeks wektorowy + pliki na dysku, trwale).");
         break;
     }
@@ -172,8 +137,7 @@ switch (args.ElementAtOrDefault(0))
             break;
         }
 
-        await store.DeleteNoteAsync(folder, noteId);
-        await noteStore.MoveToTrashAsync(folder, note.FilePath);
+        await pipeline.TrashAsync(folder, note);
         Console.WriteLine($"Przeniesiono do kosza: {note.Title}");
         break;
     }
@@ -195,16 +159,14 @@ switch (args.ElementAtOrDefault(0))
     case "restore" when args.Length >= 2:
     {
         var trashPath = args[1];
-        var restored = await noteStore.RestoreFromTrashAsync(trashPath);
-        var vector = await embedder.EmbedAsync(restored.Note.CompressedContent);
-        await store.UpsertAsync(restored.OriginalFolder, restored.Note, vector);
+        var restored = await pipeline.RestoreAsync(trashPath);
         Console.WriteLine($"Przywrocono: {restored.Note.Title} -> folder '{restored.OriginalFolder}'.");
         break;
     }
 
     case "purge" when args.Length >= 2:
     {
-        await noteStore.PurgeTrashAsync(args[1]);
+        await pipeline.PurgeAsync(args[1]);
         Console.WriteLine("Usunieto na zawsze.");
         break;
     }
@@ -214,20 +176,14 @@ switch (args.ElementAtOrDefault(0))
         var folder = args[1];
         var query = string.Join(' ', args.Skip(2));
 
-        var queryVector = await embedder.EmbedAsync(query);
-        var candidates = await store.SearchAsync(folder, queryVector, limit: 20);
-        var reranked = await reranker.RerankAsync(query, candidates);
+        var hits = await noteSearch.SearchAsync(query, [folder], vectorLimit: 20);
 
         var fullNotes = new List<Note>();
 
         Console.WriteLine($"Wyniki dla: \"{query}\"\n");
-        foreach (var r in reranked.Take(5))
+        foreach (var (_, note, score) in hits.Take(5))
         {
-            var note = r.Note;
-            if (!string.IsNullOrEmpty(r.Note.FilePath) && File.Exists(r.Note.FilePath))
-                note = await noteStore.LoadAsync(r.Note.FilePath);
-
-            Console.WriteLine($"[{r.Score:0.00}] {note.Title} — tagi: {string.Join(", ", note.Tags)}");
+            Console.WriteLine($"[{score:0.00}] {note.Title} — tagi: {string.Join(", ", note.Tags)}");
             Console.WriteLine($"    {note.RawContent}");
             fullNotes.Add(note);
         }
@@ -237,11 +193,9 @@ switch (args.ElementAtOrDefault(0))
             var answer = await answerSynthesizer.SynthesizeAsync(query, fullNotes);
             Console.WriteLine($"\nOdpowiedz:\n{answer.Answer}");
 
+            await events.PublishAsync(new SearchCompleted(query, answer.Answered));
             if (!answer.Answered)
-            {
-                await noteStore.LogGapAsync(query);
                 Console.WriteLine("(zapisano jako luka w wiedzy)");
-            }
         }
         break;
     }

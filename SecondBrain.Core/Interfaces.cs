@@ -147,14 +147,6 @@ public interface INoteStore
     // Wersjonowanie faktow (patrz FactVersion) - append-only historia per temat.
     Task RecordFactVersionAsync(string subject, string statement, string sourceTitle, CancellationToken ct = default);
     Task<IReadOnlyList<FactVersion>> ListFactHistoryAsync(string subject, CancellationToken ct = default);
-
-    // Historia calego repo (zakladka "Historia") i diff pojedynczego commita.
-    // Domyslnie puste, realna implementacja tylko w GitBackedNoteStore.
-    Task<IReadOnlyList<CommitEntry>> ListCommitsAsync(int limit = 200, CancellationToken ct = default) =>
-        Task.FromResult<IReadOnlyList<CommitEntry>>([]);
-
-    Task<IReadOnlyList<DiffFile>> GetCommitDiffAsync(string hash, CancellationToken ct = default) =>
-        Task.FromResult<IReadOnlyList<DiffFile>>([]);
 }
 
 // Folder = jeden plik w lokalnym indeksie wektorowym. Jedna implementacja (FileVectorIndex) na razie,

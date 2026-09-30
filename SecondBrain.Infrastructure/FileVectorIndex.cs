@@ -1,5 +1,4 @@
 using System.Text.Json;
-using Microsoft.Extensions.Options;
 using SecondBrain.Core;
 
 namespace SecondBrain.Infrastructure;
@@ -9,13 +8,9 @@ namespace SecondBrain.Infrastructure;
 // wyszukiwanie to brute-force cosine similarity po wczytaniu calego pliku do pamieci.
 // ponytail: jeden lock na caly indeks (nie per-folder) - prostsze, a zapisy notatek
 // i tak sa rzadkie wzgledem odczytow.
-public class FileVectorIndex(IOptions<StorageOptions> options) : IVectorIndex
+public class FileVectorIndex(NotesRoot notesRoot) : IVectorIndex
 {
-    private readonly string _dir = Path.Combine(
-        string.IsNullOrWhiteSpace(options.Value.NotesRootPath)
-            ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "SecondBrain", "notes")
-            : options.Value.NotesRootPath,
-        ".vectors");
+    private readonly string _dir = Path.Combine(notesRoot.Path, ".vectors");
 
     private readonly SemaphoreSlim _lock = new(1, 1);
 

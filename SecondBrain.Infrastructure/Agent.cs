@@ -11,13 +11,11 @@ public class FabrykaAgent(
     IHttpClientFactory httpClientFactory,
     IOptions<AgentOptions> options,
     IVectorIndex vectorIndex,
-    IEmbedder embedder,
-    IReranker reranker,
-    ICompressor compressor,
     IAnswerSynthesizer answerSynthesizer,
-    IConflictDetector conflictDetector,
     INoteStore noteStore,
-    GapAutoCloser gapAutoCloser,
+    NotePipeline pipeline,
+    NoteSearch noteSearch,
+    IEventBus events,
     ITagCleaner tagCleaner,
     TagMerger tagMerger,
     DuplicateScanner duplicateScanner) : IAgent
@@ -250,15 +248,14 @@ public class FabrykaAgent(
             case "create_folder":
             {
                 var name = Req("name");
-                var created = await vectorIndex.CreateFolderAsync(name, ct);
+                var created = await pipeline.CreateFolderAsync(name, ct);
                 return created ? $"Utworzono folder '{name}'." : $"Folder '{name}' juz istnieje.";
             }
 
             case "delete_folder":
             {
                 var folder = Req("folder");
-                await vectorIndex.DeleteFolderAsync(folder, ct);
-                await noteStore.DeleteFolderAsync(folder, ct);
+                await pipeline.DeleteFolderAsync(folder, ct);
                 return $"Usunieto folder '{folder}' trwale.";
             }
 
@@ -284,33 +281,24 @@ public class FabrykaAgent(
                 return JsonSerializer.Serialize(matches.Take(10).Select(m => new
                 {
                     m.Folder,
-                    m.Scored.Note.Id,
-                    m.Scored.Note.Title,
-                    m.Scored.Note.Tags,
-                    m.Scored.Score,
-                    Snippet = Truncate(m.Scored.Note.CompressedContent, 200)
+                    m.Note.Id,
+                    m.Note.Title,
+                    m.Note.Tags,
+                    m.Score,
+                    Snippet = Truncate(m.Note.CompressedContent, 200)
                 }));
             }
 
             case "ask_question":
             {
                 var query = Req("query");
-                var matches = await SearchAcrossAsync(query, Opt("folder"), ct);
-                var fullNotes = new List<Note>();
-                foreach (var m in matches.Take(5))
-                {
-                    var note = m.Scored.Note;
-                    if (!string.IsNullOrEmpty(note.FilePath) && File.Exists(note.FilePath))
-                        note = await noteStore.LoadAsync(note.FilePath, ct);
-                    fullNotes.Add(note);
-                }
+                var fullNotes = (await SearchAcrossAsync(query, Opt("folder"), ct)).Take(5).Select(m => m.Note).ToList();
 
                 if (fullNotes.Count == 0)
                     return "Brak notatek pasujacych do tego pytania.";
 
                 var answer = await answerSynthesizer.SynthesizeAsync(query, fullNotes, ct);
-                if (!answer.Answered)
-                    await noteStore.LogGapAsync(query, ct);
+                await events.PublishAsync(new SearchCompleted(query, answer.Answered), ct);
                 return answer.Answer;
             }
 
@@ -322,44 +310,8 @@ public class FabrykaAgent(
                 if (parentId is { } pid && !(await noteStore.ListAsync(folder, ct)).Any(n => n.Id == pid))
                     return $"Nie znaleziono notatki-rodzica {pid} w folderze '{folder}'.";
 
-                var now = DateTimeOffset.UtcNow;
-
-                var result = await compressor.CompressAsync(text, ct);
-                var note = new Note(Guid.NewGuid(), result.Title, text, result.CompressedContent, result.Tags, now, now, ParentId: parentId);
-                var path = await noteStore.SaveAsync(folder, note, ct);
-                note = note with { FilePath = path };
-
-                foreach (var def in result.Definitions ?? [])
-                    await noteStore.SaveGlossaryEntryAsync(def.Term, def.Definition, result.Title, ct);
-
-                var vector = await embedder.EmbedAsync(note.CompressedContent, ct);
-                await vectorIndex.UpsertAsync(folder, note, vector, ct);
-
-                var related = await vectorIndex.SearchAsync(folder, vector, limit: 4, ct: ct);
-                var relatedNotes = related.Where(r => r.Note.Id != note.Id).Take(3).Select(r => r.Note).ToList();
-
-                var reply = $"Zapisano notatke '{result.Title}' w folderze '{folder}'.";
-                if (relatedNotes.Count > 0)
-                {
-                    var conflict = await conflictDetector.DetectAsync(note.CompressedContent, relatedNotes, ct);
-                    if (conflict.HasConflict)
-                    {
-                        reply += $" UWAGA - mozliwa sprzecznosc z \"{conflict.ConflictingTitle}\": {conflict.Explanation}";
-
-                        if ((await noteStore.ListFactHistoryAsync(conflict.ConflictingTitle!, ct)).Count == 0)
-                        {
-                            var original = relatedNotes.First(n => n.Title == conflict.ConflictingTitle);
-                            await noteStore.RecordFactVersionAsync(conflict.ConflictingTitle!, original.CompressedContent, original.Title, ct);
-                        }
-                        await noteStore.RecordFactVersionAsync(conflict.ConflictingTitle!, note.CompressedContent, result.Title, ct);
-                    }
-                }
-
-                var closedGaps = await gapAutoCloser.TryCloseMatchingGapsAsync(ct);
-                if (closedGaps > 0)
-                    reply += $" Zamknieto rowniez {closedGaps} luk(i) w wiedzy.";
-
-                return reply;
+                var added = await pipeline.AddAsync(folder, text, parentId, ct: ct);
+                return string.Join(" ", added.Notices.Prepend($"Zapisano notatke '{added.Note.Title}' w folderze '{folder}'."));
             }
 
             case "trash_note":
@@ -371,8 +323,7 @@ public class FabrykaAgent(
                 if (note is null)
                     return $"Nie znaleziono notatki {noteId} w folderze '{folder}'.";
 
-                await vectorIndex.DeleteNoteAsync(folder, noteId, ct);
-                await noteStore.MoveToTrashAsync(folder, note.FilePath, ct);
+                await pipeline.TrashAsync(folder, note, ct);
                 return $"Przeniesiono do kosza: {note.Title}";
             }
 
@@ -384,14 +335,12 @@ public class FabrykaAgent(
 
             case "restore_note":
             {
-                var restored = await noteStore.RestoreFromTrashAsync(Req("trashPath"), ct);
-                var vector = await embedder.EmbedAsync(restored.Note.CompressedContent, ct);
-                await vectorIndex.UpsertAsync(restored.OriginalFolder, restored.Note, vector, ct);
+                var restored = await pipeline.RestoreAsync(Req("trashPath"), ct);
                 return $"Przywrocono '{restored.Note.Title}' do folderu '{restored.OriginalFolder}'.";
             }
 
             case "purge_note":
-                await noteStore.PurgeTrashAsync(Req("trashPath"), ct);
+                await pipeline.PurgeAsync(Req("trashPath"), ct);
                 return "Usunieto trwale.";
 
             case "list_gaps":
@@ -427,8 +376,7 @@ public class FabrykaAgent(
                     var note = notes.FirstOrDefault(n => n.Id == noteId);
                     if (note is null) { results.Add($"Nie znaleziono notatki {noteId}."); continue; }
 
-                    await vectorIndex.DeleteNoteAsync(folder, noteId, ct);
-                    await noteStore.MoveToTrashAsync(folder, note.FilePath, ct);
+                    await pipeline.TrashAsync(folder, note, ct);
                     results.Add($"Do kosza: {note.Title}");
                 }
                 return string.Join("\n", results);
@@ -467,12 +415,7 @@ public class FabrykaAgent(
                         .Distinct(StringComparer.OrdinalIgnoreCase)
                         .ToArray();
 
-                    var note = existing with { Tags = newTags, UpdatedAt = DateTimeOffset.UtcNow };
-                    var path = await noteStore.SaveAsync(folder, note, ct);
-                    note = note with { FilePath = path };
-
-                    var vector = await embedder.EmbedAsync(note.CompressedContent, ct);
-                    await vectorIndex.UpsertAsync(folder, note, vector, ct);
+                    var note = await pipeline.ReindexAsync(folder, existing with { Tags = newTags, UpdatedAt = DateTimeOffset.UtcNow }, ct);
                     results.Add($"Zaktualizowano tagi: {note.Title}");
                 }
                 return string.Join("\n", results);
@@ -490,12 +433,7 @@ public class FabrykaAgent(
                     var existing = notes.FirstOrDefault(n => n.Id == noteId);
                     if (existing is null) { results.Add($"Nie znaleziono notatki {noteId}."); continue; }
 
-                    var note = existing with { Pinned = pinned, UpdatedAt = DateTimeOffset.UtcNow };
-                    var path = await noteStore.SaveAsync(folder, note, ct);
-                    note = note with { FilePath = path };
-
-                    var vector = await embedder.EmbedAsync(note.CompressedContent, ct);
-                    await vectorIndex.UpsertAsync(folder, note, vector, ct);
+                    var note = await pipeline.ReindexAsync(folder, existing with { Pinned = pinned, UpdatedAt = DateTimeOffset.UtcNow }, ct);
                     results.Add(pinned ? $"Przypieto: {note.Title}" : $"Odpieto: {note.Title}");
                 }
                 return string.Join("\n", results);
@@ -505,7 +443,7 @@ public class FabrykaAgent(
             {
                 var trashed = await noteStore.ListTrashAsync(ct);
                 foreach (var t in trashed)
-                    await noteStore.PurgeTrashAsync(t.TrashPath, ct);
+                    await pipeline.PurgeAsync(t.TrashPath, ct);
                 return $"Trwale usunieto {trashed.Count} notatek z kosza.";
             }
 
@@ -514,7 +452,7 @@ public class FabrykaAgent(
                 var results = new List<string>();
                 foreach (var name in ReqArr("names"))
                 {
-                    var created = await vectorIndex.CreateFolderAsync(name, ct);
+                    var created = await pipeline.CreateFolderAsync(name, ct);
                     results.Add(created ? $"Utworzono folder '{name}'." : $"Folder '{name}' juz istnieje.");
                 }
                 return string.Join("\n", results);
@@ -525,8 +463,7 @@ public class FabrykaAgent(
                 var results = new List<string>();
                 foreach (var folder in ReqArr("folders"))
                 {
-                    await vectorIndex.DeleteFolderAsync(folder, ct);
-                    await noteStore.DeleteFolderAsync(folder, ct);
+                    await pipeline.DeleteFolderAsync(folder, ct);
                     results.Add($"Usunieto folder '{folder}' trwale.");
                 }
                 return string.Join("\n", results);
@@ -537,9 +474,7 @@ public class FabrykaAgent(
                 var results = new List<string>();
                 foreach (var trashPath in ReqArr("trashPaths"))
                 {
-                    var restored = await noteStore.RestoreFromTrashAsync(trashPath, ct);
-                    var vector = await embedder.EmbedAsync(restored.Note.CompressedContent, ct);
-                    await vectorIndex.UpsertAsync(restored.OriginalFolder, restored.Note, vector, ct);
+                    var restored = await pipeline.RestoreAsync(trashPath, ct);
                     results.Add($"Przywrocono '{restored.Note.Title}' do folderu '{restored.OriginalFolder}'.");
                 }
                 return string.Join("\n", results);
@@ -548,7 +483,7 @@ public class FabrykaAgent(
             case "bulk_purge":
             {
                 foreach (var trashPath in ReqArr("trashPaths"))
-                    await noteStore.PurgeTrashAsync(trashPath, ct);
+                    await pipeline.PurgeAsync(trashPath, ct);
                 return $"Trwale usunieto {ReqArr("trashPaths").Length} notatek z kosza.";
             }
 
@@ -631,12 +566,7 @@ public class FabrykaAgent(
                 if (existing is null)
                     return $"Nie znaleziono notatki {noteId} w folderze '{folder}'.";
 
-                var note = existing with { Pinned = pinned, UpdatedAt = DateTimeOffset.UtcNow };
-                var path = await noteStore.SaveAsync(folder, note, ct);
-                note = note with { FilePath = path };
-
-                var vector = await embedder.EmbedAsync(note.CompressedContent, ct);
-                await vectorIndex.UpsertAsync(folder, note, vector, ct);
+                var note = await pipeline.ReindexAsync(folder, existing with { Pinned = pinned, UpdatedAt = DateTimeOffset.UtcNow }, ct);
 
                 return pinned ? $"Przypieto: {note.Title}" : $"Odpieto: {note.Title}";
             }
@@ -733,17 +663,8 @@ public class FabrykaAgent(
         }
     }
 
-    private async Task<List<(string Folder, ScoredNote Scored)>> SearchAcrossAsync(string query, string? folder, CancellationToken ct)
-    {
-        var queryVector = await embedder.EmbedAsync(query, ct);
-        IReadOnlyList<string> folders = folder is not null ? [folder] : await vectorIndex.ListFoldersAsync(ct);
-
-        var candidates = await HybridNoteSearch.SearchFoldersAsync(vectorIndex, noteStore, folders, query, queryVector, vectorLimit: 10, ct);
-
-        var folderById = candidates.ToDictionary(c => c.Scored.Note.Id, c => c.Folder);
-        var reranked = await reranker.RerankAsync(query, candidates.Select(c => c.Scored).ToList(), ct);
-        return reranked.Select(r => (folderById.GetValueOrDefault(r.Note.Id, folder ?? ""), r)).ToList();
-    }
+    private Task<IReadOnlyList<SearchHit>> SearchAcrossAsync(string query, string? folder, CancellationToken ct) =>
+        noteSearch.SearchAsync(query, folder is not null ? [folder] : null, vectorLimit: 10, ct);
 
     private async Task<string> EditNoteCoreAsync(string folder, IReadOnlyList<Note> notes, Guid noteId, string text, CancellationToken ct)
     {
@@ -751,25 +672,7 @@ public class FabrykaAgent(
         if (existing is null)
             return $"Nie znaleziono notatki {noteId} w folderze '{folder}'.";
 
-        var result = await compressor.CompressAsync(text, ct);
-        var note = existing with
-        {
-            Title = result.Title,
-            RawContent = text,
-            CompressedContent = result.CompressedContent,
-            Tags = result.Tags,
-            UpdatedAt = DateTimeOffset.UtcNow
-        };
-
-        var path = await noteStore.SaveAsync(folder, note, ct);
-        note = note with { FilePath = path };
-
-        foreach (var def in result.Definitions ?? [])
-            await noteStore.SaveGlossaryEntryAsync(def.Term, def.Definition, result.Title, ct);
-
-        var vector = await embedder.EmbedAsync(note.CompressedContent, ct);
-        await vectorIndex.UpsertAsync(folder, note, vector, ct);
-
+        var note = await pipeline.EditAsync(folder, existing, text, ct);
         return $"Zaktualizowano notatke: {note.Title}";
     }
 
@@ -778,27 +681,8 @@ public class FabrykaAgent(
         if (lines.Count == 0)
             return "Brak niepustych notatek do zaimportowania.";
 
-        var imported = 0;
-        foreach (var line in lines)
-        {
-            var now = DateTimeOffset.UtcNow;
-            var result = await compressor.CompressAsync(line, ct);
-            var note = new Note(Guid.NewGuid(), result.Title, line, result.CompressedContent, result.Tags, now, now);
-            var path = await noteStore.SaveAsync(folder, note, ct);
-            note = note with { FilePath = path };
-
-            foreach (var def in result.Definitions ?? [])
-                await noteStore.SaveGlossaryEntryAsync(def.Term, def.Definition, result.Title, ct);
-
-            var vector = await embedder.EmbedAsync(note.CompressedContent, ct);
-            await vectorIndex.UpsertAsync(folder, note, vector, ct);
-            imported++;
-        }
-
-        var closedGaps = await gapAutoCloser.TryCloseMatchingGapsAsync(ct);
-        return closedGaps > 0
-            ? $"Zaimportowano {imported} notatek do '{folder}'. Zamknieto {closedGaps} luk(i) w wiedzy."
-            : $"Zaimportowano {imported} notatek do '{folder}'.";
+        var imported = await pipeline.ImportAsync(folder, lines, ct);
+        return string.Join(" ", imported.Notices.Prepend($"Zaimportowano {imported.Count} notatek do '{folder}'."));
     }
 
     private async Task<string> MoveNoteCoreAsync(string folder, Guid noteId, string? targetFolder, string? newParentIdRaw, CancellationToken ct)
@@ -835,23 +719,8 @@ public class FabrykaAgent(
             }
         }
 
-        var effectiveFolder = movingFolder ? targetFolder! : folder;
-        var updated = note with { ParentId = newParentId, UpdatedAt = DateTimeOffset.UtcNow };
-
-        if (movingFolder)
-        {
-            var newPath = await noteStore.MoveAsync(folder, targetFolder!, updated, ct);
-            updated = updated with { FilePath = newPath };
-            await vectorIndex.DeleteNoteAsync(folder, noteId, ct);
-        }
-        else
-        {
-            var path = await noteStore.SaveAsync(folder, updated, ct);
-            updated = updated with { FilePath = path };
-        }
-
-        var vector = await embedder.EmbedAsync(updated.CompressedContent, ct);
-        await vectorIndex.UpsertAsync(effectiveFolder, updated, vector, ct);
+        var updated = await pipeline.MoveAsync(folder, movingFolder ? targetFolder! : folder,
+            note with { ParentId = newParentId, UpdatedAt = DateTimeOffset.UtcNow }, ct);
 
         return movingFolder
             ? $"Przeniesiono '{updated.Title}' do folderu '{targetFolder}'."
