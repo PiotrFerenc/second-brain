@@ -27,9 +27,11 @@ Odstępstwa od planu (świadome):
 1. ~~`duplicates` nie jest pluginem~~ — zrobione po P2 agenta: plugin `duplicates`
    (backend-only: `DuplicateScanner` + narzędzie `find_duplicate_notes`), `TagCleaner`/
    `TagMerger` w pluginie `tags`. W Infrastructure nie ma już serwisów funkcji.
-2. **`INoteStore` nie schudł** (luki, słownik, fakty, szablony, scalanie tagów zostają) —
-   ten sam powód: agent i CLI wołają te metody. Magazyny pluginów (`GapStore` itd.)
-   powstaną przy P2; do tego czasu pluginy używają `INoteStore`.
+2. ~~`INoteStore` nie schudł~~ — zrobione w P5 (po P2 agenta): luki, słownik, fakty,
+   szablony mają własne magazyny w pluginach (`GapStore`, `GlossaryStore`, `FactStore`,
+   `TemplateStore`) i własne narzędzia agenta; `INoteStore` = notatki, foldery, kosz,
+   skille, `MergeTagsAsync`. CLI bierze magazyny pluginów przez `GetService` (wyłączony
+   plugin → komunikat zamiast wyjątku).
 3. `PluginManager` żyje w Sdk (CLI nie może referencować WinExe); `TabPlacement` →
    `TabArea` (kolizja z `Avalonia.Controls.TabPlacement`).
 4. Dodane do kontraktu w trakcie migracji: `IShell.Search`, `IShell.SelectedSearchResult`,

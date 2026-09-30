@@ -32,17 +32,20 @@ public sealed class TemplatesSlot(TemplateStore templates, IEditorContext editor
     public Control CreateControl()
     {
         var panel = new StackPanel { Orientation = Avalonia.Layout.Orientation.Horizontal, Spacing = 8 };
-        panel.AttachedToVisualTree += async (_, _) =>
-        {
-            if (panel.Children.Count > 0)
-                return;
-            foreach (var template in await templates.ListAsync())
-            {
-                var button = new Button { Content = template.Name, Classes = { "subtleAction" } };
-                button.Click += (_, _) => editor.Text = template.Content;
-                panel.Children.Add(button);
-            }
-        };
+        // Od razu przy budowie, nie na AttachedToVisualTree - to zdarzenie nie odpala sie dla
+        // kontrolek obecnych w pierwszym layoucie okna, wiec rzad szablonow (i domyslne pliki
+        // .templates/ na swiezym roocie) nie pojawialy sie po starcie.
+        _ = FillAsync(panel);
         return panel;
+    }
+
+    private async Task FillAsync(StackPanel panel)
+    {
+        foreach (var template in await templates.ListAsync())
+        {
+            var button = new Button { Content = template.Name, Classes = { "subtleAction" } };
+            button.Click += (_, _) => editor.Text = template.Content;
+            panel.Children.Add(button);
+        }
     }
 }

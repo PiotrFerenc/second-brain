@@ -32,8 +32,8 @@ dziennik, kosz, skróty klawiszowe, renderowanie Markdown. Solucja: `SecondBrain
 SecondBrain.slnx
   SecondBrain.Core/            interfejsy domenowe + modele, bez zaleznosci zewnetrznych
     Note.cs, Interfaces.cs      Note/ScoredNote; ICompressor, IEmbedder, IReranker, IAnswerSynthesizer,
-                                INoteStore (notatki, kosz, szablony, skille, luki, slownik, fakty,
-                                scalanie tagow - metody funkcji zostaja tu, dopoki uzywa ich agent),
+                                INoteStore (notatki, foldery, kosz, skille, scalanie tagow - magazyny
+                                funkcji sa w ich pluginach: GapStore, GlossaryStore, FactStore, TemplateStore),
                                 IVectorIndex, IAgent, IAgentSessionStore, IOcrExtractor
     Events.cs                   zdarzenia (NoteCompressed, NoteAdded, NoteEdited, NoteReindexed,
                                 NoteTrashed/Restored/Purged, FolderCreated/Deleted, ImportCompleted,
@@ -45,8 +45,9 @@ SecondBrain.slnx
     NoteSearch.cs               wyszukiwanie hybrydowe + reranker (uzywa: plugin search, gaps, agent)
     EventBus.cs                 handlery z DI, sekwencyjnie, wyjatek handlera logowany, nie przerywa
     NotesRoot.cs                jedna klasa liczy katalog notatek
-    Options.cs, HttpClientHeaders.cs, Embedding.cs, Compression.cs, AnswerSynthesis.cs, Reranking.cs,
-    TagCleaning.cs, DuplicateScanner.cs   providerzy i serwisy uzywane przez rdzen/agenta
+    Options.cs, HttpClientHeaders.cs, Embedding.cs, Compression.cs, AnswerSynthesis.cs, Reranking.cs
+                                providerzy rdzenia (czyszczenie tagow, duplikaty, OCR, przepisywanie,
+                                sprzecznosci: w pluginach)
     NoteFileStore.cs, FileVectorIndex.cs, AgentSessionStore.cs
     Agent.cs                    FabrykaAgent = tylko petla (SendAsync/ConfirmAsync/RunLoop/chat/completions,
                                 katalog skilli w prompcie); narzedzia z AgentToolRegistry
