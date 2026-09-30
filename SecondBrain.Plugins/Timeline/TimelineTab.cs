@@ -1,3 +1,4 @@
+using Avalonia;
 using System.Collections.ObjectModel;
 using System.Globalization;
 using Avalonia.Controls;
@@ -50,14 +51,21 @@ public sealed partial class TimelineTab(IVectorIndex vectorIndex, INoteStore not
             .Select(g => new TimelineGroup(g.Key.ToString("d MMMM yyyy", new CultureInfo("pl-PL")), g.ToList()))
             .ToList();
 
-        // NotesChanged moze przyjsc spoza watku UI (agent, CLI) - kolekcja bindowana wymaga UI.
-        await Dispatcher.UIThread.InvokeAsync(() =>
+        // NotesChanged moze przyjsc spoza watku UI (agent) - kolekcja bindowana wymaga UI.
+        // W CLI nie ma petli Avalonii: InvokeAsync nigdy by sie nie wykonal i `add` wisialby
+        // w nieskonczonosc, wiec bez aplikacji aktualizujemy wprost.
+        void Apply()
         {
             Groups.Clear();
             foreach (var g in groups)
                 Groups.Add(g);
             HasTimeline = Groups.Count > 0;
-        });
+        }
+
+        if (Application.Current is null)
+            Apply();
+        else
+            await Dispatcher.UIThread.InvokeAsync(Apply);
     }
 
     [RelayCommand]
