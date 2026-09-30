@@ -3,7 +3,7 @@ using SecondBrain.Core;
 
 namespace SecondBrain.Infrastructure.AgentTools;
 
-// Slownik, fakty, tagi, skille, szablony. Magazyny nadal w INoteStore
+// Slownik, tagi, skille, szablony. Magazyny nadal w INoteStore
 // (PLAN-PLUGINS.md: odchudzenie po przeniesieniu tych narzedzi do pluginow).
 
 public sealed class ListGlossaryTool(INoteStore noteStore) : AgentTool
@@ -46,16 +46,6 @@ public sealed class DeleteGlossaryEntryTool(INoteStore noteStore) : AgentTool
         var deleted = await noteStore.DeleteGlossaryEntryAsync(term, ct);
         return deleted ? $"Usunieto ze slownika: {term}" : $"Nie znaleziono terminu '{term}' w slowniku.";
     }
-}
-
-public sealed class FactHistoryTool(INoteStore noteStore) : AgentTool
-{
-    public override string Name => "fact_history";
-    public override string Description => "Pokaz historie sprzecznych wersji faktu dla danego tematu (wykryte wczesniej przez wykrywacz sprzecznosci).";
-    protected override string Parameters => """{"type":"object","properties":{"subject":{"type":"string"}},"required":["subject"]}""";
-
-    public override async Task<string> ExecuteAsync(JsonElement args, CancellationToken ct = default) =>
-        JsonSerializer.Serialize(await noteStore.ListFactHistoryAsync(args.Req("subject"), ct));
 }
 
 public sealed class FindDuplicateTagsTool(INoteStore noteStore, IVectorIndex vectorIndex, ITagCleaner tagCleaner) : AgentTool

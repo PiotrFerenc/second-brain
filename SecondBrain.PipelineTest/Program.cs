@@ -4,6 +4,7 @@ using SecondBrain.Core;
 using SecondBrain.Infrastructure;
 using SecondBrain.PipelineTest;
 using SecondBrain.Plugins.Gaps;
+using SecondBrain.Plugins.Conflicts;
 using SecondBrain.Plugins.Search;
 using SecondBrain.Plugins.Sdk;
 
@@ -345,7 +346,12 @@ switch (args.ElementAtOrDefault(0))
     case "fact-history" when args.Length >= 2:
     {
         var subject = string.Join(' ', args.Skip(1));
-        var history = await noteStore.ListFactHistoryAsync(subject);
+        if (provider.GetService<FactStore>() is not { } facts)
+        {
+            Console.WriteLine("Plugin sprzecznosci wylaczony.");
+            break;
+        }
+        var history = await facts.ListFactHistoryAsync(subject);
         if (history.Count == 0)
         {
             Console.WriteLine($"Brak historii dla '{subject}'.");

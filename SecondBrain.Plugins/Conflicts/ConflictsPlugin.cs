@@ -10,7 +10,6 @@ namespace SecondBrain.Plugins.Conflicts;
 // Wykrywacz sprzecznosci faktow + wersjonowanie faktow (.facts/). Bez UI: komunikat trafia
 // do Notices zapisu notatki, historia przez fact-history (CLI/agent). Wlasna sekcja configu
 // "ConflictDetection" i wlasny named HttpClient, jak kazdy provider (PLAN.md sekcja 3).
-// Magazyn faktow na razie przez INoteStore (uzywa go tez agent) - wlasny FactStore w fazie 2.
 public sealed class ConflictsPlugin : IPlugin
 {
     public string Id => "conflicts";
@@ -23,6 +22,8 @@ public sealed class ConflictsPlugin : IPlugin
         services.AddHttpClient("ConflictDetection", (sp, client) =>
             HttpClientHeaders.Apply(client, sp.GetRequiredService<IOptions<ConflictDetectionOptions>>().Value));
         services.AddSingleton<ConflictDetector>();
+        services.AddSingleton<FactStore>();
+        services.AddSingleton<IAgentTool, FactHistoryTool>();
         services.AddSingleton<IEventHandler<NoteAdded>, ConflictOnNoteAdded>();
     }
 }
@@ -46,7 +47,7 @@ public class ConflictDetectionOptions : HttpClientOptions
 }
 
 // Tylko pojedyncze dodanie (nie import: N linii = N wywolan LLM, 2N byloby za drogie).
-public sealed class ConflictOnNoteAdded(ConflictDetector conflictDetector, INoteStore noteStore) : IEventHandler<NoteAdded>
+public sealed class ConflictOnNoteAdded(ConflictDetector conflictDetector, FactStore facts) : IEventHandler<NoteAdded>
 {
     public async Task HandleAsync(NoteAdded e, CancellationToken ct = default)
     {
@@ -61,11 +62,11 @@ public sealed class ConflictOnNoteAdded(ConflictDetector conflictDetector, INote
 
         // Pierwsza sprzecznosc dla tematu: dopisz tez PIERWOTNA wersje, zeby historia
         // od razu miala obie strony.
-        if ((await noteStore.ListFactHistoryAsync(conflict.ConflictingTitle!, ct)).Count == 0)
+        if ((await facts.ListFactHistoryAsync(conflict.ConflictingTitle!, ct)).Count == 0)
         {
             var original = e.Related.First(n => n.Title == conflict.ConflictingTitle);
-            await noteStore.RecordFactVersionAsync(conflict.ConflictingTitle!, original.CompressedContent, original.Title, ct);
+            await facts.RecordFactVersionAsync(conflict.ConflictingTitle!, original.CompressedContent, original.Title, ct);
         }
-        await noteStore.RecordFactVersionAsync(conflict.ConflictingTitle!, e.Note.CompressedContent, e.Result.Title, ct);
+        await facts.RecordFactVersionAsync(conflict.ConflictingTitle!, e.Note.CompressedContent, e.Result.Title, ct);
     }
 }

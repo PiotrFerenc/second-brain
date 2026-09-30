@@ -30,10 +30,6 @@ public record TagGroup(string[] Tags, string SuggestedCanonical);
 // musi wiedziec do ktorego pliku wektorow doupsertowac notatke po zmianie na dysku.
 public record FolderedNote(string Folder, Note Note);
 
-// Wersjonowanie faktow: gdy wykrywacz sprzecznosci zlapie sprzeczna wartosc dla tego
-// samego tematu, obie wersje trafiaja tu jako trwala historia (nie tylko jednorazowe
-// ostrzezenie w statusie, ktore latwo przewinac/przegapic).
-public record FactVersion(DateTimeOffset RecordedAt, string SourceTitle, string Statement);
 
 // Historia calego repo notatek (widok "Historia" - jak SourceTree/GitKraken).
 public record CommitEntry(string Hash, string ShortHash, DateTimeOffset When, string Message);
@@ -118,9 +114,6 @@ public interface INoteStore
     // z folderem, zeby wywolujacy mogl doupsertowac je do indeksu wektorowego (tagi sa tez w payloadzie).
     Task<IReadOnlyList<FolderedNote>> MergeTagsAsync(string[] fromTags, string toTag, CancellationToken ct = default);
 
-    // Wersjonowanie faktow (patrz FactVersion) - append-only historia per temat.
-    Task RecordFactVersionAsync(string subject, string statement, string sourceTitle, CancellationToken ct = default);
-    Task<IReadOnlyList<FactVersion>> ListFactHistoryAsync(string subject, CancellationToken ct = default);
 }
 
 // Folder = jeden plik w lokalnym indeksie wektorowym. Jedna implementacja (FileVectorIndex) na razie,
