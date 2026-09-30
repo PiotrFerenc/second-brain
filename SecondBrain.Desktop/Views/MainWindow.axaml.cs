@@ -5,7 +5,6 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
-using Avalonia.Media.Imaging;
 using Avalonia.Platform.Storage;
 using Microsoft.Extensions.DependencyInjection;
 using SecondBrain.Desktop.ViewModels;
@@ -214,53 +213,6 @@ public partial class MainWindow : Window
             contents.Add(await File.ReadAllTextAsync(file));
 
         await vm.ImportLinesCommand.ExecuteAsync(contents);
-    }
-
-    // OCR ze schowka: obraz -> base64 -> IOcrExtractor -> tekst do wglądu w polu notatki
-    // (nie zapisujemy od razu - OCR bywa niedokladny, user ma szanse poprawic przed Zapisz).
-    private async void PasteImage_Click(object? sender, RoutedEventArgs e)
-    {
-        if (DataContext is not MainViewModel vm)
-            return;
-
-        var clipboard = GetTopLevel(this)?.Clipboard;
-        var data = clipboard is null ? null : await clipboard.TryGetDataAsync();
-        var bitmapItem = data?.Items.FirstOrDefault(i => i.Formats.Contains(DataFormat.Bitmap));
-        if (bitmapItem is null)
-        {
-            vm.EditorStatus = "Brak obrazka w schowku.";
-            return;
-        }
-
-        if (await bitmapItem.TryGetRawAsync(DataFormat.Bitmap) is not Bitmap bitmap)
-        {
-            vm.EditorStatus = "Nie udalo sie odczytac obrazka ze schowka.";
-            return;
-        }
-
-        using var stream = new MemoryStream();
-        bitmap.Save(stream, new PngBitmapEncoderOptions());
-
-        await vm.RunOcrCommand.ExecuteAsync(stream.ToArray());
-    }
-
-    // Wyszukiwanie po obrazie: ten sam schowek->OCR co przy edytorze, ale wynik leci do
-    // SearchByImageCommand (OCR -> SearchQuery -> SearchAsync) zamiast do pola notatki.
-    private async void PasteImageSearch_Click(object? sender, RoutedEventArgs e)
-    {
-        if (DataContext is not MainViewModel vm)
-            return;
-
-        var clipboard = GetTopLevel(this)?.Clipboard;
-        var data = clipboard is null ? null : await clipboard.TryGetDataAsync();
-        var bitmapItem = data?.Items.FirstOrDefault(i => i.Formats.Contains(DataFormat.Bitmap));
-        if (bitmapItem is null || await bitmapItem.TryGetRawAsync(DataFormat.Bitmap) is not Bitmap bitmap)
-            return;
-
-        using var stream = new MemoryStream();
-        bitmap.Save(stream, new PngBitmapEncoderOptions());
-
-        await vm.SearchByImageCommand.ExecuteAsync(stream.ToArray());
     }
 
     // Drag&drop w drzewie: przeciagniecie jednej notatki na druga zagniezdza ja pod nia

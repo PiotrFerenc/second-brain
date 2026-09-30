@@ -218,8 +218,6 @@
                             <sdk:SlotHost SlotId="Editor.Templates" />
                             <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto">
                                 <StackPanel Grid.Column="0" x:Name="TemplatesPanel" Orientation="Horizontal" Spacing="8" />
-                                <Button Grid.Column="1" Content="Wklej obrazek ze schowka" Classes="subtleAction"
-                                        Click="PasteImage_Click" Margin="0,0,8,0" />
                                 <Button Grid.Column="2" Content="Importuj z pliku..." Classes="subtleAction"
                                         Click="ImportFile_Click" Margin="0,0,8,0" />
                                 <Button Grid.Column="3" Content="Importuj z folderu..." Classes="subtleAction" Click="ImportFolder_Click" />
@@ -269,8 +267,6 @@
                                       IsChecked="{Binding SearchCurrentFolderOnly}"
                                       IsEnabled="{Binding SelectedFolder, Converter={x:Static acnv:ObjectConverters.IsNotNull}}"
                                       VerticalAlignment="Center" />
-                            <Button Content="Szukaj po obrazku" Classes="subtleAction" Click="PasteImageSearch_Click"
-                                    ToolTip.Tip="OCR obrazka ze schowka jako zapytanie" />
                             <sdk:SlotHost SlotId="Search.Toolbar" />
                         </StackPanel>
 

@@ -105,16 +105,6 @@ public class RerankerOptions : HttpClientOptions
     public string Model { get; set; } = "rerank-v3.5";
 }
 
-// LightOnOCR-2-1B to zwykle self-hosted serwer (np. vLLM), nie publiczne SaaS jak OpenAI -
-// BaseAddress pusty domyslnie, do uzupelnienia per-maszyna (ten sam wzorzec co Reranker/Cohere).
-public class OcrOptions : HttpClientOptions
-{
-    public string Model { get; set; } = "LightOnOCR-2-1B";
-
-    public string Prompt { get; set; } =
-        "Przepisz caly tekst widoczny na tym obrazku, doslownie, bez komentarzy. Sformatuj wynik jako czytelny markdown (naglowki, listy, pogrubienia, akapity zgodnie ze struktura tekstu na obrazku), zachowujac oryginalna tresc bez zmian.";
-}
-
 // System prompt podaje user w edytorze (pole instrukcji), wiec tu tylko model - bez SystemPrompt.
 public class NoteRewriteOptions : HttpClientOptions
 {
