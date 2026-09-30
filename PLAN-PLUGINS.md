@@ -379,7 +379,7 @@ dodawaniu pluginu):
 | `Sidebar.AboveTree` | nad drzewem | `tags` (baner aktywnego filtra) |
 | `Editor.Templates` | nad polem tekstu | `templates` |
 | `Editor.Toolbar` | rząd przycisków obok „Zapisz" | `ocr`, `import` |
-| `Editor.Footer` | pod polem tekstu | `rewrite` |
+| `Editor.Footer` | pod polem „Notatka nadrzędna" | `rewrite` |
 | `Note.Header` | pod tytułem notatki | `tags` (chipy) |
 | `Note.Actions` | obok pin/edytuj/kopiuj | `trash` („Usuń") |
 | `Note.Footer` | pod treścią | `backlinks` |

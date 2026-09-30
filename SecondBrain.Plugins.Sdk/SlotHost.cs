@@ -29,15 +29,31 @@ public class SlotHost : ItemsControl
         set => SetValue(OrientationProperty, value);
     }
 
+    // Bez tego podklasa nie dostaje motywu ItemsControl i nic sie nie renderuje.
+    protected override Type StyleKeyOverride => typeof(ItemsControl);
+
     public SlotHost()
     {
         ItemsPanel = new FuncTemplate<Panel?>(() => new StackPanel { Orientation = Orientation, Spacing = 8 });
     }
 
+    // AttachedToVisualTree nie odpala dla kontrolek z pierwszego layoutu okna - wypelniamy tez
+    // przy ustawieniu SlotId (parsowanie XAML), a attach zostaje jako fallback gdy Services jeszcze brak.
+    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
+    {
+        base.OnPropertyChanged(change);
+        if (change.Property == SlotIdProperty)
+            Fill();
+    }
+
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
     {
         base.OnAttachedToVisualTree(e);
+        Fill();
+    }
 
+    private void Fill()
+    {
         if (ItemsSource is not null || SlotId is null || PluginRuntime.Services is null)
             return;
 
