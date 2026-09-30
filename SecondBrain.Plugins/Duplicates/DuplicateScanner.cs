@@ -1,6 +1,6 @@
 using SecondBrain.Core;
 
-namespace SecondBrain.Infrastructure;
+namespace SecondBrain.Plugins.Duplicates;
 
 // Czysto odczytowy skan podobienstwa wektorowego miedzy folderami - znajduje notatki
 // ktore sa niemal identyczne ale zyja w dwoch roznych folderach (kandydaci do recznego

@@ -8,6 +8,7 @@ using SecondBrain.Plugins.Conflicts;
 using SecondBrain.Plugins.Glossary;
 using SecondBrain.Plugins.Search;
 using SecondBrain.Plugins.Tags;
+using SecondBrain.Plugins.Duplicates;
 using SecondBrain.Plugins.Sdk;
 
 var config = new ConfigurationBuilder()
@@ -38,7 +39,7 @@ var agent = provider.GetRequiredService<IAgent>();
 var tagCleaner = provider.GetService<TagCleaner>();          // null gdy plugin tagow wylaczony
 var tagMerger = provider.GetService<TagMerger>();
 var ocrExtractor = provider.GetService<IOcrExtractor>();   // null gdy plugin OCR wylaczony
-var duplicateScanner = provider.GetRequiredService<DuplicateScanner>();
+var duplicateScanner = provider.GetService<DuplicateScanner>();   // null gdy plugin duplikatow wylaczony
 var gapStore = provider.GetService<GapStore>();   // null gdy plugin luk wylaczony
 
 async Task AddNoteAsync(string folder, string rawText)
@@ -385,6 +386,12 @@ switch (args.ElementAtOrDefault(0))
 
     case "find-duplicates":
     {
+        if (duplicateScanner is null)
+        {
+            Console.WriteLine("Plugin duplikatow wylaczony.");
+            break;
+        }
+
         var duplicates = await duplicateScanner.FindCrossFolderDuplicatesAsync();
         if (duplicates.Count == 0)
         {

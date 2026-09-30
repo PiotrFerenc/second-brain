@@ -63,7 +63,6 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<NotePipeline>();
 
         services.AddSingleton<IVectorIndex, FileVectorIndex>();
-        services.AddSingleton<DuplicateScanner>();
         services.AddSingleton<IAgentSessionStore, FileAgentSessionStore>();
 
         return services;
