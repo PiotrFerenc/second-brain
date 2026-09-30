@@ -33,9 +33,6 @@ public partial class MainViewModel(
     public partial SearchResultItem? SelectedNote { get; set; }
 
     [ObservableProperty]
-    public partial string BacklinksText { get; set; } = "";
-
-    [ObservableProperty]
     public partial bool HasFolders { get; set; }
 
     // Aktywny filtr po tagu (klikniecie w chip w widoku Notatka) - zawezia drzewo do
@@ -64,7 +61,6 @@ public partial class MainViewModel(
         {
             SelectedNote = value.Note;
             SelectedTabIndex = TabNote;
-            _ = LoadBacklinksAsync();
         }
     }
 
@@ -443,28 +439,11 @@ public partial class MainViewModel(
             NoteEditStatus = "";
 
             await LoadTreeAsync();
-            await LoadBacklinksAsync();
         }
         finally
         {
             IsBusy = false;
         }
-    }
-
-    private async Task LoadBacklinksAsync()
-    {
-        BacklinksText = "";
-        if (SelectedNote is null)
-            return;
-
-        var notes = await noteStore.ListAsync(SelectedNote.Folder);
-        var referencing = notes
-            .Where(n => n.Id != SelectedNote.Id &&
-                        n.RawContent.Contains($"[[{SelectedNote.Title}]]", StringComparison.OrdinalIgnoreCase))
-            .Select(n => n.Title)
-            .ToList();
-
-        BacklinksText = referencing.Count > 0 ? string.Join(", ", referencing) : "Brak.";
     }
 
     // Klikniecie w tag: zawezia DRZEWO folderow do notatek z tym tagiem (ze wszystkich

@@ -10,6 +10,7 @@ public sealed class NullShell : IShell
 {
     public string? SelectedFolder => null;
     public NoteItem? SelectedNote => null;
+    public event Action? SelectedNoteChanged { add { } remove { } }
     public NoteItem? SelectedSearchResult => null;
     public IReadOnlyList<string> Folders => [];
     public Func<Note, bool>? TreeFilter { get; set; }

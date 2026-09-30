@@ -262,9 +262,6 @@
                             </Grid>
                             <WrapPanel x:Name="NoteTagsPanel" IsVisible="{Binding !IsEditingNote}" />
                             <sdk:SlotHost SlotId="Note.Header" Orientation="Vertical" IsVisible="{Binding !IsEditingNote}" />
-                            <TextBlock Classes="subtle" FontSize="12" TextWrapping="Wrap" IsVisible="{Binding !IsEditingNote}">
-                                <Run Text="Odnośniki do tej notatki: " /><Run Text="{Binding BacklinksText}" />
-                            </TextBlock>
                         </StackPanel>
 
                         <sdk:SlotHost DockPanel.Dock="Bottom" SlotId="Note.Footer" Orientation="Vertical" Margin="0,12,0,0" IsVisible="{Binding !IsEditingNote}" />
