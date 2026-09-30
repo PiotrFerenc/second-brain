@@ -1,11 +1,19 @@
 using System.Net.Http.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Options;
-using SecondBrain.Core;
+using SecondBrain.Infrastructure;
 
-namespace SecondBrain.Infrastructure;
+namespace SecondBrain.Plugins.Rewrite;
 
-public class FabrykaNoteRewriter(IHttpClientFactory httpClientFactory, IOptions<NoteRewriteOptions> options) : INoteRewriter
+// System prompt podaje user w edytorze (pole instrukcji), wiec tu tylko model - bez SystemPrompt.
+public class NoteRewriteOptions : HttpClientOptions
+{
+    public string Model { get; set; } = "gpt-3.5-turbo";
+}
+
+// Przepisuje surowy tekst notatki wg krotkiej instrukcji wpisanej przez usera w edytorze
+// (instrukcja = system prompt, tekst notatki = wiadomosc usera). Zwraca czysty tekst.
+public class NoteRewriter(IHttpClientFactory httpClientFactory, IOptions<NoteRewriteOptions> options)
 {
     private readonly NoteRewriteOptions _options = options.Value;
 
