@@ -10,13 +10,6 @@ public class FileNoteStore(NotesRoot notesRoot, IEventBus events) : INoteStore
     private const string CompressedHeader = "## Skompresowane (embedowane)";
     private const string TrashSeparator = "___";
 
-    private static readonly (string Name, string Content)[] DefaultTemplates =
-    [
-        ("Spotkanie", "## Spotkanie\nData: \nUczestnicy: \n\n### Ustalenia\n- \n\n### Kolejne kroki\n- \n"),
-        ("Pomysł", "## Pomysł\n\nProblem: \n\nRozwiązanie: \n\nDlaczego to działa: \n"),
-        ("Zadanie", "## Zadanie\n\nCel: \n\nKroki:\n1. \n\nTermin: \n"),
-    ];
-
     private readonly string _root = notesRoot.Path;
 
     public async Task<string> SaveAsync(string folder, Note note, CancellationToken ct = default)
@@ -127,23 +120,6 @@ public class FileNoteStore(NotesRoot notesRoot, IEventBus events) : INoteStore
             File.Delete(trashPath);
 
         await Changed("Trwale usunieto notatke z kosza", ct);
-    }
-
-    public async Task<IReadOnlyList<NoteTemplate>> ListTemplatesAsync(CancellationToken ct = default)
-    {
-        var dir = Path.Combine(_root, ".templates");
-        if (!Directory.Exists(dir))
-        {
-            Directory.CreateDirectory(dir);
-            foreach (var (name, content) in DefaultTemplates)
-                await File.WriteAllTextAsync(Path.Combine(dir, $"{name}.md"), content, ct);
-        }
-
-        var templates = new List<NoteTemplate>();
-        foreach (var file in Directory.EnumerateFiles(dir, "*.md").OrderBy(f => f))
-            templates.Add(new NoteTemplate(Path.GetFileNameWithoutExtension(file), await File.ReadAllTextAsync(file, ct)));
-
-        return templates;
     }
 
     public async Task<IReadOnlyList<AgentSkill>> ListSkillsAsync(CancellationToken ct = default)
