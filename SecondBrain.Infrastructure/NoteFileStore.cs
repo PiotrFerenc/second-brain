@@ -137,15 +137,21 @@ public class FileNoteStore(IOptions<StorageOptions> options) : INoteStore
 
     public async Task<IReadOnlyList<AgentSkill>> ListSkillsAsync(CancellationToken ct = default)
     {
-        var dir = Path.Combine(_root, ".skills");
-        if (!Directory.Exists(dir))
-            return [];
+        // Wbudowane skille (Skills/ w repo, kopiowane do katalogu aplikacji) + skille uzytkownika
+        // z .skills/ w katalogu notatek - skill uzytkownika o tej samej nazwie nadpisuje wbudowany.
+        var skills = new Dictionary<string, AgentSkill>(StringComparer.OrdinalIgnoreCase);
+        foreach (var dir in new[] { Path.Combine(AppContext.BaseDirectory, "Skills"), Path.Combine(_root, ".skills") })
+        {
+            if (!Directory.Exists(dir))
+                continue;
+            foreach (var file in Directory.EnumerateFiles(dir, "*.md"))
+            {
+                var name = Path.GetFileNameWithoutExtension(file);
+                skills[name] = new AgentSkill(name, await File.ReadAllTextAsync(file, ct));
+            }
+        }
 
-        var skills = new List<AgentSkill>();
-        foreach (var file in Directory.EnumerateFiles(dir, "*.md").OrderBy(f => f))
-            skills.Add(new AgentSkill(Path.GetFileNameWithoutExtension(file), await File.ReadAllTextAsync(file, ct)));
-
-        return skills;
+        return skills.Values.OrderBy(s => s.Name).ToList();
     }
 
     public async Task LogGapAsync(string query, CancellationToken ct = default)

@@ -124,7 +124,7 @@ public interface INoteStore
     // Szablony notatek - pliki .md czytelne i edytowalne przez uzytkownika poza aplikacja.
     Task<IReadOnlyList<NoteTemplate>> ListTemplatesAsync(CancellationToken ct = default);
 
-    // Skille agenta - pliki .md w .skills/, pierwsza linia = opis widoczny dla agenta,
+    // Skille agenta - pliki .md z Skills/ (repo) i .skills/ (notatki), pierwsza linia = opis widoczny dla agenta,
     // pelna tresc (instrukcja) ladowana dopiero gdy agent wywola use_skill.
     Task<IReadOnlyList<AgentSkill>> ListSkillsAsync(CancellationToken ct = default);
 

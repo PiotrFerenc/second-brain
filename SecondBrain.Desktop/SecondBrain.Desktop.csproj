@@ -36,5 +36,6 @@
 
   <ItemGroup>
     <None Include="appsettings.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Skills\*.md" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>
