@@ -23,9 +23,12 @@ public sealed class NullShell : IShell
 
 public sealed class NullEditorContext : IEditorContext
 {
+    public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged { add { } remove { } }
     public string? Folder => null;
+    public void SetFolder(string folder) { }
     public string Text { get; set; } = "";
-    public string Status { set { } }
+    public string Status { get; set; } = "";
     public bool IsBusy { get; set; }
+    public Task SaveAsync() => Task.CompletedTask;
     public Task OpenQuickNoteAsync(string folder) => Task.CompletedTask;
 }

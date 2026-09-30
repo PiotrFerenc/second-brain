@@ -1,21 +1,24 @@
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
-using SecondBrain.Desktop.ViewModels;
+using SecondBrain.Plugins.Sdk;
 
-namespace SecondBrain.Desktop.Views;
+namespace SecondBrain.Plugins.QuickNote;
 
 // Male okienko "szybka notatka" jak w OneNote (Win+N) - wpisujesz i Zapisz/Ctrl+Enter,
-// zamiast otwierac cale glowne okno. Dzieli DataContext (MainViewModel) z MainWindow,
-// wiec Zapisz idzie przez ten sam pipeline (kompresja/embedding/tagi) co edytor w glownym oknie.
+// zamiast otwierac cale glowne okno. DataContext to IEditorContext hosta, wiec Zapisz idzie
+// przez ten sam pipeline (kompresja/embedding/tagi) co edytor w glownym oknie.
 public partial class QuickNoteWindow : Window
 {
+    // Bezparametrowy konstruktor wymaga go loader XAML (AVLN3001); kontekst wchodzi przez DataContext.
     public QuickNoteWindow()
     {
         InitializeComponent();
         Opened += (_, _) => NoteTextBox.Focus();
         KeyDown += OnKeyDown;
     }
+
+    private IEditorContext Editor => (IEditorContext)DataContext!;
 
     private async void OnKeyDown(object? sender, KeyEventArgs e)
     {
@@ -29,12 +32,9 @@ public partial class QuickNoteWindow : Window
 
     private async Task SaveAsync()
     {
-        if (DataContext is not MainViewModel vm)
-            return;
+        await Editor.SaveAsync();
 
-        await vm.SaveNoteCommand.ExecuteAsync(null);
-
-        if (vm.EditorStatus.StartsWith("Zapisano"))
+        if (Editor.Status.StartsWith("Zapisano"))
             Close();
     }
 }
