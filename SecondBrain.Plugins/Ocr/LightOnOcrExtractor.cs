@@ -2,8 +2,9 @@ using System.Net.Http.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Options;
 using SecondBrain.Core;
+using SecondBrain.Infrastructure;
 
-namespace SecondBrain.Infrastructure;
+namespace SecondBrain.Plugins.Ocr;
 
 public class LightOnOcrExtractor(IHttpClientFactory httpClientFactory, IOptions<OcrOptions> options) : IOcrExtractor
 {

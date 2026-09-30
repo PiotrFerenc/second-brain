@@ -27,7 +27,6 @@ public static class ServiceCollectionExtensions
         services.Configure<RerankerOptions>(config.GetSection("Reranker"));
         services.Configure<VectorIndexOptions>(config.GetSection("VectorIndex"));
         services.Configure<StorageOptions>(config.GetSection("Storage"));
-        services.Configure<OcrOptions>(config.GetSection("Ocr"));
         services.Configure<NoteRewriteOptions>(config.GetSection("NoteRewrite"));
 
         services.AddHttpClient("Compression", (sp, client) =>
@@ -51,9 +50,6 @@ public static class ServiceCollectionExtensions
         services.AddHttpClient("Reranker", (sp, client) =>
             HttpClientHeaders.Apply(client, sp.GetRequiredService<IOptions<RerankerOptions>>().Value));
 
-        services.AddHttpClient("Ocr", (sp, client) =>
-            HttpClientHeaders.Apply(client, sp.GetRequiredService<IOptions<OcrOptions>>().Value));
-
         services.AddHttpClient("NoteRewrite", (sp, client) =>
             HttpClientHeaders.Apply(client, sp.GetRequiredService<IOptions<NoteRewriteOptions>>().Value));
 
@@ -65,7 +61,6 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IAgent, FabrykaAgent>();
         services.AddSingleton<ITagCleaner, FabrykaTagCleaner>();
         services.AddSingleton<TagMerger>();
-        services.AddSingleton<IOcrExtractor, LightOnOcrExtractor>();
         services.AddSingleton<INoteRewriter, FabrykaNoteRewriter>();
         services.AddSingleton<NotesRoot>();
         services.AddSingleton<IEventBus, EventBus>();

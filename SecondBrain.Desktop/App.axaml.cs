@@ -4,7 +4,6 @@ using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Input;
 using Avalonia.Markup.Xaml;
-using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 using Microsoft.Extensions.DependencyInjection;
 using SecondBrain.Desktop.ViewModels;
@@ -107,11 +106,8 @@ public partial class App : Application
             clipboardItem.Click += async (_, _) => await NewNoteFromClipboardTextAsync(folder);
             folderMenu.Items.Add(clipboardItem);
 
-            var imageItem = new NativeMenuItem("Obrazek ze schowka (OCR)");
-            imageItem.Click += async (_, _) => await NewNoteFromClipboardImageAsync(folder);
-            folderMenu.Items.Add(imageItem);
 
-            // Pozycje z pluginow (ITrayNewNoteContribution) - po wbudowanych trzech.
+            // Pozycje z pluginow (ITrayNewNoteContribution, np. OCR) - po wbudowanych dwoch.
             foreach (var contribution in Services.GetServices<ITrayNewNoteContribution>())
                 folderMenu.Items.Add(contribution.Build(folder));
 
@@ -141,7 +137,7 @@ public partial class App : Application
         _quickNoteWindow.Activate();
     }
 
-    // Tekst ze schowka (nie obrazek) trafia od razu do pola notatki, tak samo jak OCR ponizej -
+    // Tekst ze schowka (nie obrazek) trafia od razu do pola notatki -
     // user wciaz musi kliknac Zapisz, zeby dac szanse na poprawki przed kompresja/zapisem.
     private async Task NewNoteFromClipboardTextAsync(string folder)
     {
@@ -156,26 +152,6 @@ public partial class App : Application
 
         OpenQuickNote(folder);
         vm.NoteText = text;
-    }
-
-    // Ten sam schowek->OCR co przycisk "Wklej obrazek ze schowka" w edytorze (patrz
-    // MainWindow.axaml.cs PasteImage_Click), tylko wywolany z tray zamiast z okna.
-    private async Task NewNoteFromClipboardImageAsync(string folder)
-    {
-        if (_mainWindow?.DataContext is not MainViewModel vm)
-            return;
-
-        var clipboard = TopLevel.GetTopLevel(_mainWindow)?.Clipboard;
-        var data = clipboard is null ? null : await clipboard.TryGetDataAsync();
-        var bitmapItem = data?.Items.FirstOrDefault(i => i.Formats.Contains(DataFormat.Bitmap));
-        if (bitmapItem is null || await bitmapItem.TryGetRawAsync(DataFormat.Bitmap) is not Bitmap bitmap)
-            return;
-
-        using var stream = new MemoryStream();
-        bitmap.Save(stream, new PngBitmapEncoderOptions());
-
-        OpenQuickNote(folder);
-        await vm.RunOcrCommand.ExecuteAsync(stream.ToArray());
     }
 
     private void ShowMainWindow()

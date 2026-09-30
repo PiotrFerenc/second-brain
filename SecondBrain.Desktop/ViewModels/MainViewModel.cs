@@ -17,7 +17,6 @@ public partial class MainViewModel(
     IEventBus events,
     IAgent agent,
     IAgentSessionStore agentSessionStore,
-    IOcrExtractor ocrExtractor,
     INoteRewriter noteRewriter) : ViewModelBase
 {
     public const int TabEditor = 0;
@@ -425,25 +424,6 @@ public partial class MainViewModel(
         }
     }
 
-    // OCR ze schowka: wyciagniety tekst laduje w polu notatki do wglądu/edycji, NIE zapisuje
-    // sie automatycznie - OCR bywa niedokladny, user ma szanse poprawic przed "Zapisz".
-    [RelayCommand]
-    private async Task RunOcrAsync(byte[] imageBytes)
-    {
-        IsBusy = true;
-        try
-        {
-            EditorStatus = "Odczytuje tekst z obrazka (OCR)...";
-            var text = await ocrExtractor.ExtractTextAsync(imageBytes, "image/png");
-            NoteText = text;
-            EditorStatus = "Tekst z obrazka wczytany - sprawdz i zapisz.";
-        }
-        finally
-        {
-            IsBusy = false;
-        }
-    }
-
     // Instrukcja idzie jako system prompt, tresc notatki jako user - odpowiedz zastepuje NoteText.
     [RelayCommand]
     private async Task RewriteNoteAsync()
@@ -469,20 +449,6 @@ public partial class MainViewModel(
         {
             IsBusy = false;
         }
-    }
-
-    // Wyszukiwanie po obrazie: ten sam OCR co w edytorze, ale wyciagniety tekst leci wprost
-    // jako zapytanie do istniejacego SearchAsync zamiast do pola notatki.
-    [RelayCommand]
-    private async Task SearchByImageAsync(byte[] imageBytes)
-    {
-        var text = await ocrExtractor.ExtractTextAsync(imageBytes, "image/png");
-        if (string.IsNullOrWhiteSpace(text))
-            return;
-
-        SearchQuery = text;
-        SelectedTabIndex = TabSearch;
-        await SearchAsync();
     }
 
     // ---- Notatka (podglad wybranej w drzewie) ----

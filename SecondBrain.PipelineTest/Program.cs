@@ -33,7 +33,7 @@ var events = provider.GetRequiredService<IEventBus>();
 var agent = provider.GetRequiredService<IAgent>();
 var tagCleaner = provider.GetRequiredService<ITagCleaner>();
 var tagMerger = provider.GetRequiredService<TagMerger>();
-var ocrExtractor = provider.GetRequiredService<IOcrExtractor>();
+var ocrExtractor = provider.GetService<IOcrExtractor>();   // null gdy plugin OCR wylaczony
 var duplicateScanner = provider.GetRequiredService<DuplicateScanner>();
 
 async Task AddNoteAsync(string folder, string rawText)
@@ -96,6 +96,12 @@ switch (args.ElementAtOrDefault(0))
 
     case "ocr" when args.Length >= 3:
     {
+        if (ocrExtractor is null)
+        {
+            Console.WriteLine("Plugin OCR wylaczony.");
+            break;
+        }
+
         var folder = args[1];
         var imagePath = args[2];
         var mimeType = Path.GetExtension(imagePath).ToLowerInvariant() switch
