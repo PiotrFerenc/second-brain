@@ -14,7 +14,7 @@ public static class ServiceCollectionExtensions
     // (np. services.AddSingleton&lt;IEmbedder, FabrykaEmbedder&gt;()) - ostatnia wygrywa.
     //
     // Kazdy provider strzelajacy do API ma wlasna sekcje configu i wlasny named HttpClient -
-    // Compression/AnswerSynthesis/Agent/TagCleaning/Embedding moga wiec
+    // Compression/AnswerSynthesis/Agent/Embedding moga wiec
     // wskazywac na rozne adresy/klucze, nawet jesli dzis wszystkie mierza w ta sama infrastrukture.
     // VectorIndex to lokalny plikowy magazyn wektorow (FileVectorIndex), nie provider LLM - zostaje jak jest.
     public static IServiceCollection AddSecondBrainInfrastructure(this IServiceCollection services, IConfiguration config)
@@ -22,7 +22,6 @@ public static class ServiceCollectionExtensions
         services.Configure<CompressionOptions>(config.GetSection("Compression"));
         services.Configure<AnswerSynthesisOptions>(config.GetSection("AnswerSynthesis"));
         services.Configure<AgentOptions>(config.GetSection("Agent"));
-        services.Configure<TagCleaningOptions>(config.GetSection("TagCleaning"));
         services.Configure<EmbeddingOptions>(config.GetSection("Embedding"));
         services.Configure<RerankerOptions>(config.GetSection("Reranker"));
         services.Configure<VectorIndexOptions>(config.GetSection("VectorIndex"));
@@ -37,9 +36,6 @@ public static class ServiceCollectionExtensions
 
         services.AddHttpClient("Agent", (sp, client) =>
             HttpClientHeaders.Apply(client, sp.GetRequiredService<IOptions<AgentOptions>>().Value));
-
-        services.AddHttpClient("TagCleaning", (sp, client) =>
-            HttpClientHeaders.Apply(client, sp.GetRequiredService<IOptions<TagCleaningOptions>>().Value));
 
         services.AddHttpClient("Embedding", (sp, client) =>
             HttpClientHeaders.Apply(client, sp.GetRequiredService<IOptions<EmbeddingOptions>>().Value));
@@ -60,8 +56,6 @@ public static class ServiceCollectionExtensions
             services.AddSingleton(typeof(IAgentTool), toolType);
         services.AddSingleton<AgentToolRegistry>();
         services.AddSingleton<IAgentToolSource, McpToolSource>();
-        services.AddSingleton<ITagCleaner, FabrykaTagCleaner>();
-        services.AddSingleton<TagMerger>();
         services.AddSingleton<NotesRoot>();
         services.AddSingleton<IEventBus, EventBus>();
         services.AddSingleton<INoteStore, FileNoteStore>();

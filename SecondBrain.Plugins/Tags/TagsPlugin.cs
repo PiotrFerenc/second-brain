@@ -1,13 +1,16 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using SecondBrain.Core;
+using SecondBrain.Infrastructure;
 using SecondBrain.Plugins.Sdk;
 
 namespace SecondBrain.Plugins.Tags;
 
 // Tagi: chipy pod tytulem notatki (klik = filtr drzewa), baner aktywnego filtra nad drzewem,
-// auto-tagowanie z sasiadow przy zapisie. Czyszczenie tagow (ITagCleaner/TagMerger) zostaje
-// w Infrastructure, bo uzywa go agent (PLAN-AGENT-PLUGINS.md P2).
+// auto-tagowanie z sasiadow przy zapisie, czyszczenie tagow (LLM grupuje duplikaty, TagMerger
+// scala) z narzedziami agenta find_duplicate_tags/merge_tags. Wlasna sekcja configu
+// "TagCleaning" i wlasny named HttpClient, jak kazdy provider (PLAN.md sekcja 3).
 public sealed class TagsPlugin : IPlugin
 {
     public string Id => "tags";
@@ -20,6 +23,14 @@ public sealed class TagsPlugin : IPlugin
         services.AddSingleton<ISlotContribution, TagChipsSlot>();
         services.AddSingleton<ISlotContribution, TagFilterBanner>();
         services.AddSingleton<IEventHandler<NoteCompressed>, AutoTagOnCompressed>();
+
+        services.Configure<TagCleaningOptions>(config.GetSection("TagCleaning"));
+        services.AddHttpClient("TagCleaning", (sp, client) =>
+            HttpClientHeaders.Apply(client, sp.GetRequiredService<IOptions<TagCleaningOptions>>().Value));
+        services.AddSingleton<TagCleaner>();
+        services.AddSingleton<TagMerger>();
+        services.AddSingleton<IAgentTool, FindDuplicateTagsTool>();
+        services.AddSingleton<IAgentTool, MergeTagsTool>();
     }
 }
 

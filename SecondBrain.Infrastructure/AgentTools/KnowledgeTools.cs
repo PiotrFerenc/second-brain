@@ -3,7 +3,7 @@ using SecondBrain.Core;
 
 namespace SecondBrain.Infrastructure.AgentTools;
 
-// Luki w wiedzy, slownik, fakty, tagi, skille, szablony. Magazyny nadal w INoteStore
+// Luki w wiedzy, slownik, fakty, skille, szablony. Magazyny nadal w INoteStore
 // (PLAN-PLUGINS.md: odchudzenie po przeniesieniu tych narzedzi do pluginow).
 
 public sealed class ListGapsTool(INoteStore noteStore) : AgentTool
@@ -98,40 +98,6 @@ public sealed class FactHistoryTool(INoteStore noteStore) : AgentTool
 
     public override async Task<string> ExecuteAsync(JsonElement args, CancellationToken ct = default) =>
         JsonSerializer.Serialize(await noteStore.ListFactHistoryAsync(args.Req("subject"), ct));
-}
-
-public sealed class FindDuplicateTagsTool(INoteStore noteStore, IVectorIndex vectorIndex, ITagCleaner tagCleaner) : AgentTool
-{
-    public override string Name => "find_duplicate_tags";
-    public override string Description => "Znajdz grupy potencjalnie zduplikowanych tagow (liczba pojedyncza/mnoga, literowki, synonimy) w calej bazie - kandydaci do merge_tags.";
-    protected override string Parameters => """{"type":"object","properties":{}}""";
-
-    public override async Task<string> ExecuteAsync(JsonElement args, CancellationToken ct = default)
-    {
-        var allTags = new List<string>();
-        foreach (var folder in await vectorIndex.ListFoldersAsync(ct))
-            foreach (var note in await noteStore.ListAsync(folder, ct))
-                allTags.AddRange(note.Tags);
-
-        var groups = await tagCleaner.FindDuplicateGroupsAsync(allTags.Distinct(StringComparer.OrdinalIgnoreCase).ToList(), ct);
-        return JsonSerializer.Serialize(groups);
-    }
-}
-
-public sealed class MergeTagsTool(TagMerger tagMerger) : AgentTool
-{
-    public override string Name => "merge_tags";
-    public override string Description => "Scal liste tagow w jeden kanoniczny tag we wszystkich notatkach (wszystkie foldery).";
-    protected override string Parameters => """{"type":"object","properties":{"fromTags":{"type":"array","items":{"type":"string"}},"toTag":{"type":"string"}},"required":["fromTags","toTag"]}""";
-    public override bool IsMutating => true;
-    public override string Describe(JsonElement args) => $"Scalic tagi [{string.Join(", ", SArr(args, "fromTags"))}] w tag '{S(args, "toTag")}' we wszystkich notatkach?";
-
-    public override async Task<string> ExecuteAsync(JsonElement args, CancellationToken ct = default)
-    {
-        var toTag = args.Req("toTag");
-        var count = await tagMerger.MergeAsync(args.ReqArr("fromTags"), toTag, ct);
-        return $"Scalono tagi w '{toTag}' - zaktualizowano {count} notatek.";
-    }
 }
 
 public sealed class UseSkillTool(INoteStore noteStore) : AgentTool

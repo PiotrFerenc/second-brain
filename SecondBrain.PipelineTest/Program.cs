@@ -4,6 +4,7 @@ using SecondBrain.Core;
 using SecondBrain.Infrastructure;
 using SecondBrain.PipelineTest;
 using SecondBrain.Plugins.Search;
+using SecondBrain.Plugins.Tags;
 using SecondBrain.Plugins.Sdk;
 
 var config = new ConfigurationBuilder()
@@ -31,8 +32,8 @@ var pipeline = provider.GetRequiredService<NotePipeline>();
 var noteSearch = provider.GetRequiredService<NoteSearch>();
 var events = provider.GetRequiredService<IEventBus>();
 var agent = provider.GetRequiredService<IAgent>();
-var tagCleaner = provider.GetRequiredService<ITagCleaner>();
-var tagMerger = provider.GetRequiredService<TagMerger>();
+var tagCleaner = provider.GetService<TagCleaner>();          // null gdy plugin tagow wylaczony
+var tagMerger = provider.GetService<TagMerger>();
 var ocrExtractor = provider.GetService<IOcrExtractor>();   // null gdy plugin OCR wylaczony
 var duplicateScanner = provider.GetRequiredService<DuplicateScanner>();
 
@@ -294,6 +295,12 @@ switch (args.ElementAtOrDefault(0))
         foreach (var g in counts)
             Console.WriteLine($"{g.Key} ({g.Count()})");
 
+        if (tagCleaner is null)
+        {
+            Console.WriteLine("Plugin tagow wylaczony.");
+            break;
+        }
+
         var groups = await tagCleaner.FindDuplicateGroupsAsync(counts.Select(g => g.Key).ToList());
         if (groups.Count > 0)
         {
@@ -308,6 +315,12 @@ switch (args.ElementAtOrDefault(0))
     {
         var toTag = args[1];
         var fromTags = args.Skip(2).ToArray();
+
+        if (tagMerger is null)
+        {
+            Console.WriteLine("Plugin tagow wylaczony.");
+            break;
+        }
 
         var count = await tagMerger.MergeAsync(fromTags, toTag);
         Console.WriteLine($"Scalono {string.Join(", ", fromTags)} -> {toTag} w {count} notatce/-ach.");
