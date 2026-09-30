@@ -1,8 +1,9 @@
 using CliWrap;
 using CliWrap.Buffered;
 using SecondBrain.Core;
+using SecondBrain.Infrastructure;
 
-namespace SecondBrain.Infrastructure;
+namespace SecondBrain.Plugins.History;
 
 // Katalog notatek jako repo gita: darmowa historia wersji/backup bez akcji uzytkownika.
 // Commity leca w tle po kazdym StorageChanged (GitCommitOnChange), zakladka "Historia"

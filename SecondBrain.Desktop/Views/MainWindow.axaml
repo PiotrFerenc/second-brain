@@ -45,7 +45,6 @@
                         Classes="subtleAction" Command="{Binding ShowGapsTabCommand}" />
                 <Button Content="Słownik" Classes="subtleAction" Command="{Binding ShowGlossaryTabCommand}" />
                 <Button Content="Oś czasu" Classes="subtleAction" Command="{Binding ShowTimelineTabCommand}" />
-                <Button Content="Historia" Classes="subtleAction" Command="{Binding ShowHistoryTabCommand}" />
                 <Button Content="Agent" Classes="subtleAction" Command="{Binding ShowAgentTabCommand}" />
                 <!-- Zakladki z pluginow (ITabContribution, Placement=SidebarToolbar) -->
                 <ItemsControl ItemsSource="{Binding ToolbarTabs}">
@@ -531,77 +530,6 @@
                         </ScrollViewer>
                     </DockPanel>
 
-                    <DockPanel Margin="0,20,0,0" IsVisible="{Binding IsHistoryTabActive}">
-                        <Grid ColumnDefinitions="280,*">
-
-                            <Panel Grid.Column="0">
-                                <TextBlock Text="Historia jest pusta - jeszcze nic nie zacommitowano."
-                                           Classes="subtle" TextWrapping="Wrap"
-                                           IsVisible="{Binding !HasCommits}" />
-
-                                <ListBox ItemsSource="{Binding Commits}"
-                                         SelectedItem="{Binding SelectedCommit}"
-                                         IsVisible="{Binding HasCommits}">
-                                    <ListBox.ItemTemplate>
-                                        <DataTemplate>
-                                            <StackPanel Spacing="2">
-                                                <TextBlock Text="{Binding Message}" FontWeight="Medium" TextWrapping="Wrap" />
-                                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                                    <TextBlock Text="{Binding ShortHash}" Classes="subtle diffMono" FontSize="11" />
-                                                    <TextBlock Text="{Binding When, StringFormat='{}{0:yyyy-MM-dd HH:mm}'}"
-                                                               Classes="subtle" FontSize="11.5" />
-                                                </StackPanel>
-                                            </StackPanel>
-                                        </DataTemplate>
-                                    </ListBox.ItemTemplate>
-                                </ListBox>
-                            </Panel>
-
-                            <DockPanel Grid.Column="1" Margin="20,0,0,0"
-                                       IsVisible="{Binding SelectedCommit, Converter={x:Static acnv:ObjectConverters.IsNotNull}}">
-                                <StackPanel DockPanel.Dock="Top" Spacing="2" Margin="0,0,0,16">
-                                    <TextBlock Text="{Binding SelectedCommit.Message}" FontSize="17" FontWeight="Bold" TextWrapping="Wrap" />
-                                    <StackPanel Orientation="Horizontal" Spacing="8">
-                                        <TextBlock Text="{Binding SelectedCommit.ShortHash}" Classes="subtle diffMono" />
-                                        <TextBlock Text="{Binding SelectedCommit.When, StringFormat='{}{0:yyyy-MM-dd HH:mm}'}" Classes="subtle" FontSize="11.5" />
-                                    </StackPanel>
-                                </StackPanel>
-
-                                <TextBlock DockPanel.Dock="Top" Text="Ten commit nie zmienia żadnych plików."
-                                           Classes="subtle" TextWrapping="Wrap"
-                                           IsVisible="{Binding !HasCommitDiff}" />
-
-                                <ScrollViewer IsVisible="{Binding HasCommitDiff}">
-                                    <ItemsControl ItemsSource="{Binding CommitDiffFiles}">
-                                        <ItemsControl.ItemTemplate>
-                                            <DataTemplate>
-                                                <StackPanel Margin="0,0,0,20" Spacing="6">
-                                                    <TextBlock Text="{Binding Path}" Classes="label" TextWrapping="Wrap" />
-                                                    <ItemsControl ItemsSource="{Binding Lines}">
-                                                        <ItemsControl.ItemTemplate>
-                                                            <DataTemplate>
-                                                                <Border Classes.diffAdd="{Binding IsAdded}"
-                                                                        Classes.diffRemove="{Binding IsRemoved}"
-                                                                        Classes.diffHunk="{Binding IsHunk}"
-                                                                        Padding="8,1" CornerRadius="3">
-                                                                    <StackPanel Orientation="Horizontal" Spacing="4">
-                                                                        <TextBlock Text="{Binding Marker}" Classes="diffMarker"
-                                                                                   Classes.add="{Binding IsAdded}"
-                                                                                   Classes.remove="{Binding IsRemoved}" />
-                                                                        <TextBlock Text="{Binding Text}" Classes="diffMono" TextWrapping="NoWrap" />
-                                                                    </StackPanel>
-                                                                </Border>
-                                                            </DataTemplate>
-                                                        </ItemsControl.ItemTemplate>
-                                                    </ItemsControl>
-                                                </StackPanel>
-                                            </DataTemplate>
-                                        </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
-                                </ScrollViewer>
-                            </DockPanel>
-                        </Grid>
-                    </DockPanel>
 
                     <Grid ColumnDefinitions="220,*" Margin="0,20,0,0" IsVisible="{Binding IsAgentTabActive}">
 

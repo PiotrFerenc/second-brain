@@ -63,13 +63,3 @@ public sealed class GapLogOnSearch(INoteStore noteStore) : IEventHandler<SearchC
     public Task HandleAsync(SearchCompleted e, CancellationToken ct = default) =>
         e.Answered ? Task.CompletedTask : noteStore.LogGapAsync(e.Query, ct);
 }
-
-// Cichy backup do gita po kazdej zmianie na dysku (patrz GitRepository.ScheduleCommit).
-public sealed class GitCommitOnChange(GitRepository git) : IEventHandler<StorageChanged>
-{
-    public Task HandleAsync(StorageChanged e, CancellationToken ct = default)
-    {
-        git.ScheduleCommit(e.Message);
-        return Task.CompletedTask;
-    }
-}

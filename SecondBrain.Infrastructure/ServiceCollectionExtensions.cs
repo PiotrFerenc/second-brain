@@ -71,7 +71,6 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<NotesRoot>();
         services.AddSingleton<IEventBus, EventBus>();
         services.AddSingleton<INoteStore, FileNoteStore>();
-        services.AddSingleton<GitRepository>();
         services.AddSingleton<NoteSearch>();
         services.AddSingleton<NotePipeline>();
 
@@ -82,7 +81,6 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IEventHandler<NoteAdded>, GapAutoCloseOnNoteAdded>();
         services.AddSingleton<IEventHandler<ImportCompleted>, GapAutoCloseOnNoteAdded>();
         services.AddSingleton<IEventHandler<SearchCompleted>, GapLogOnSearch>();
-        services.AddSingleton<IEventHandler<StorageChanged>, GitCommitOnChange>();
         services.AddSingleton<IVectorIndex, FileVectorIndex>();
         services.AddSingleton<DuplicateScanner>();
         services.AddSingleton<IAgentSessionStore, FileAgentSessionStore>();
