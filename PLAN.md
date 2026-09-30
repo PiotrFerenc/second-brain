@@ -47,7 +47,12 @@ SecondBrain.slnx
     NotesRoot.cs                jedna klasa liczy katalog notatek
     Options.cs, HttpClientHeaders.cs, Embedding.cs, Compression.cs, AnswerSynthesis.cs, Reranking.cs,
     TagCleaning.cs, DuplicateScanner.cs   providerzy i serwisy uzywane przez rdzen/agenta
-    NoteFileStore.cs, FileVectorIndex.cs, AgentSessionStore.cs, Agent.cs
+    NoteFileStore.cs, FileVectorIndex.cs, AgentSessionStore.cs
+    Agent.cs                    FabrykaAgent = tylko petla (SendAsync/ConfirmAsync/RunLoop/chat/completions,
+                                katalog skilli w prompcie); narzedzia z AgentToolRegistry
+    AgentTools/                 AgentTool (baza), *Tools.cs (jedna klasa = jedno narzedzie IAgentTool,
+                                rejestrowane skanem asemblera), AgentToolRegistry (wbudowane + zrodla),
+                                McpToolSource (serwery MCP z sekcji Plugins:Mcp jako IAgentToolSource)
     ServiceCollectionExtensions.cs  AddSecondBrainInfrastructure(config)
 
   SecondBrain.Plugins.Sdk/     kontrakty pluginow (refs: Core, Avalonia, CommunityToolkit.Mvvm)
@@ -216,7 +221,7 @@ Te ustalenia są wiążące — nie zmieniaj ich bez wyraźnej prośby użytkown
 | **Wykrywacz sprzeczności używa osobnego modelu `ConflictModel` (`gpt-5`), różnego od `CompressionModel` (`gpt-3.5-turbo`)** | Zmierzone na żywo: `gpt-3.5-turbo` w trybie `json_object` myli się na tym zadaniu ok. 1/3 przypadków nawet przy `temperature:0` — `response_format: json_object` odbiera modelowi miejsce na chain-of-thought, co potwierdzone porównaniem z odpowiedzią tego samego promptu bez trybu JSON (poprawna za każdym razem). `gpt-5` ma natywne rozumowanie i rozwiązuje to poprawnie bez żadnych sztuczek w prompcie |
 | **Wykrywanie sprzeczności tylko przy `add` (pojedyncza notatka), pominięte przy `import` (import z pliku, N linii)** | N notatek importu to już N wywołań LLM (kompresja); podwojenie do 2N przez conflict-check na każdej linii byłoby zbyt kosztowne/wolne, a import z pliku to zwykle świeże dane, nie duplikaty istniejących faktów |
 | **Agent czatowy: zawsze globalny** (nie ograniczony do aktualnie otwartego folderu/zakładki), pełny zestaw 15 narzędzi od razu (foldery, notatki, szukaj, RAG, dodaj, kosz, przywróć/usuń trwale, luki, słownik) | Wprost wybrane przez użytkownika (AskUserQuestion) zamiast kontekstu per-zakładka i okrojonego zestawu odczyt-only |
-| **Narzędzia agenta modyfikujące dane wymagaja potwierdzenia w czacie (Tak/Nie) przed wykonaniem**; czyste odczyty wykonują się od razu bez pytania | Wprost wybrane przez użytkownika; lista mutujących: `create_folder`, `add_note`, `trash_note`, `restore_note`, `purge_note`, `delete_folder`, `resolve_gap` — wszystko inne to odczyt |
+| **Narzędzia agenta modyfikujące dane wymagają potwierdzenia w czacie (Tak/Nie) przed wykonaniem**; czyste odczyty wykonują się od razu | Wprost wybrane przez użytkownika. Flaga to `IAgentTool.IsMutating` na klasie narzędzia (nie osobna lista); narzędzia z serwerów MCP są mutujące, o ile nie mają `readOnlyHint=true` |
 | **Agent: `gpt-5` (`AgentModel`), `parallel_tool_calls:false`** | Orkiestracja (co wywołać, w jakiej kolejności) to zadanie rozumowania jak wykrywanie sprzeczności — ten sam wybór modelu i powód (patrz `ConflictModel` wyżej). `parallel_tool_calls:false` wymusza jedno wywołanie narzędzia na turę, co upraszcza flow potwierdzeń (zawsze dokładnie jedno oczekujące wywołanie do zaakceptowania/odrzucenia, nie trzeba godzić czesciowo odpowiedzianych batchy) |
 | **`ConversationState` w `IAgent` to nieprzezroczysty string** (cała historia + wywołania narzędzi w formacie OpenAI, serializowana do JSON) | Wywołujący (CLI, `MainViewModel`) tylko przechowuje i oddaje blob z powrotem, nie zna wewnętrznego formatu providera; nie jest zapisywany na dysk — rozmowa żyje tylko w pamięci na czas działania aplikacji, tak jak reszta stanu edytora |
 | **Agent: nowa zakładka "Agent"** (przycisk w pasku narzędzi obok Słownika), dymki czatu (user/asystent), karta potwierdzenia Tak/Nie nad polem wpisywania | Wprost wybrane przez użytkownika (nowa zakładka zamiast zadokowanego panelu); Tak/Nie jako dwie osobne komendy bez parametru (nie `CommandParameter="True"/"False"` rzutowane z string na bool w runtime — kruche) |
@@ -241,6 +246,9 @@ Te ustalenia są wiążące — nie zmieniaj ich bez wyraźnej prośby użytkown
 | **CLI rejestruje `NullShell`/`NullEditorContext`** | Zakładki pluginów bywają handlerami zdarzeń i wstrzykują `IShell`; bez tego `EventBus` nie mógł ich utworzyć w CLI |
 | **Metody luk/słownika/faktów/szablonów/scalania tagów zostają w `INoteStore`; `DuplicateScanner`, `ITagCleaner`, `TagMerger` zostają w Infrastructure** | Używa ich `FabrykaAgent` (Infrastructure nie może referencować pluginów). Przenoszą się razem z narzędziami agenta (`PLAN-AGENT-PLUGINS.md` P2); plugin `duplicates` odłożony z tego samego powodu |
 | **Okna/kontrolki pluginów: bezparametrowy konstruktor, zależności przez `DataContext`; kontrybucja slotu to fabryka (`CreateControl` per `SlotHost`)** | Loader XAML ostrzega przy konstruktorze z parametrem; jeden slot (`Editor.Footer`) żyje w dwóch oknach (główne + szybka notatka) |
+
+| **Narzędzia agenta jako klasy `IAgentTool` (`Infrastructure/AgentTools/`, pluginy rejestrują swoje przez DI), `FabrykaAgent` to tylko pętla** | Wcześniej 42 narzędzia w jednym `switch` + 4 miejsca do edycji na narzędzie. Teraz nowe narzędzie = jedna klasa; wyłączony plugin nie rejestruje swoich. Złoty plik JSON `tools` przed/po refaktorze identyczny (`dotnet run -- tools`) |
+| **Zewnętrzne pluginy agenta = serwery MCP (stdio) z `appsettings.json`, pakiet `ModelContextProtocol.Core` 2.2.0, tylko klient** | Gotowy ekosystem serwerów zamiast własnego formatu; JSON Schema 1:1 z function calling; `readOnlyHint` mapuje się na potwierdzenia. `Microsoft.Extensions.AI` przychodzi jako zależność MCP, `IChatClient` nie jest używany do własnych wywołań LLM |
 
 ## 4. Co dalej
 
@@ -338,6 +346,7 @@ Nie zaczynaj żadnej z tych ścieżek bez wyraźnej prośby i decyzji, która op
 
 - Nie dodawaj chunkowania długich notatek — świadomie odrzucone na tym etapie.
 - Nie wprowadzaj bazy SQLite ani innego magazynu metadanych; pliki `.md` plus Qdrant wystarczą.
+- Nie używaj `IChatClient`/`Microsoft.Extensions.AI` (zależność pakietu MCP) do własnych wywołań LLM.
 - Nie buduj warstwy abstrakcji nad providerami LLM „na przyszłość" — jeden interfejs na
   funkcję (`ICompressor`, `IEmbedder`, `IReranker`) i tyle.
 - Nie commituj `appsettings.json` z prawdziwym kluczem — jest w `.gitignore`, aktualizuj

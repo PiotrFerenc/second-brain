@@ -70,6 +70,12 @@ Reguły, które kosztowały nas czas:
 
 Backend wtyczek działa też w CLI (`SecondBrain.PipelineTest`), więc `add` z konsoli robi to samo, co zapis w oknie.
 
+## Narzędzia agenta
+
+Agent czatowy (zakładka Agent, CLI `dotnet run -- agent`) używa narzędzi typu function calling. Jedno narzędzie to jedna publiczna klasa dziedzicząca po `AgentTool` (`SecondBrain.Infrastructure/AgentTools/`): nazwa, opis, schemat parametrów jako JSON, `IsMutating` (czy pytać Tak/Nie), `Describe` (tekst pytania) i `ExecuteAsync`. Klasy z Infrastructure są rejestrowane automatycznie; wtyczka rejestruje swoje przez `services.AddSingleton<IAgentTool, MojeNarzedzie>()` i po wyłączeniu wtyczki narzędzie znika z listy.
+
+`dotnet run -- tools` w `SecondBrain.PipelineTest` drukuje tablicę narzędzi w formie wysyłanej do API, `tools --mutating` listę z flagami. Skille (`Skills/*.md`) opisują agentowi, jak łączyć narzędzia; nazwy i teksty wyników są częścią tego kontraktu.
+
 ## Pluginy MCP agenta
 
 Agent czatowy może korzystać z narzędzi dowolnego serwera [MCP](https://modelcontextprotocol.io) (Model Context Protocol) uruchamianego przez stdio – bez pisania kodu, samą konfiguracją. Sekcja `Plugins.Mcp` w `appsettings.json` (Desktop i CLI mają osobne pliki):

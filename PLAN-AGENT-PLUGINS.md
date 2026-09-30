@@ -4,6 +4,23 @@ Dokument roboczy dla agentów kodujących, uzupełnienie `PLAN.md` (sekcje 3 i 5
 dokumentu nadal obowiązują). Cel: dać aplikacji system pluginów bez rozbudowy własnego
 formatu, a wcześniej uporządkować kod agenta tak, żeby pluginy miały się do czego podpiąć.
 
+## Stan realizacji (2026-09-30)
+
+Krok 0, P1 (wspólny z `PLAN-PLUGINS.md`), P2, P3 i P4 wykonane i scalone na `master`.
+
+- `Agent.cs` 874 → 150 linii; 43 narzędzia (42 stare + nowe `list_skills`) jako klasy w
+  `Infrastructure/AgentTools/`; złoty plik `tools` przed/po identyczny, 26 mutujących.
+- `McpToolSource` na `ModelContextProtocol.Core` 2.2.0 (typy: `StdioClientTransport`,
+  `McpClient.CreateAsync/ListToolsAsync/CallToolAsync`, `ToolAnnotations.ReadOnlyHint`),
+  konfiguracja `Plugins:Mcp` (`PluginsOptions.Mcp` jako lista), CLI `mcp-tools`/`mcp-call`,
+  odebrane na `@modelcontextprotocol/server-filesystem`.
+- Odstępstwa: skan asemblera rejestruje tylko publiczne klasy `IAgentTool` (narzędzia MCP są
+  prywatne, tworzone w runtime); przykład w `appsettings.Example.json` ma `Enabled: false`,
+  żeby świeża kopia szablonu nie odpalała `npx`.
+- Krok dodatkowy P5 (poza tym planem): narzędzia i magazyny luk/słownika/faktów/tagów
+  przechodzą do swoich pluginów, `INoteStore` chudnie. To domyka ogony fazy 2 z
+  `PLAN-PLUGINS.md`.
+
 ## 0. W skrócie
 
 - Pluginy w trzech warstwach, od najtańszej: **skille `.md`** (już są, zostają bez zmian),
