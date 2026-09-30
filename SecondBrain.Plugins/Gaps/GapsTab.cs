@@ -16,9 +16,9 @@ public class GapItem(string query, DateTimeOffset askedAt, string path)
 }
 
 // Zakladka "Luki (N)". Lista przeladowuje sie po kazdym StorageChanged (wlasne handlery,
-// agent, CLI - wszystko przechodzi przez INoteStore, ktory to publikuje) i przy aktywacji.
+// agent, CLI - wszystko przechodzi przez GapStore, ktory to publikuje) i przy aktywacji.
 // IShell opcjonalny: w CLI nie ma powloki, a handlery zdarzen i tak tworza te klase.
-public sealed partial class GapsTab(INoteStore noteStore, IShell? shell = null) : ObservableObject, ITabContribution, IEventHandler<StorageChanged>
+public sealed partial class GapsTab(GapStore gaps, IShell? shell = null) : ObservableObject, ITabContribution, IEventHandler<StorageChanged>
 {
     public string Id => "gaps";
     public string Title => $"Luki ({Gaps.Count})";
@@ -44,7 +44,7 @@ public sealed partial class GapsTab(INoteStore noteStore, IShell? shell = null) 
     private async Task LoadGapsAsync()
     {
         Gaps.Clear();
-        foreach (var g in await noteStore.ListGapsAsync())
+        foreach (var g in await gaps.ListAsync())
             Gaps.Add(new GapItem(g.Query, g.AskedAt, g.Path));
 
         HasGaps = Gaps.Count > 0;
@@ -58,7 +58,7 @@ public sealed partial class GapsTab(INoteStore noteStore, IShell? shell = null) 
         if (item is null)
             return;
 
-        await noteStore.ResolveGapAsync(item.Path);
+        await gaps.ResolveAsync(item.Path);
         SelectedGap = null;
         await LoadGapsAsync();
     }

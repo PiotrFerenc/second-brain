@@ -165,54 +165,6 @@ public class FileNoteStore(NotesRoot notesRoot, IEventBus events) : INoteStore
         return skills.Values.OrderBy(s => s.Name).ToList();
     }
 
-    public async Task LogGapAsync(string query, CancellationToken ct = default)
-    {
-        var dir = Path.Combine(_root, ".gaps");
-        Directory.CreateDirectory(dir);
-        var path = Path.Combine(dir, $"{Guid.NewGuid()}.md");
-
-        var content = $"""
-            ---
-            asked: {DateTimeOffset.UtcNow:O}
-            ---
-            {query}
-            """;
-
-        await File.WriteAllTextAsync(path, content, ct);
-        await Changed($"Zapisano luke w wiedzy: {query}", ct);
-    }
-
-    public async Task<IReadOnlyList<KnowledgeGap>> ListGapsAsync(CancellationToken ct = default)
-    {
-        var dir = Path.Combine(_root, ".gaps");
-        if (!Directory.Exists(dir))
-            return [];
-
-        var gaps = new List<KnowledgeGap>();
-        foreach (var file in Directory.EnumerateFiles(dir, "*.md"))
-        {
-            var lines = await File.ReadAllLinesAsync(file, ct);
-            if (lines.Length < 3 || lines[0] != "---" || lines[2] != "---")
-                continue;
-
-            var askedValue = lines[1][(lines[1].IndexOf(':') + 1)..].Trim();
-            var asked = DateTimeOffset.Parse(askedValue);
-            var query = string.Join('\n', lines[3..]).Trim();
-
-            gaps.Add(new KnowledgeGap(query, asked, file));
-        }
-
-        return gaps.OrderByDescending(g => g.AskedAt).ToList();
-    }
-
-    public async Task ResolveGapAsync(string path, CancellationToken ct = default)
-    {
-        if (File.Exists(path))
-            File.Delete(path);
-
-        await Changed("Odrzucono luke w wiedzy", ct);
-    }
-
     public async Task SaveGlossaryEntryAsync(string term, string definition, string sourceTitle, CancellationToken ct = default)
     {
         var dir = Path.Combine(_root, ".glossary");

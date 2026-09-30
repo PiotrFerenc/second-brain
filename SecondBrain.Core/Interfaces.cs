@@ -21,8 +21,6 @@ public record AnswerResult(
     [property: JsonPropertyName("answered")] bool Answered,
     [property: JsonPropertyName("answer")] string Answer);
 
-public record KnowledgeGap(string Query, DateTimeOffset AskedAt, string Path);
-
 public record GlossaryEntry(string Term, string Definition, string SourceTitle);
 
 // Sugestia grupy tagow-duplikatow (np. "spotkanie"/"spotkania") do reczengo scalenia.
@@ -108,11 +106,6 @@ public interface INoteStore
     // Skille agenta - pliki .md z Skills/ (repo) i .skills/ (notatki), pierwsza linia = opis widoczny dla agenta,
     // pelna tresc (instrukcja) ladowana dopiero gdy agent wywola use_skill.
     Task<IReadOnlyList<AgentSkill>> ListSkillsAsync(CancellationToken ct = default);
-
-    // Luki w wiedzy: pytania, na ktore RAG jawnie odpowiedzial "notatki tego nie zawieraja".
-    Task LogGapAsync(string query, CancellationToken ct = default);
-    Task<IReadOnlyList<KnowledgeGap>> ListGapsAsync(CancellationToken ct = default);
-    Task ResolveGapAsync(string path, CancellationToken ct = default);
 
     // Auto-slownik: definicje wylapane przy kompresji, globalne (nie per-folder).
     // Ten sam termin nadpisuje poprzedni wpis (najnowsza definicja wygrywa).
