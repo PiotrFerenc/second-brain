@@ -9,7 +9,7 @@ namespace SecondBrain.Plugins.Glossary;
 
 // Lista ladowana przy kazdym wejsciu w zakladke - zapis notatki/akcja agenta dzieja sie
 // w innych zakladkach, wiec to pokrywa dawne reczne LoadGlossaryAsync po kazdej mutacji.
-public sealed partial class GlossaryTab(INoteStore noteStore) : ObservableObject, ITabContribution
+public sealed partial class GlossaryTab(GlossaryStore store) : ObservableObject, ITabContribution
 {
     public string Id => "glossary";
     public string Title => "Słownik";
@@ -30,7 +30,7 @@ public sealed partial class GlossaryTab(INoteStore noteStore) : ObservableObject
     public async Task OnActivatedAsync(CancellationToken ct)
     {
         GlossaryEntries.Clear();
-        foreach (var e in await noteStore.ListGlossaryAsync(ct))
+        foreach (var e in await store.ListAsync(ct))
             GlossaryEntries.Add(e);
 
         HasGlossary = GlossaryEntries.Count > 0;

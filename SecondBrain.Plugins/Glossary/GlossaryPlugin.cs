@@ -6,8 +6,8 @@ using SecondBrain.Plugins.Sdk;
 namespace SecondBrain.Plugins.Glossary;
 
 // Auto-slownik: definicje ("X to Y") zlapane przy kompresji notatki trafiaja do .glossary/,
-// zakladka je listuje. Magazyn na razie przez INoteStore (uzywa go tez agent) - wlasny
-// GlossaryStore dopiero w fazie 2 (PLAN-PLUGINS.md).
+// zakladka je listuje, agent ma do nich narzedzia. Wlasny magazyn (GlossaryStore) - nic z tego
+// nie zyje w INoteStore.
 public sealed class GlossaryPlugin : IPlugin
 {
     public string Id => "glossary";
@@ -16,7 +16,11 @@ public sealed class GlossaryPlugin : IPlugin
 
     public void ConfigureServices(IServiceCollection services, IConfiguration config)
     {
+        services.AddSingleton<GlossaryStore>();
         services.AddSingleton<ITabContribution, GlossaryTab>();
+        services.AddSingleton<IAgentTool, ListGlossaryTool>();
+        services.AddSingleton<IAgentTool, AddGlossaryEntryTool>();
+        services.AddSingleton<IAgentTool, DeleteGlossaryEntryTool>();
         services.AddSingleton<GlossaryOnNoteAdded>();
         services.AddSingleton<IEventHandler<NoteAdded>>(sp => sp.GetRequiredService<GlossaryOnNoteAdded>());
         services.AddSingleton<IEventHandler<NoteEdited>>(sp => sp.GetRequiredService<GlossaryOnNoteAdded>());

@@ -23,8 +23,6 @@ public record AnswerResult(
 
 public record KnowledgeGap(string Query, DateTimeOffset AskedAt, string Path);
 
-public record GlossaryEntry(string Term, string Definition, string SourceTitle);
-
 // Sugestia grupy tagow-duplikatow (np. "spotkanie"/"spotkania") do reczengo scalenia.
 public record TagGroup(string[] Tags, string SuggestedCanonical);
 
@@ -113,12 +111,6 @@ public interface INoteStore
     Task LogGapAsync(string query, CancellationToken ct = default);
     Task<IReadOnlyList<KnowledgeGap>> ListGapsAsync(CancellationToken ct = default);
     Task ResolveGapAsync(string path, CancellationToken ct = default);
-
-    // Auto-slownik: definicje wylapane przy kompresji, globalne (nie per-folder).
-    // Ten sam termin nadpisuje poprzedni wpis (najnowsza definicja wygrywa).
-    Task SaveGlossaryEntryAsync(string term, string definition, string sourceTitle, CancellationToken ct = default);
-    Task<IReadOnlyList<GlossaryEntry>> ListGlossaryAsync(CancellationToken ct = default);
-    Task<bool> DeleteGlossaryEntryAsync(string term, CancellationToken ct = default);
 
     // Czyszczenie tagow: podmienia kazdy tag z fromTags na toTag we wszystkich notatkach
     // (wszystkie foldery), przepisujac pliki na dysku. Zwraca zaktualizowane notatki wraz

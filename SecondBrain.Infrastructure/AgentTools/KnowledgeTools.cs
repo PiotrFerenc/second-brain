@@ -3,7 +3,7 @@ using SecondBrain.Core;
 
 namespace SecondBrain.Infrastructure.AgentTools;
 
-// Luki w wiedzy, slownik, fakty, tagi, skille, szablony. Magazyny nadal w INoteStore
+// Luki w wiedzy, fakty, tagi, skille, szablony (slownik: plugin glossary). Magazyny nadal w INoteStore
 // (PLAN-PLUGINS.md: odchudzenie po przeniesieniu tych narzedzi do pluginow).
 
 public sealed class ListGapsTool(INoteStore noteStore) : AgentTool
@@ -45,48 +45,6 @@ public sealed class BulkResolveGapsTool(INoteStore noteStore) : AgentTool
         foreach (var path in paths)
             await noteStore.ResolveGapAsync(path, ct);
         return $"Odrzucono {paths.Length} luk w wiedzy.";
-    }
-}
-
-public sealed class ListGlossaryTool(INoteStore noteStore) : AgentTool
-{
-    public override string Name => "list_glossary";
-    public override string Description => "Wylistuj slownik pojec zbudowany automatycznie z notatek.";
-    protected override string Parameters => """{"type":"object","properties":{}}""";
-
-    public override async Task<string> ExecuteAsync(JsonElement args, CancellationToken ct = default) =>
-        JsonSerializer.Serialize(await noteStore.ListGlossaryAsync(ct));
-}
-
-public sealed class AddGlossaryEntryTool(INoteStore noteStore) : AgentTool
-{
-    public override string Name => "add_glossary_entry";
-    public override string Description => "Dodaj recznie wpis do slownika pojec (albo nadpisz istniejacy o tym samym terminie).";
-    protected override string Parameters => """{"type":"object","properties":{"term":{"type":"string"},"definition":{"type":"string"}},"required":["term","definition"]}""";
-    public override bool IsMutating => true;
-    public override string Describe(JsonElement args) => $"Dodac do slownika: '{S(args, "term")}' = \"{Truncate(S(args, "definition"), 100)}\"?";
-
-    public override async Task<string> ExecuteAsync(JsonElement args, CancellationToken ct = default)
-    {
-        var term = args.Req("term");
-        await noteStore.SaveGlossaryEntryAsync(term, args.Req("definition"), "Reczny wpis", ct);
-        return $"Dodano do slownika: {term}";
-    }
-}
-
-public sealed class DeleteGlossaryEntryTool(INoteStore noteStore) : AgentTool
-{
-    public override string Name => "delete_glossary_entry";
-    public override string Description => "Usun wpis ze slownika pojec po terminie.";
-    protected override string Parameters => """{"type":"object","properties":{"term":{"type":"string"}},"required":["term"]}""";
-    public override bool IsMutating => true;
-    public override string Describe(JsonElement args) => $"Usunac ze slownika termin '{S(args, "term")}'?";
-
-    public override async Task<string> ExecuteAsync(JsonElement args, CancellationToken ct = default)
-    {
-        var term = args.Req("term");
-        var deleted = await noteStore.DeleteGlossaryEntryAsync(term, ct);
-        return deleted ? $"Usunieto ze slownika: {term}" : $"Nie znaleziono terminu '{term}' w slowniku.";
     }
 }
 
