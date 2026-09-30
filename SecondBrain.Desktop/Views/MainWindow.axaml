@@ -215,12 +215,9 @@
                         <sdk:SlotHost DockPanel.Dock="Bottom" SlotId="Editor.Footer" Orientation="Vertical" Margin="0,12,0,0" />
 
                         <StackPanel DockPanel.Dock="Top" Spacing="8" Margin="0,0,0,12">
-                            <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto">
+                            <Grid ColumnDefinitions="*,Auto">
                                 <sdk:SlotHost Grid.Column="0" SlotId="Editor.Templates" />
-                                <Button Grid.Column="2" Content="Importuj z pliku..." Classes="subtleAction"
-                                        Click="ImportFile_Click" Margin="0,0,8,0" />
-                                <Button Grid.Column="3" Content="Importuj z folderu..." Classes="subtleAction" Click="ImportFolder_Click" />
-                                <sdk:SlotHost Grid.Column="4" SlotId="Editor.Toolbar" Margin="8,0,0,0" />
+                                <sdk:SlotHost Grid.Column="1" SlotId="Editor.Toolbar" Margin="8,0,0,0" />
                             </Grid>
                             <TextBox Text="{Binding NoteTagsInput}" PlaceholderText="tagi po przecinku (puste = LLM zaproponuje)" />
                             <ComboBox ItemsSource="{Binding ParentOptions}"

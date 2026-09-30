@@ -383,43 +383,6 @@ public partial class MainViewModel(
         return [.. baseTags, .. extra];
     }
 
-    // Import zbiorczy: kazda niepusta linia pliku przechodzi przez ten sam pipeline
-    // co pojedyncza notatka (kompresja -> zapis -> embedding -> upsert). Bez wykrywacza
-    // sprzecznosci - N linii to juz N wywolan LLM, kolejne podwoilyby koszt/czas importu.
-    // Definicje do slownika zostaja, bo pochodza z tej samej kompresji (bez dodatkowego kosztu).
-    // Domykanie luk zostaje: LLM leci tylko gdy sa otwarte luki (ListGapsAsync pusta = zero
-    // dodatkowych wywolan), wiec koszt jest zaniedbywalny w porownaniu do wykrywacza sprzecznosci.
-    [RelayCommand]
-    private async Task ImportLinesAsync(IReadOnlyList<string> lines)
-    {
-        if (SelectedFolder is null)
-        {
-            EditorStatus = "Wybierz folder przed importem.";
-            return;
-        }
-
-        IsBusy = true;
-        try
-        {
-            EditorStatus = "Importuje...";
-            var imported = await pipeline.ImportAsync(SelectedFolder, lines);
-            if (imported.Count == 0)
-            {
-                EditorStatus = "";
-                return;
-            }
-
-            EditorStatus = string.Join(" ", imported.Notices.Prepend($"Zaimportowano notatek: {imported.Count}."));
-
-            await LoadTreeAsync();
-            await LoadParentOptionsAsync();
-        }
-        finally
-        {
-            IsBusy = false;
-        }
-    }
-
     // ---- Notatka (podglad wybranej w drzewie) ----
 
     [RelayCommand]
