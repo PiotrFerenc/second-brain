@@ -15,8 +15,10 @@ jobs:
 
       - name: Zip source
         run: |
-          # bez testow, CLI, ikony i dokumentacji; Skills/*.md to czesc aplikacji
-          git ls-files | grep -v '^SecondBrain.Tests/' | grep -v -E '^(\.claude/|\.gitignore$|SecondBrain\.PipelineTest/|SecondBrain\.Desktop/Assets/|[^/]+\.md$)' | zip -9 -X -@ second-brain-source.zip
+          # bez dokumentacji i .claude; Skills/*.md to czesc aplikacji
+          # appsettings.json jest w .gitignore (klucze), a csproj go kopiuje - zip dostaje szablon
+          for p in SecondBrain.Desktop SecondBrain.PipelineTest; do cp $p/appsettings.Example.json $p/appsettings.json; done
+          { git ls-files | grep -v -E '^(\.claude/|[^/]+\.md$)'; ls SecondBrain.*/appsettings.json; } | zip -9 -X -@ second-brain-source.zip
 
       - name: Publish release
         env:
