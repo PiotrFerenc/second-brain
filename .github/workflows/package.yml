@@ -13,17 +13,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Pack source
+      - name: Zip source
         run: |
-          git ls-files > /tmp/files.txt
-          7z a -mx=9 second-brain-source.7z @/tmp/files.txt
+          # bez testow i dokumentacji; Skills/*.md to czesc aplikacji
+          git ls-files | grep -v '^SecondBrain.Tests/' | grep -v -E '^(\.claude/|[^/]+\.md$)' | zip -9 -X -@ second-brain-source.zip
 
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           tag="build-${{ github.run_number }}"
-          gh release create "$tag" second-brain-source.7z \
+          gh release create "$tag" second-brain-source.zip \
             --repo "${{ github.repository }}" \
             --title "Build ${{ github.run_number }}" \
-            --notes "Archiwum 7z zrodel (bez kompilacji) z commita ${{ github.sha }}"
+            --notes "Zip zrodel (bez kompilacji) z commita ${{ github.sha }}"
