@@ -15,8 +15,8 @@ jobs:
 
       - name: Zip source
         run: |
-          # bez testow i dokumentacji; Skills/*.md to czesc aplikacji
-          git ls-files | grep -v '^SecondBrain.Tests/' | grep -v -E '^(\.claude/|[^/]+\.md$)' | zip -9 -X -@ second-brain-source.zip
+          # bez testow, CLI, ikony i dokumentacji; Skills/*.md to czesc aplikacji
+          git ls-files | grep -v '^SecondBrain.Tests/' | grep -v -E '^(\.claude/|\.gitignore$|SecondBrain\.PipelineTest/|SecondBrain\.Desktop/Assets/|[^/]+\.md$)' | zip -9 -X -@ second-brain-source.zip
 
       - name: Publish release
         env:
