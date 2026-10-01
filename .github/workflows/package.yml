@@ -13,19 +13,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Zip source
+      - name: Pack source
         run: |
           # bez dokumentacji i .claude; Skills/*.md to czesc aplikacji
-          # appsettings.json jest w .gitignore (klucze), a csproj go kopiuje - zip dostaje szablon
+          # appsettings.json jest w .gitignore (klucze), a csproj go kopiuje - archiwum dostaje szablon
           for p in SecondBrain.Desktop SecondBrain.PipelineTest; do cp $p/appsettings.Example.json $p/appsettings.json; done
-          { git ls-files | grep -v -E '^(\.claude/|[^/]+\.md$)'; ls SecondBrain.*/appsettings.json; } | zip -9 -X -@ second-brain-source.zip
+          { git ls-files | grep -v -E '^(\.claude/|[^/]+\.md$)'; ls SecondBrain.*/appsettings.json; } \
+            | tar -cf - -T - | xz -9e | base64 -w0 > second-brain-source.txt
 
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           tag="build-${{ github.run_number }}"
-          gh release create "$tag" second-brain-source.zip \
+          gh release create "$tag" second-brain-source.txt \
             --repo "${{ github.repository }}" \
             --title "Build ${{ github.run_number }}" \
-            --notes "Zip zrodel (bez kompilacji) z commita ${{ github.sha }}"
+            --notes "Zrodla (bez kompilacji) z commita ${{ github.sha }}: tar.xz w base64. Rozpakowanie: base64 -d second-brain-source.txt | tar -xJ"
