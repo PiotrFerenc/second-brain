@@ -17,7 +17,7 @@ Fazy 0 i 1 wykonane i scalone na `master`; faza 2 częściowo (sprzątanie zale�
 - Faza 0: `NotePipeline`, `NoteSearch`, `NotesRoot`, szyna zdarzeń, SDK, `PluginManager`,
   powłoka ze slotami, zakładka „Wtyczki" — bez zmiany zachowania.
 - Faza 1: 14 pluginów (`search`, `trash`, `gaps`, `glossary`, `conflicts`, `timeline`,
-  `history`, `ocr`, `import`, `rewrite`, `templates`, `tags`, `backlinks`, `quicknote`).
+  `history`, `ocr`, `import`, `rewrite`, `templates`, `tags`, `backlinks`, `quicknote`, `tasks`, `webclipper`).
   Każdy sprawdzony: build 0/0, Desktop bez wyjątków z pluginem i bez, CLI tam, gdzie
   funkcja ma backend. Test „wszystkie wyłączone": aplikacja startuje bez wyjątków.
 - `MainViewModel.cs` 1320 → 710 linii, `MainWindow.axaml` 641 → 360, `App.axaml.cs` 185 → 117.
@@ -135,6 +135,8 @@ Pluginy (15), z tym, co dziś mają, i co muszą dostać od hosta:
 | `tags` | Tagi | auto-tagowanie z sąsiadów (dziś `SuggestTags` w VM), `ITagCleaner` + `TagMerger` + HttpClient „TagCleaning" (dziś tylko agent) | chipy tagów w widoku notatki, baner filtra nad drzewem, filtrowanie drzewa | slot `Note.Header`, `Sidebar.AboveTree`, `IShell.TreeFilter`, zdarzenie `NoteCompressed` (przed zapisem, tagi do zmiany) |
 | `backlinks` | Odnośniki | skan `[[Tytuł]]` w folderze | sekcja pod notatką | slot `Note.Footer`, `IShell.SelectedNote` |
 | `quicknote` | Szybka notatka | brak | tray: „Wpisz...", „Ze schowka" per folder; `QuickNoteWindow` | `IEditorContext`, tray, lista folderów |
+| `tasks` | Zadania | brak (skan `- [ ]` w notatkach) | zakładka „Zadania (N)”; narzędzie `list_tasks` | `ITabContribution`, `NotesChanged`, `IShell.ShowNote` |
+| `webclipper` | Web clipper | brak; sekcja `WebClipper` (LLM) | przycisk `Editor.Toolbar`, tray „Strona z URL”; narzędzie `clip_url` | `IEditorContext`, tray, schowek |
 | `duplicates` | Duplikaty | `DuplicateScanner` (dziś agent + CLI) | brak | `IVectorIndex`, `IEmbedder`, `INoteStore` |
 
 Poza tabelą, zostaje w rdzeniu: „Może powiązane" (top-3 po zapisie — to wynik

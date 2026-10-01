@@ -1,0 +1,32 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="using:SecondBrain.Plugins.Tasks"
+             x:Class="SecondBrain.Plugins.Tasks.TasksView"
+             x:DataType="local:TasksTab">
+    <DockPanel>
+        <TextBlock DockPanel.Dock="Top" Classes="subtle" TextWrapping="Wrap"
+                   Text="Brak otwartych zadań. Dopisz w notatce linię '- [ ] zadanie 2026-10-05' (data = termin)."
+                   IsVisible="{Binding !HasTasks}" />
+
+        <ScrollViewer IsVisible="{Binding HasTasks}">
+            <ItemsControl ItemsSource="{Binding Tasks}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="local:TaskItem">
+                        <Button Classes="subtleAction" Margin="0,0,0,4"
+                                HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                Command="{Binding $parent[UserControl].((local:TasksTab)DataContext).OpenNoteCommand}"
+                                CommandParameter="{Binding}">
+                            <StackPanel Spacing="2">
+                                <TextBlock Text="{Binding Text}" TextWrapping="Wrap" />
+                                <StackPanel Orientation="Horizontal" Spacing="10">
+                                    <TextBlock Text="{Binding Source}" Classes="subtle" FontSize="11.5" />
+                                    <TextBlock Text="{Binding DueText}" Classes="subtle" FontSize="11.5" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Button>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+    </DockPanel>
+</UserControl>

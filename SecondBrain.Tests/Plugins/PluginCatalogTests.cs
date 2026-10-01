@@ -32,7 +32,7 @@ public class PluginCatalogTests : IDisposable
     private static readonly string[] Expected =
     [
         "backlinks", "conflicts", "duplicates", "gaps", "glossary", "history", "import",
-        "ocr", "quicknote", "rewrite", "search", "tags", "templates", "timeline", "trash",
+        "ocr", "quicknote", "rewrite", "search", "tags", "tasks", "templates", "timeline", "trash", "webclipper",
     ];
 
     [Fact]
@@ -153,7 +153,7 @@ public class PluginCatalogTests : IDisposable
         Assert.Empty(sp.GetServices<ITabContribution>());
         Assert.Empty(sp.GetServices<ISlotContribution>());
         var tools = sp.GetServices<IAgentTool>().Select(t => t.Name).ToHashSet();
-        foreach (var pluginTool in new[] { "list_gaps", "list_glossary", "list_trash", "search_notes", "ask_question", "fact_history", "find_duplicate_notes", "merge_tags", "list_templates" })
+        foreach (var pluginTool in new[] { "list_gaps", "list_glossary", "list_trash", "search_notes", "ask_question", "fact_history", "find_duplicate_notes", "merge_tags", "list_templates", "list_tasks", "clip_url" })
             Assert.DoesNotContain(pluginTool, tools);
         Assert.Contains("add_note", tools);   // narzedzia rdzenia zostaja
         Assert.Empty(sp.GetServices<ITrayNewNoteContribution>());

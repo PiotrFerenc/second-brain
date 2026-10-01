@@ -141,6 +141,7 @@ public class ToolCatalogTests : IDisposable
     [InlineData("list_glossary")]
     [InlineData("list_trash")]
     [InlineData("list_templates")]
+    [InlineData("list_tasks")]
     [InlineData("fact_history")]
     [InlineData("find_duplicate_notes")]
     [InlineData("find_duplicate_tags")]
@@ -156,6 +157,7 @@ public class ToolCatalogTests : IDisposable
     [InlineData("bulk_import")]
     [InlineData("resolve_gap")]
     [InlineData("add_glossary_entry")]
+    [InlineData("clip_url")]
     public void MutatingTools_AskForConfirmation(string name) =>
         Assert.True(Tools.Single(t => t.Name == name).IsMutating);
 
@@ -163,7 +165,7 @@ public class ToolCatalogTests : IDisposable
     public void ExpectedPluginTools_ArePresent()
     {
         var names = Tools.Select(t => t.Name).ToHashSet();
-        foreach (var expected in new[] { "list_gaps", "list_glossary", "list_trash", "search_notes", "fact_history", "find_duplicate_notes", "merge_tags", "list_templates", "use_skill" })
+        foreach (var expected in new[] { "list_gaps", "list_glossary", "list_trash", "search_notes", "fact_history", "find_duplicate_notes", "merge_tags", "list_templates", "list_tasks", "clip_url", "use_skill" })
             Assert.Contains(expected, names);
     }
 

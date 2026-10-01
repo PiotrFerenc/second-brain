@@ -16,6 +16,13 @@ public static class ClipboardText
         await clipboard.SetDataAsync(transfer);
     }
 
+    public static async Task<string?> GetAsync(TopLevel? topLevel)
+    {
+        var data = topLevel?.Clipboard is { } clipboard ? await clipboard.TryGetDataAsync() : null;
+        var item = data?.Items.FirstOrDefault(i => i.Formats.Contains(DataFormat.Text));
+        return item is null ? null : await item.TryGetRawAsync(DataFormat.Text) as string;
+    }
+
     private sealed class TextDataTransfer(string text) : IAsyncDataTransfer
     {
         public IReadOnlyList<DataFormat> Formats { get; } = [DataFormat.Text];

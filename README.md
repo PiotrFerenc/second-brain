@@ -47,7 +47,10 @@ Każda funkcja poza rdzeniem (drzewo, foldery, edytor, widok notatki, agent) jes
 
 Zakładka **Wtyczki** w pasku bocznym pokazuje listę z przełącznikami. Zmiana działa po ponownym uruchomieniu aplikacji (przycisk „Uruchom ponownie" na dole listy). Stan jest w `~/SecondBrain/plugins.json` jako lista wyłączonych, np. `{"disabled":["ocr","rewrite"]}` – brak pliku oznacza wszystkie włączone. Wyłączona wtyczka nie rejestruje niczego: znika jej zakładka, przyciski w slotach, pozycje w menu tray i reakcje na zdarzenia.
 
-Wbudowane wtyczki: `search`, `trash`, `gaps`, `glossary`, `conflicts`, `timeline`, `history`, `ocr`, `import`, `rewrite`, `templates`, `tags`, `backlinks`, `quicknote`.
+Wbudowane wtyczki: `search`, `trash`, `gaps`, `glossary`, `conflicts`, `timeline`, `history`, `ocr`, `import`, `rewrite`, `templates`, `tags`, `backlinks`, `quicknote`, `tasks`, `webclipper`.
+
+- `tasks` – zakładka „Zadania”: linie `- [ ] tekst` ze wszystkich notatek, termin = data `RRRR-MM-DD` w tekście, przeterminowane są oznaczone; narzędzie agenta `list_tasks`. Bez własnego magazynu (notatki są źródłem prawdy).
+- `webclipper` – URL ze schowka → strona → LLM czyści do markdown. Przycisk w pasku edytora i pozycja w tray (tekst ląduje w edytorze do wglądu), narzędzie agenta `clip_url` (z potwierdzeniem). Sekcja `WebClipper` w `appsettings.json` (LLM); pobieranie stron idzie osobnym klientem bez konfiguracji.
 
 ### Jak napisać wtyczkę
 
