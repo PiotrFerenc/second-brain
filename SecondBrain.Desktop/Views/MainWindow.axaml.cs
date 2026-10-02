@@ -24,14 +24,21 @@ public partial class MainWindow : Window
     // X i minimalizacja tylko chowaja okno do tray (App.axaml TrayIcon) zamiast konczyc
     // program - realne zamkniecie tylko przez CloseFromTray (menu tray "Zamknij").
     private bool _reallyClosing;
+    private bool _initialized;
 
     public MainWindow()
     {
         InitializeComponent();
         LoadWindowSize();
 
+        // Opened odpala przy kazdym Show() po Hide() (tray "Pokaz") - inicjalizacja tylko raz,
+        // inaczej zakladki pluginow i skroty dubluja sie z kazdym pokazaniem okna.
         Opened += async (_, _) =>
         {
+            if (_initialized)
+                return;
+            _initialized = true;
+
             if (DataContext is MainViewModel vm)
             {
                 await vm.InitializeCommand.ExecuteAsync(null);
